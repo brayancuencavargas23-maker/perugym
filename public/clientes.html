@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Clientes - PeruGym</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <div class="topbar" id="topbar"></div>
+    <div class="page-content">
+      <div class="search-bar">
+        <div class="search-input-wrap">
+          <span class="search-icon" id="search-icon-el"></span>
+          <input type="text" id="search" class="form-control" placeholder="Buscar por nombre, DNI o email...">
+        </div>
+        <select id="filter-activo" class="form-control" style="width:140px">
+          <option value="">Todos</option>
+          <option value="true">Activos</option>
+          <option value="false">Inactivos</option>
+        </select>
+        <button class="btn btn-primary" id="btn-new" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-new-cliente"></span> Nuevo Cliente</button>
+        <button class="btn btn-success" onclick="exportarClientes()" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-excel-cl"></span> Exportar Excel</button>
+      </div>
+      <div class="card">
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Cliente</th><th>DNI</th><th>Membresía</th><th>Vencimiento</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="clientes-table"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="pagination"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Nuevo Cliente</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-overlay')" style="display:inline-flex;align-items:center"><span id="icon-close-cl"></span></button>
+    </div>
+    <div class="modal-body">
+      <form id="cliente-form">
+        <input type="hidden" id="cliente-id">
+        <div style="text-align:center;margin-bottom:16px">
+          <img id="foto-preview" class="photo-preview hidden" src="" alt="foto">
+          <div id="foto-placeholder" style="width:80px;height:80px;border-radius:50%;background:var(--primary);display:inline-flex;align-items:center;justify-content:center;color:#fff"></div>
+          <div class="mt-1">
+            <label class="btn btn-outline btn-sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px">
+              <span id="icon-camera-cl"></span> Foto <input type="file" id="foto" accept="image/*" style="display:none">
+            </label>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Nombre *</label><input type="text" id="c-nombre" class="form-control" required></div>
+          <div class="form-group"><label>DNI</label><input type="text" id="c-dni" class="form-control"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Email</label><input type="email" id="c-email" class="form-control"></div>
+          <div class="form-group"><label>Teléfono</label><input type="text" id="c-telefono" class="form-control"></div>
+        </div>
+        <div class="form-group"><label>Notas</label><textarea id="c-notas" class="form-control" rows="2"></textarea></div>
+        <div class="form-group hidden" id="activo-group">
+          <label><input type="checkbox" id="c-activo"> Cliente activo</label>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-overlay')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save-cliente" onclick="withLoading(this, saveCliente)">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/cache.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/icons.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+  initLayout('clientes', 'Clientes');
+  // Render icons after layout
+  document.getElementById('search-icon-el').innerHTML   = icon('search');
+  document.getElementById('icon-new-cliente').innerHTML = icon('plus');
+  document.getElementById('icon-camera-cl').innerHTML   = icon('camera');
+  document.getElementById('icon-close-cl').innerHTML    = icon('close');
+  document.getElementById('foto-placeholder').innerHTML = icon('user');
+  document.getElementById('icon-excel-cl').innerHTML    = icon('excel');
+  let currentPage = 1;
+
+  async function loadClientes(page = 1) {
+    currentPage = page;
+    const search = document.getElementById('search').value;
+    const activo = document.getElementById('filter-activo').value;
+    let qs = `?page=${page}&limit=15`;
+    if (search) qs += `&search=${encodeURIComponent(search)}`;
+    if (activo) qs += `&activo=${activo}`;
+    try {
+      const data = await api.get(`/clientes${qs}`);
+      document.getElementById('clientes-table').innerHTML = data.data.map(c => {
+        const days = daysUntil(c.fecha_fin);
+        const expClass = days !== null && days <= 7 ? 'badge-warning' : days !== null && days < 0 ? 'badge-danger' : 'badge-info';
+        const estadoMem = c.membresia_estado
+          ? `<span class="badge ${c.membresia_estado === 'activo' ? 'badge-success' : 'badge-danger'}">${c.membresia_estado}</span>`
+          : '<span style="color:var(--text-light)">Sin membresía</span>';
+        return `<tr>
+          <td>
+            <div class="member-cell">
+              ${c.foto_url
+                ? `<img src="${c.foto_url}" class="member-avatar" alt="${c.nombre}">`
+                : `<div class="member-avatar" style="display:flex;align-items:center;justify-content:center">${avatarInitials(c.nombre)}</div>`}
+              <div>
+                <div style="font-weight:600">${c.nombre}</div>
+                <div style="font-size:12px;color:var(--text-light)">${c.email || c.telefono || ''}</div>
+              </div>
+            </div>
+          </td>
+          <td>${c.dni || '-'}</td>
+          <td>${estadoMem}<div style="font-size:11px;color:var(--text-light)">${c.plan_nombre || ''}</div></td>
+          <td>${c.fecha_fin ? `<span class="badge ${expClass}">${fmtDate(c.fecha_fin)}</span>` : '-'}</td>
+          <td><span class="badge ${c.activo ? 'badge-success' : 'badge-danger'}">${c.activo ? 'Activo' : 'Inactivo'}</span></td>
+          <td>
+            <button class="btn btn-sm btn-outline" title="Editar" onclick="editCliente('${c.id}')">${icon('edit')}</button>
+            <button class="btn btn-sm btn-outline" title="Asignar membresía" onclick="irAMembresia('${c.id}')">${icon('membresias')}</button>
+            <button class="btn btn-sm btn-danger" title="Eliminar" onclick="withLoading(this, () => deleteCliente('${c.id}', '${c.nombre.replace(/'/g, "\\'")}'), 'Eliminando...')">${icon('trash')}</button>
+          </td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="6" class="text-center" style="padding:30px;color:var(--text-light)">Sin clientes</td></tr>';
+      renderPagination(document.getElementById('pagination'), data.page, data.pages, loadClientes);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function editCliente(id) {
+    try {
+      const c = await api.get(`/clientes/${id}`);
+      document.getElementById('cliente-id').value = c.id;
+      document.getElementById('c-nombre').value = c.nombre;
+      document.getElementById('c-dni').value = c.dni || '';
+      document.getElementById('c-email').value = c.email || '';
+      document.getElementById('c-telefono').value = c.telefono || '';
+      document.getElementById('c-notas').value = c.notas || '';
+      document.getElementById('c-activo').checked = c.activo;
+      document.getElementById('activo-group').classList.remove('hidden');
+      document.getElementById('modal-title').textContent = 'Editar Cliente';
+      if (c.foto_url) {
+        document.getElementById('foto-preview').src = c.foto_url;
+        document.getElementById('foto-preview').classList.remove('hidden');
+        document.getElementById('foto-placeholder').style.display = 'none';
+      }
+      openModal('modal-overlay');
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  document.getElementById('btn-new').onclick = () => {
+    document.getElementById('cliente-form').reset();
+    document.getElementById('cliente-id').value = '';
+    document.getElementById('modal-title').textContent = 'Nuevo Cliente';
+    document.getElementById('activo-group').classList.add('hidden');
+    document.getElementById('foto-preview').classList.add('hidden');
+    document.getElementById('foto-placeholder').style.display = '';
+    openModal('modal-overlay');
+  };
+
+  document.getElementById('foto').onchange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        document.getElementById('foto-preview').src = ev.target.result;
+        document.getElementById('foto-preview').classList.remove('hidden');
+        document.getElementById('foto-placeholder').style.display = 'none';
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  async function saveCliente() {
+    const id = document.getElementById('cliente-id').value;
+    const formData = new FormData();
+    formData.append('nombre', document.getElementById('c-nombre').value);
+    formData.append('dni', document.getElementById('c-dni').value);
+    formData.append('email', document.getElementById('c-email').value);
+    formData.append('telefono', document.getElementById('c-telefono').value);
+    formData.append('notas', document.getElementById('c-notas').value);
+    if (id) formData.append('activo', document.getElementById('c-activo').checked);
+    const fotoFile = document.getElementById('foto').files[0];
+    if (fotoFile) formData.append('foto', fotoFile);
+    try {
+      const url = id ? `/api/clientes/${id}` : '/api/clientes';
+      const res = await fetch(url, {
+        method: id ? 'PUT' : 'POST',
+        headers: { Authorization: `Bearer ${api.getToken()}` },
+        body: formData
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      const data = await res.json().catch(() => null);
+
+      if (id && data) {
+        // PUT: patch quirúrgico — no borra el caché de toda la lista
+        gymCache.patchItem('clientes', id, () => data);
+      } else {
+        // POST: nuevo cliente — invalidar para que aparezca en la lista
+        gymCache.invalidate('clientes');
+      }
+
+      toast(id ? 'Cliente actualizado' : 'Cliente creado');
+      closeModal('modal-overlay');
+      loadClientes(currentPage);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  function irAMembresia(clienteId) {
+    // Redirige a membresías con el cliente preseleccionado via query param
+    window.location.href = `/membresias.html?cliente_id=${clienteId}`;
+  }
+
+  async function deleteCliente(id, nombre) {
+    const ok = await confirmDialog({
+      title: 'Eliminar cliente',
+      message: `¿Eliminar a <strong>${nombre}</strong>? Esta acción no se puede deshacer.`,
+      confirmText: 'Sí, eliminar',
+      type: 'danger'
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/clientes/${id}`, {
+        remove: { ns: 'clientes', id },
+      });
+      toast('Cliente eliminado');
+      loadClientes(currentPage);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  let searchTimer;
+  document.getElementById('search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => loadClientes(1), 400); };
+  document.getElementById('filter-activo').onchange = () => loadClientes(1);
+
+  function exportarClientes() {
+    api.download('/reports/clientes/excel', 'clientes.xlsx').then(() => toast('Descarga iniciada')).catch(err => toast(err.message, 'error'));
+  }
+
+  loadClientes();
+</script>
+</body>
+</html>

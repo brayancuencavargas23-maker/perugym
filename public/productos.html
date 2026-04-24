@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Productos - GymPro</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .product-img { width:44px; height:44px; border-radius:8px; object-fit:cover; background:var(--bg); }
+    .product-img-placeholder { width:44px; height:44px; border-radius:8px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:20px; }
+    .stock-low { color:var(--danger); font-weight:700; }
+    .stock-ok  { color:var(--success); font-weight:600; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <div class="topbar" id="topbar"></div>
+    <div class="page-content">
+
+
+
+      <!-- ── PRODUCTOS ── -->
+      <div id="section-products">
+        <div class="search-bar">
+          <div class="search-input-wrap">
+            <span class="search-icon" id="icon-search-prod"></span>
+            <input type="text" id="search-prod" class="form-control" placeholder="Buscar producto...">
+          </div>
+          <select id="filter-cat" class="form-control" style="width:160px">
+            <option value="">Todas las categorías</option>
+          </select>
+          <select id="filter-active-prod" class="form-control" style="width:130px">
+            <option value="">Todos</option>
+            <option value="true">Activos</option>
+            <option value="false">Inactivos</option>
+          </select>
+          <button class="btn btn-primary" id="btn-new-prod" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-plus-prod"></span> Nuevo Producto</button>
+          <button class="btn btn-success" onclick="exportarStock()" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-excel-stock"></span> Exportar Stock</button>
+        </div>
+        <div class="card">
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Estado</th><th>Acciones</th></tr>
+              </thead>
+              <tbody id="products-table"></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="pagination-prod"></div>
+        </div>
+      </div>
+
+
+
+    </div>
+  </div>
+</div>
+
+<!-- Modal Producto -->
+<div class="modal-overlay hidden" id="modal-product">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="prod-modal-title">Nuevo Producto</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-product')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="prod-id">
+      <div style="text-align:center;margin-bottom:16px">
+        <img id="prod-photo-preview" style="width:80px;height:80px;border-radius:10px;object-fit:cover;display:none" src="" alt="">
+        <div id="prod-photo-placeholder" style="width:80px;height:80px;border-radius:10px;background:var(--bg);display:inline-flex;align-items:center;justify-content:center"></div>
+        <div class="mt-1">
+          <label class="btn btn-outline btn-sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px">
+            <span id="icon-camera-prod"></span> Foto <input type="file" id="prod-photo" accept="image/*" style="display:none">
+          </label>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Nombre *</label><input type="text" id="prod-name" class="form-control" required></div>
+        <div class="form-group">
+          <label>Categoría</label>
+          <input type="text" id="prod-cat" class="form-control" list="cat-list" placeholder="Ej: Suplementos">
+          <datalist id="cat-list"></datalist>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Precio (S/) *</label><input type="number" id="prod-price" class="form-control" step="0.01" required></div>
+        <div class="form-group"><label>Stock inicial</label><input type="number" id="prod-stock" class="form-control" value="0" min="0"></div>
+      </div>
+      <div class="form-group"><label>Descripción</label><textarea id="prod-desc" class="form-control" rows="2"></textarea></div>
+      <div class="form-group hidden" id="prod-active-group">
+        <label><input type="checkbox" id="prod-active"> Producto activo</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-product')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save-prod" onclick="withLoading(this, saveProduct)">Guardar</button>
+    </div>
+  </div>
+</div>
+
+
+
+<script src="/js/cache.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/icons.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+  initLayout('productos', 'Productos');
+  document.getElementById('icon-search-prod').innerHTML = icon('search');
+  document.getElementById('icon-plus-prod').innerHTML  = icon('plus');
+  document.getElementById('icon-camera-prod').innerHTML  = icon('camera');
+  document.getElementById('icon-excel-stock').innerHTML  = icon('excel');
+  document.getElementById('prod-photo-placeholder').innerHTML = icon('productos', 'font-size:28px');
+  const user = JSON.parse(localStorage.getItem('gym_user') || '{}');
+  let pageProd = 1;
+  let allProducts = [];
+
+  // ── PRODUCTOS ──
+  async function loadCategories() {
+    const cats = await api.get('/productos/categorias');
+    const sel = document.getElementById('filter-cat');
+    const dl  = document.getElementById('cat-list');
+    cats.forEach(c => {
+      sel.innerHTML += `<option value="${c}">${c}</option>`;
+      dl.innerHTML  += `<option value="${c}">`;
+    });
+  }
+
+  async function loadProducts(page = 1) {
+    pageProd = page;
+    const search   = document.getElementById('search-prod').value;
+    const category = document.getElementById('filter-cat').value;
+    const active   = document.getElementById('filter-active-prod').value;
+    let qs = `?page=${page}&limit=15`;
+    if (search)   qs += `&search=${encodeURIComponent(search)}`;
+    if (category) qs += `&categoria=${encodeURIComponent(category)}`;
+    if (active)   qs += `&activo=${active}`;
+
+    try {
+      const data = await api.get(`/productos${qs}`);
+      allProducts = data.data;
+      document.getElementById('products-table').innerHTML = data.data.map(p => `
+        <tr>
+          <td>
+            <div style="display:flex;align-items:center;gap:10px">
+              ${p.foto_url
+                ? `<img src="${p.foto_url}" class="product-img" alt="">`
+                : `<div class="product-img-placeholder">📦</div>`}
+              <div>
+                <div style="font-weight:600">${p.nombre}</div>
+                <div style="font-size:11px;color:var(--text-light)">${p.descripcion || ''}</div>
+              </div>
+            </div>
+          </td>
+          <td>${p.categoria ? `<span class="badge badge-info">${p.categoria}</span>` : '-'}</td>
+          <td style="font-weight:600">S/ ${parseFloat(p.precio_venta).toFixed(2)}</td>
+          <td class="${p.stock <= 5 ? 'stock-low' : 'stock-ok'}">${p.stock} ${p.stock <= 5 ? '⚠️' : ''}</td>
+          <td><span class="badge ${p.activo ? 'badge-success' : 'badge-danger'}">${p.activo ? 'Activo' : 'Inactivo'}</span></td>
+          <td>
+            ${user.role === 'admin' ? `<button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center" onclick="editProduct('${p._id || p.id}')">${icon('edit')}</button>` : ''}
+            ${user.role === 'admin' ? `<button class="btn btn-sm btn-danger" style="display:inline-flex;align-items:center" onclick="withLoading(this, () => deleteProduct('${p._id || p.id}', '${p.nombre.replace(/'/g, "\\'")}'), 'Eliminando...')">${icon('trash')}</button>` : ''}
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="6" class="text-center" style="padding:30px;color:var(--text-light)">Sin productos</td></tr>';
+      renderPagination(document.getElementById('pagination-prod'), data.page, data.pages, loadProducts);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  document.getElementById('btn-new-prod').onclick = () => {
+    if (user.role !== 'admin') return toast('Solo administradores', 'warning');
+    document.getElementById('prod-id').value = '';
+    document.getElementById('prod-name').value = '';
+    document.getElementById('prod-cat').value = '';
+    document.getElementById('prod-price').value = '';
+    document.getElementById('prod-stock').value = 0;
+    document.getElementById('prod-desc').value = '';
+    document.getElementById('prod-active-group').classList.add('hidden');
+    document.getElementById('prod-photo-preview').style.display = 'none';
+    document.getElementById('prod-photo-placeholder').style.display = '';
+    document.getElementById('prod-modal-title').textContent = 'Nuevo Producto';
+    openModal('modal-product');
+  };
+
+  document.getElementById('prod-photo').onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById('prod-photo-preview').src = ev.target.result;
+      document.getElementById('prod-photo-preview').style.display = '';
+      document.getElementById('prod-photo-placeholder').style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+  };
+
+  async function editProduct(id) {
+    const data = await api.get(`/productos?page=1&limit=500`);
+    const p = data.data.find(x => x._id === id || x.id === id);
+    if (!p) return;
+    document.getElementById('prod-id').value = p._id || p.id;
+    document.getElementById('prod-name').value = p.nombre;
+    document.getElementById('prod-cat').value = p.categoria || '';
+    document.getElementById('prod-price').value = p.precio_venta;
+    document.getElementById('prod-stock').value = p.stock;
+    document.getElementById('prod-desc').value = p.descripcion || '';
+    document.getElementById('prod-active').checked = p.activo;
+    document.getElementById('prod-active-group').classList.remove('hidden');
+    document.getElementById('prod-modal-title').textContent = 'Editar Producto';
+    if (p.foto_url) {
+      document.getElementById('prod-photo-preview').src = p.foto_url;
+      document.getElementById('prod-photo-preview').style.display = '';
+      document.getElementById('prod-photo-placeholder').style.display = 'none';
+    }
+    openModal('modal-product');
+  }
+
+  async function saveProduct() {
+    const id = document.getElementById('prod-id').value;
+    const formData = new FormData();
+    formData.append('nombre',      document.getElementById('prod-name').value);
+    formData.append('categoria',   document.getElementById('prod-cat').value);
+    formData.append('precio_venta',document.getElementById('prod-price').value);
+    formData.append('stock',       document.getElementById('prod-stock').value);
+    formData.append('descripcion', document.getElementById('prod-desc').value);
+    formData.append('activo',      id ? document.getElementById('prod-active').checked : true);
+    const foto = document.getElementById('prod-photo').files[0];
+    if (foto) formData.append('foto', foto);
+    try {
+      const url    = id ? `/api/productos/${id}` : '/api/productos';
+      const method = id ? 'PUT' : 'POST';
+      const res = await fetch(url, { method, headers: { Authorization: `Bearer ${api.getToken()}` }, body: formData });
+      if (!res.ok) throw new Error((await res.json()).error);
+      const data = await res.json().catch(() => null);
+
+      if (id && data) {
+        // PUT: actualizar solo ese ítem en caché (no borrar toda la lista)
+        gymCache.patchItem('productos', id, () => data);
+      } else {
+        // POST: nuevo producto — invalidar para que aparezca en la lista
+        gymCache.invalidate('productos');
+      }
+
+      toast(id ? 'Producto actualizado' : 'Producto creado');
+      closeModal('modal-product');
+      loadProducts(pageProd);
+      loadCategories();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function deleteProduct(id, nombre) {
+    const ok = await confirmDialog({
+      title: 'Eliminar producto',
+      message: `¿Eliminar <strong>${nombre}</strong>? Esta acción no se puede deshacer.`,
+      confirmText: 'Sí, eliminar',
+      type: 'danger'
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/productos/${id}`, { remove: { ns: 'productos', id } });
+      toast('Producto eliminado');
+      loadProducts(pageProd);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  // Búsqueda con debounce
+  let searchTimer;
+  document.getElementById('search-prod').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => loadProducts(1), 400); };
+  document.getElementById('filter-cat').onchange = () => loadProducts(1);
+  document.getElementById('filter-active-prod').onchange = () => loadProducts(1);
+
+  loadCategories();
+  loadProducts();
+
+  function exportarStock() {
+    api.download('/reports/stock/excel', 'stock-productos.xlsx').then(() => toast('Descarga iniciada')).catch(err => toast(err.message, 'error'));
+  }
+</script>
+</body>
+</html>

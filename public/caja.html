@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Caja - GymPro</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .caja-status-bar {
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .caja-abierta  { background: rgba(40,167,69,0.12);  border: 1.5px solid var(--success); }
+    .caja-cerrada  { background: rgba(220,53,69,0.10);  border: 1.5px solid var(--danger);  }
+    .caja-dot { width:12px; height:12px; border-radius:50%; display:inline-block; margin-right:8px; }
+    .dot-green { background:var(--success); box-shadow:0 0 6px var(--success); }
+    .dot-red   { background:var(--danger);  box-shadow:0 0 6px var(--danger);  }
+    .caja-info-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:24px; }
+    .caja-info-item { background:var(--card-bg); border-radius:var(--radius); padding:14px 18px; box-shadow:var(--shadow); }
+    .caja-info-label { font-size:11px; color:var(--text-light); text-transform:uppercase; letter-spacing:.5px; }
+    .caja-info-value { font-size:22px; font-weight:700; margin-top:4px; }
+    .tabs { display:flex; gap:4px; background:var(--bg); padding:4px; border-radius:10px; width:fit-content; margin-bottom:20px; }
+    .tab { padding:8px 20px; border-radius:8px; border:none; background:transparent; cursor:pointer; font-size:13px; font-weight:600; color:var(--text-light); transition:all .2s; }
+    .tab.active { background:#fff; color:var(--primary); box-shadow:var(--shadow); }
+    .product-img { width:40px; height:40px; border-radius:8px; object-fit:cover; }
+    .product-img-ph { width:40px; height:40px; border-radius:8px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:18px; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <div class="topbar" id="topbar"></div>
+    <div class="page-content">
+
+      <!-- Estado de caja -->
+      <div id="caja-status-bar" class="caja-status-bar caja-cerrada">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="caja-dot dot-red" id="caja-dot"></span>
+          <div>
+            <div style="font-weight:700;font-size:16px" id="caja-status-text">Caja Cerrada</div>
+            <div style="font-size:12px;color:var(--text-light)" id="caja-status-sub">No hay caja abierta</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px" id="caja-actions">
+          <button class="btn btn-success" id="btn-abrir" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-unlock-caja"></span> Abrir Caja</button>
+        </div>
+      </div>
+
+      <!-- Info de caja abierta -->
+      <div id="caja-info" class="hidden">
+        <div class="caja-info-grid">
+          <div class="caja-info-item">
+            <div class="caja-info-label">Monto Inicial</div>
+            <div class="caja-info-value" id="info-inicial">S/ 0.00</div>
+          </div>
+          <div class="caja-info-item">
+            <div class="caja-info-label">Ventas del turno</div>
+            <div class="caja-info-value" style="color:var(--success)" id="info-ventas">S/ 0.00</div>
+          </div>
+          <div class="caja-info-item">
+            <div class="caja-info-label">Total en caja</div>
+            <div class="caja-info-value" style="color:var(--primary)" id="info-total">S/ 0.00</div>
+          </div>
+          <div class="caja-info-item">
+            <div class="caja-info-label">Apertura</div>
+            <div style="font-size:14px;font-weight:600;margin-top:4px" id="info-apertura">-</div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+          <div class="tabs" style="margin-bottom:0">
+            <button class="tab active" id="tab-venta" onclick="switchTab('venta')" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-tab-venta"></span> Nueva Venta</button>
+            <button class="tab" id="tab-ventas" onclick="switchTab('ventas')" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-tab-ventas"></span> Ventas del turno</button>
+          </div>
+          <button id="btn-export-ventas" onclick="exportarVentasTurno()" style="display:none;align-items:center;gap:6px" class="btn btn-success"><span id="icon-tab-export"></span> Exportar Excel</button>
+        </div>
+
+        <!-- Nueva venta -->
+        <div id="section-venta">
+          <div class="card" style="max-width:600px">
+            <h3 style="font-size:15px;margin-bottom:16px">Registrar Venta</h3>
+            <div class="form-group">
+              <label>Producto *</label>
+              <select id="v-product" class="form-control" onchange="onVProductChange()">
+                <option value="">Seleccionar producto...</option>
+              </select>
+            </div>
+            <div id="v-stock-info" style="font-size:12px;color:var(--text-light);margin-top:-8px;margin-bottom:12px"></div>
+            <div class="form-group">
+              <label>Miembro (opcional)</label>
+              <select id="v-member" class="form-control">
+                <option value="">Sin miembro asociado</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Cantidad</label>
+                <input type="number" id="v-qty" class="form-control" value="1" min="1" oninput="updateVTotal()">
+              </div>
+              <div class="form-group">
+                <label>Total</label>
+                <input type="text" id="v-total" class="form-control" readonly style="background:var(--bg);font-weight:700;font-size:18px">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Notas</label>
+              <input type="text" id="v-notes" class="form-control" placeholder="Opcional...">
+            </div>
+            <button class="btn btn-success w-full" id="btn-confirmar-venta" style="margin-top:8px;display:inline-flex;align-items:center;justify-content:center;gap:6px" onclick="withLoading(this, registrarVenta, 'Registrando...')"><span id="icon-confirm-venta"></span> Confirmar Venta</button>
+          </div>
+        </div>
+
+        <!-- Ventas del turno -->
+        <div id="section-ventas" class="hidden">
+          <div class="card">
+            <div class="table-wrapper">
+              <table>
+                <thead><tr><th>Producto</th><th>Miembro</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Hora</th><th></th></tr></thead>
+                <tbody id="turno-ventas-table"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Historial de cajas -->
+      <div id="historial-section">
+        <h3 style="font-size:15px;margin-bottom:16px;margin-top:8px;display:flex;align-items:center;gap:6px" id="h-historial"></h3>
+        <div class="card">
+          <div class="table-wrapper">
+            <table>
+              <thead><tr><th>Apertura</th><th>Cierre</th><th>Cajero</th><th>M. Inicial</th><th>Ventas</th><th>M. Final</th><th>Estado</th><th></th></tr></thead>
+              <tbody id="historial-table"></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="pagination-hist"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Modal abrir caja -->
+<div class="modal-overlay hidden" id="modal-abrir">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h3>🔓 Abrir Caja</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-abrir')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Monto inicial en caja (S/)</label>
+        <input type="number" id="abrir-monto" class="form-control" value="0" step="0.01" min="0">
+      </div>
+      <div class="form-group">
+        <label>Notas</label>
+        <textarea id="abrir-notas" class="form-control" rows="2" placeholder="Opcional..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-abrir')">Cancelar</button>
+      <button class="btn btn-success" onclick="withLoading(this, abrirCaja, 'Abriendo...')">🔓 Abrir Caja</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal cerrar caja -->
+<div class="modal-overlay hidden" id="modal-cerrar">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h3>🔒 Cerrar Caja</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-cerrar')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="alert alert-warning">Asegúrate de haber registrado todas las ventas antes de cerrar.</div>
+      <div class="form-group mt-2">
+        <label>Monto final contado en caja (S/)</label>
+        <input type="number" id="cerrar-monto" class="form-control" step="0.01" min="0">
+      </div>
+      <div class="form-group">
+        <label>Notas de cierre</label>
+        <textarea id="cerrar-notas" class="form-control" rows="2" placeholder="Opcional..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-cerrar')">Cancelar</button>
+      <button class="btn btn-danger" onclick="withLoading(this, cerrarCaja, 'Cerrando...')">🔒 Cerrar Caja</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal detalle caja -->
+<div class="modal-overlay hidden" id="modal-detalle">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header">
+      <h3>Detalle de Caja</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-detalle')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Producto</th><th>Miembro</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Hora</th></tr></thead>
+          <tbody id="detalle-table"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/cache.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/icons.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+  initLayout('caja', 'Caja');
+  document.getElementById('icon-unlock-caja').innerHTML  = icon('unlock');
+  document.getElementById('icon-tab-venta').innerHTML    = icon('cart');
+  document.getElementById('icon-tab-ventas').innerHTML   = icon('planes');
+  document.getElementById('icon-tab-export').innerHTML   = icon('excel');
+  document.getElementById('icon-confirm-venta').innerHTML = icon('check');
+  document.getElementById('h-historial').innerHTML       = icon('calendar') + ' Historial de Cajas';
+  let cajaActual = null;
+  let currentTabCaja = 'venta';
+
+  function switchTab(tab) {
+    currentTabCaja = tab;
+    document.getElementById('section-venta').classList.toggle('hidden', tab !== 'venta');
+    document.getElementById('section-ventas').classList.toggle('hidden', tab !== 'ventas');
+    document.getElementById('tab-venta').classList.toggle('active', tab === 'venta');
+    document.getElementById('tab-ventas').classList.toggle('active', tab === 'ventas');
+    document.getElementById('btn-export-ventas').style.display = tab === 'ventas' ? 'inline-flex' : 'none';
+    if (tab === 'ventas') loadTurnoVentas();
+  }
+
+  async function anularVenta(id) {
+    const ok = await confirmDialog({
+      title: 'Anular venta',
+      message: '¿Anular esta venta? Se revertirá el stock del producto.',
+      confirmText: 'Sí, anular',
+      type: 'danger'
+    });
+    if (!ok) return;
+    try {
+      const result = await api.put(`/ventas/${id}/anular`, {});
+      // Patch quirúrgico: actualizar solo los productos afectados en caché
+      // sin borrar toda la lista de productos
+      if (result?.productos?.length) {
+        result.productos.forEach(p => {
+          gymCache.patchItem('productos', p._id || p.id, () => p);
+        });
+      }
+      // Invalidar solo caja (totales cambian) y el detalle de esta caja
+      gymCache.invalidate('caja');
+      toast('Venta anulada — stock revertido', 'warning');
+      loadEstado();
+      if (currentTabCaja === 'ventas') loadTurnoVentas();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function loadEstado() {
+    try {
+      const caja = await api.get('/caja/estado');
+      cajaActual = caja;
+      const bar  = document.getElementById('caja-status-bar');
+      const dot  = document.getElementById('caja-dot');
+      const text = document.getElementById('caja-status-text');
+      const sub  = document.getElementById('caja-status-sub');
+      const acts = document.getElementById('caja-actions');
+      const info = document.getElementById('caja-info');
+
+      if (caja) {
+        bar.className = 'caja-status-bar caja-abierta';
+        dot.className = 'caja-dot dot-green';
+        text.textContent = 'Caja Abierta';
+        sub.textContent  = `Cajero: ${caja.usuario_nombre} · Desde ${fmtDateTime(caja.apertura)}`;
+        acts.innerHTML = `<button class="btn btn-danger" style="display:inline-flex;align-items:center;gap:6px" onclick="openModal('modal-cerrar')">${icon('lock')} Cerrar Caja</button>`;
+        info.classList.remove('hidden');
+
+        // Calcular ventas del turno
+        const detalle = await api.get(`/caja/${caja.id}/detalle`);
+        const totalPagos  = detalle.pagos.reduce((s, p) => s + parseFloat(p.monto || 0), 0);
+        const totalVentas = detalle.ventas.filter(v => !v.anulada).reduce((s, v) => s + parseFloat(v.subtotal || 0), 0);
+        const totalVentasAll = totalPagos + totalVentas;
+        const inicial = parseFloat(caja.monto_inicial);
+
+        document.getElementById('info-inicial').textContent  = `S/ ${inicial.toFixed(2)}`;
+        document.getElementById('info-ventas').textContent   = `S/ ${totalVentasAll.toFixed(2)}`;
+        document.getElementById('info-total').textContent    = `S/ ${(inicial + totalVentasAll).toFixed(2)}`;
+        document.getElementById('info-apertura').textContent = fmtDateTime(caja.apertura);
+
+        await loadVentaSelects();
+      } else {        bar.className = 'caja-status-bar caja-cerrada';
+        dot.className = 'caja-dot dot-red';
+        text.textContent = 'Caja Cerrada';
+        sub.textContent  = 'No hay caja abierta';
+        acts.innerHTML   = `<button class="btn btn-success" id="btn-abrir" style="display:inline-flex;align-items:center;gap:6px" onclick="openModal('modal-abrir')">${icon('unlock')} Abrir Caja</button>`;
+        info.classList.add('hidden');
+      }
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function loadVentaSelects() {
+    const [prods, clientes] = await Promise.all([
+      api.get('/productos?activo=true&limit=500'),
+      api.get('/clientes?activo=true&limit=500')
+    ]);
+    document.getElementById('v-product').innerHTML =
+      '<option value="">Seleccionar producto...</option>' +
+      prods.data.map(p => `<option value="${p._id || p.id}" data-price="${p.precio_venta}" data-stock="${p.stock}">${p.nombre} — S/${parseFloat(p.precio_venta).toFixed(2)} (stock: ${p.stock})</option>`).join('');
+    document.getElementById('v-member').innerHTML =
+      '<option value="">Sin cliente asociado</option>' +
+      clientes.data.map(c => `<option value="${c._id || c.id}">${c.nombre}</option>`).join('');
+  }
+
+  function onVProductChange() {
+    const sel   = document.getElementById('v-product');
+    const opt   = sel.options[sel.selectedIndex];
+    const stock = opt?.dataset?.stock;
+    document.getElementById('v-stock-info').textContent = stock !== undefined ? `Stock disponible: ${stock} unidades` : '';
+    updateVTotal();
+  }
+
+  function updateVTotal() {
+    const sel   = document.getElementById('v-product');
+    const opt   = sel.options[sel.selectedIndex];
+    const price = parseFloat(opt?.dataset?.price || 0);
+    const qty   = parseInt(document.getElementById('v-qty').value) || 1;
+    document.getElementById('v-total').value = price ? `S/ ${(price * qty).toFixed(2)}` : '';
+  }
+
+  async function registrarVenta() {
+    if (!cajaActual) return toast('Debes abrir la caja primero', 'warning');
+    const product_id = document.getElementById('v-product').value;
+    const cliente_id = document.getElementById('v-member').value;
+    const quantity   = parseInt(document.getElementById('v-qty').value) || 1;
+    if (!product_id) return toast('Selecciona un producto', 'warning');
+    try {
+      const venta = await api.post('/ventas', {
+        cliente_id: cliente_id || null,
+        caja_id: cajaActual.id,
+        items: [{ producto_id: product_id, cantidad: quantity }]
+      });
+
+      // Patch quirúrgico: decrementar stock solo del producto vendido en caché
+      // sin borrar toda la lista de productos
+      if (venta?.items?.length) {
+        venta.items.forEach(item => {
+          const pid = item.producto_id?._id || item.producto_id;
+          gymCache.patchItem('productos', pid, (p) => ({
+            ...p,
+            stock: Math.max(0, (p.stock || 0) - item.cantidad),
+          }));
+        });
+      }
+      // Invalidar solo caja (totales del turno cambian)
+      gymCache.invalidate('caja');
+
+      toast('Venta registrada ✅');
+      document.getElementById('v-product').value = '';
+      document.getElementById('v-qty').value = 1;
+      document.getElementById('v-total').value = '';
+      document.getElementById('v-notes').value = '';
+      document.getElementById('v-stock-info').textContent = '';
+      loadEstado();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function loadTurnoVentas() {
+    if (!cajaActual) return;
+    try {
+      const detalle = await api.get(`/caja/${cajaActual.id}/detalle`);
+      document.getElementById('turno-ventas-table').innerHTML = detalle.ventas.map(v => `
+        <tr style="${v.anulada ? 'opacity:0.45;text-decoration:line-through' : ''}">
+          <td>${v.producto_nombre || '-'}</td>
+          <td>${v.cliente_nombre || '-'}</td>
+          <td style="text-align:center">${v.cantidad}</td>
+          <td>S/ ${parseFloat(v.precio_unit).toFixed(2)}</td>
+          <td style="font-weight:700;color:${v.anulada ? 'var(--danger)' : 'var(--success)'}">
+            ${v.anulada ? '<span style="font-size:11px;font-weight:600">ANULADA</span>' : `S/ ${parseFloat(v.subtotal).toFixed(2)}`}
+          </td>
+          <td style="font-size:12px">${fmtDateTime(v.fecha_venta)}</td>
+          <td>
+            ${!v.anulada
+              ? `<button class="btn btn-sm btn-danger" style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap" onclick="anularVenta('${v.id}')">${icon('trash')} Anular</button>`
+              : ''}
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="7" class="text-center" style="padding:20px;color:var(--text-light)">Sin ventas en este turno</td></tr>';
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function abrirCaja() {
+    const monto_inicial = document.getElementById('abrir-monto').value;
+    const notas         = document.getElementById('abrir-notas').value;
+    try {
+      await api.post('/caja/abrir', { monto_inicial, notas }, false, {
+        invalidate: ['caja'],
+      });
+      toast('Caja abierta ✅');
+      closeModal('modal-abrir');
+      loadEstado();
+      loadHistorial();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function cerrarCaja() {
+    if (!cajaActual) return;
+    const monto_final = document.getElementById('cerrar-monto').value;
+    const notas       = document.getElementById('cerrar-notas').value;
+    try {
+      await api.put(`/caja/cerrar/${cajaActual.id}`, { monto_final, notas }, {
+        invalidate: ['caja'],
+      });
+      toast('Caja cerrada 🔒');
+      closeModal('modal-cerrar');
+      cajaActual = null;
+      loadEstado();
+      loadHistorial();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function loadHistorial(page = 1) {
+    try {
+      const data = await api.get(`/caja?page=${page}&limit=15`);
+      document.getElementById('historial-table').innerHTML = data.data.map(c => `
+        <tr>
+          <td style="font-size:12px">${fmtDateTime(c.apertura)}</td>
+          <td style="font-size:12px">${c.cierre ? fmtDateTime(c.cierre) : '-'}</td>
+          <td>${c.usuario_nombre || '-'}</td>
+          <td>S/ ${parseFloat(c.monto_inicial).toFixed(2)}</td>
+          <td style="color:var(--success);font-weight:600">S/ ${(parseFloat(c.ingresos_membresias||0) + parseFloat(c.ingresos_ventas||0)).toFixed(2)}</td>
+          <td>${c.monto_final != null ? `S/ ${parseFloat(c.monto_final).toFixed(2)}` : '-'}</td>
+          <td><span class="badge ${c.estado === 'abierta' ? 'badge-success' : 'badge-info'}">${c.estado}</span></td>
+          <td><button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center" onclick="verDetalle('${c.id}')">${icon('eye')}</button></td>
+        </tr>
+      `).join('') || '<tr><td colspan="8" class="text-center" style="padding:20px;color:var(--text-light)">Sin historial</td></tr>';
+      renderPagination(document.getElementById('pagination-hist'), data.page, data.pages, loadHistorial);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function verDetalle(id) {
+    try {
+      const detalle = await api.get(`/caja/${id}/detalle`);
+      const rows = [
+        ...detalle.pagos.map(p => `<tr><td>💳 ${p.plan_nombre||'Membresía'}</td><td>${p.cliente_nombre||'-'}</td><td>1</td><td>S/ ${parseFloat(p.monto).toFixed(2)}</td><td style="font-weight:700;color:var(--success)">S/ ${parseFloat(p.monto).toFixed(2)}</td><td style="font-size:12px">${fmtDateTime(p.fecha_pago)}</td></tr>`),
+        ...detalle.ventas.map(v => `<tr style="${v.anulada ? 'opacity:0.45;text-decoration:line-through' : ''}"><td>🛒 ${v.producto_nombre||'-'}${v.anulada ? ' <span style="font-size:10px;color:var(--danger);font-weight:700;text-decoration:none">[ANULADA]</span>' : ''}</td><td>${v.cliente_nombre||'-'}</td><td>${v.cantidad}</td><td>S/ ${parseFloat(v.precio_unit).toFixed(2)}</td><td style="font-weight:700;color:${v.anulada ? 'var(--danger)' : 'var(--success)'}">S/ ${parseFloat(v.subtotal).toFixed(2)}</td><td style="font-size:12px">${fmtDateTime(v.fecha_venta)}</td></tr>`)
+      ];
+      document.getElementById('detalle-table').innerHTML = rows.join('') ||
+        '<tr><td colspan="6" class="text-center" style="padding:20px;color:var(--text-light)">Sin movimientos</td></tr>';
+      openModal('modal-detalle');
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  document.getElementById('btn-abrir').onclick = () => openModal('modal-abrir');
+
+  function exportarVentasTurno() {
+    if (!cajaActual) return toast('No hay caja abierta', 'warning');
+    api.download(`/reports/ventas/excel?caja_id=${cajaActual.id}`, 'ventas-turno.xlsx')
+      .then(() => toast('Descarga iniciada'))
+      .catch(err => toast(err.message, 'error'));
+  }
+
+  loadEstado();
+  loadHistorial();
+</script>
+</body>
+</html>

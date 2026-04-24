@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Reportes - GymPro</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <div class="topbar" id="topbar"></div>
+    <div class="page-content">
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px">
+
+        <div class="card">
+          <h3 style="font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:6px" id="h-rep-pagos"></h3>
+          <div class="form-group"><label>Desde</label><input type="date" id="pay-from" class="form-control"></div>
+          <div class="form-group"><label>Hasta</label><input type="date" id="pay-to" class="form-control"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-success" style="display:inline-flex;align-items:center;gap:6px" onclick="downloadReport('pagos', 'excel')"><span id="icon-excel-pay"></span> Excel</button>
+            <button class="btn btn-danger"  style="display:inline-flex;align-items:center;gap:6px" onclick="downloadReport('pagos', 'pdf')"><span id="icon-pdf-pay"></span> PDF</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:6px" id="h-rep-clientes"></h3>
+          <p style="font-size:13px;color:var(--text-light);margin-bottom:16px">Exporta el listado completo de clientes con su estado y plan.</p>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-success" style="display:inline-flex;align-items:center;gap:6px" onclick="downloadReport('clientes', 'excel')"><span id="icon-excel-mem"></span> Excel</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:6px" id="h-rep-asis"></h3>
+          <div class="form-group"><label>Desde</label><input type="date" id="att-from" class="form-control"></div>
+          <div class="form-group"><label>Hasta</label><input type="date" id="att-to" class="form-control"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-success" style="display:inline-flex;align-items:center;gap:6px" onclick="downloadReport('asistencia', 'excel')"><span id="icon-excel-att"></span> Excel</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:6px" id="h-rep-mem"></h3>
+          <div class="form-group">
+            <label>Filtrar por estado</label>
+            <select id="mem-estado" class="form-control">
+              <option value="">Todos</option>
+              <option value="activo">Activo</option>
+              <option value="vencido">Vencido</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-success" style="display:inline-flex;align-items:center;gap:6px" onclick="downloadReport('membresias', 'excel')"><span id="icon-excel-memb"></span> Excel</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:6px" id="h-rep-pendientes"></h3>
+          <p style="font-size:13px;color:var(--text-light);margin-bottom:16px">Lista de clientes con pagos pendientes para hacer seguimiento.</p>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-success" style="display:inline-flex;align-items:center;gap:6px" onclick="downloadReport('pagos-pendientes', 'excel')"><span id="icon-excel-pend"></span> Excel</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:6px" id="h-rep-stock"></h3>
+          <p style="font-size:13px;color:var(--text-light);margin-bottom:16px">Inventario completo con precios y stock actual. Stock bajo marcado en rojo.</p>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-success" style="display:inline-flex;align-items:center;gap:6px" onclick="downloadReport('stock', 'excel')"><span id="icon-excel-stock"></span> Excel</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:6px" id="h-rep-ventas"></h3>
+          <div class="form-group"><label>Desde</label><input type="date" id="sale-from" class="form-control"></div>
+          <div class="form-group"><label>Hasta</label><input type="date" id="sale-to" class="form-control"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-success" style="display:inline-flex;align-items:center;gap:6px" onclick="downloadReport('ventas', 'excel')"><span id="icon-excel-ventas"></span> Excel</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:6px" id="h-rep-caja"></h3>
+          <div class="form-group"><label>Desde</label><input type="date" id="caja-from" class="form-control"></div>
+          <div class="form-group"><label>Hasta</label><input type="date" id="caja-to" class="form-control"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-success" style="display:inline-flex;align-items:center;gap:6px" onclick="downloadReport('caja', 'excel')"><span id="icon-excel-caja"></span> Excel</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/cache.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/icons.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+  initLayout('reports', 'Reportes');
+  document.getElementById('h-rep-pagos').innerHTML      = icon('pagos')      + ' Reporte de Pagos';
+  document.getElementById('h-rep-clientes').innerHTML   = icon('clientes')   + ' Reporte de Clientes';
+  document.getElementById('h-rep-asis').innerHTML       = icon('asistencia') + ' Reporte de Asistencia';
+  document.getElementById('h-rep-mem').innerHTML        = icon('membresias') + ' Reporte de Membresías';
+  document.getElementById('h-rep-pendientes').innerHTML = icon('warning')    + ' Pagos Pendientes';
+  document.getElementById('h-rep-stock').innerHTML      = icon('productos')  + ' Stock de Productos';
+  document.getElementById('h-rep-ventas').innerHTML     = icon('cart')       + ' Reporte de Ventas';
+  document.getElementById('h-rep-caja').innerHTML       = icon('caja')       + ' Resumen de Caja';
+  ['icon-excel-pay','icon-pdf-pay','icon-excel-mem','icon-excel-att',
+   'icon-excel-memb','icon-excel-pend','icon-excel-stock','icon-excel-ventas','icon-excel-caja']
+    .forEach(id => { document.getElementById(id).innerHTML = icon('excel'); });
+
+  async function downloadReport(type, format) {
+    let qs = '?';
+    if (type === 'pagos') {
+      const from = document.getElementById('pay-from').value;
+      const to   = document.getElementById('pay-to').value;
+      if (from) qs += `from=${from}&`;
+      if (to)   qs += `to=${to}&`;
+    } else if (type === 'asistencia') {
+      const from = document.getElementById('att-from').value;
+      const to   = document.getElementById('att-to').value;
+      if (from) qs += `from=${from}&`;
+      if (to)   qs += `to=${to}&`;
+    } else if (type === 'membresias') {
+      const estado = document.getElementById('mem-estado').value;
+      if (estado) qs += `estado=${estado}&`;
+    } else if (type === 'ventas') {
+      const from = document.getElementById('sale-from').value;
+      const to   = document.getElementById('sale-to').value;
+      if (from) qs += `from=${from}&`;
+      if (to)   qs += `to=${to}&`;
+    } else if (type === 'caja') {
+      const from = document.getElementById('caja-from').value;
+      const to   = document.getElementById('caja-to').value;
+      if (from) qs += `from=${from}&`;
+      if (to)   qs += `to=${to}&`;
+    }
+
+    const ext = format === 'excel' ? 'xlsx' : 'pdf';
+    const endpoint = format === 'pdf' ? `/reports/${type}/pdf${qs}` : `/reports/${type}/excel${qs}`;
+    try {
+      await api.download(endpoint, `${type}.${ext}`);
+      toast('Descarga iniciada');
+    } catch (err) { toast(err.message, 'error'); }
+  }
+</script>
+</body>
+</html>

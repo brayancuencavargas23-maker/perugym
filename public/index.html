@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Peru Gym - Más Fuerte Cada Día</title>
+  <link rel="stylesheet" href="/css/landing.css">
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav>
+    <div class="nav-logo">
+      <div class="logo-circle" id="nav-logo-wrap">
+        <img id="nav-logo-img" src="" alt="Peru Gym" style="display:none;width:100%;height:100%;object-fit:contain;border-radius:50%">
+        <span id="nav-logo-text">PERU<br>GYM</span>
+      </div>
+    </div>
+    <ul class="nav-links">
+      <li><a href="#inicio">Inicio</a></li>
+      <li><a href="#nosotros">Nosotros</a></li>
+      <li><a href="#planes">Planes</a></li>
+      <!--<li><a href="#nosotros">Sedes</a></li> -->
+      <!--<li><a href="#planes">Clases</a></li> -->
+      <li><a href="#footer">Contacto</a></li>
+    </ul>
+    <div class="nav-actions">
+      <a href="/login.html" class="btn-outline-nav">Iniciar sesión</a>
+      <a href="#planes" class="btn-red">Únete ahora</a>
+    </div>
+    <button class="hamburger-nav">☰</button>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero" id="inicio">
+    <div class="hero-bg" id="hero-bg"></div>
+    <div class="hero-content">
+      <h1>Más Fuerte<span>Cada Día</span></h1>
+      <p class="hero-subtitle">Tu mejor versión, <em>nuestro compromiso</em></p>
+      <p class="hero-desc">
+        En Peru Gym tenemos todo lo que necesitas para transformar
+        tu cuerpo y tu mente. Entrena con los mejores equipos,
+        entrenadores y una comunidad que te impulsa.
+      </p>
+      <div class="hero-btns">
+        <a href="#planes" class="btn-hero-primary">Únete ahora</a>
+        <a href="#nosotros" class="btn-hero-outline">
+          <span class="play-icon">▶</span> Ver video
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES BAR -->
+  <div class="features-bar">
+    <div class="features-grid">
+      <div class="feature-item">
+        <div class="feature-icon">🏋️</div>
+        <div>
+          <div class="feature-title">Equipos<br>de Primera</div>
+          <div class="feature-desc">Tecnología de punta para tu entrenamiento.</div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">👨‍🏫</div>
+        <div>
+          <div class="feature-title">Entrenadores<br>Certificados</div>
+          <div class="feature-desc">Expertos que te guían en cada paso.</div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">📋</div>
+        <div>
+          <div class="feature-title">Planes para<br>Cada Objetivo</div>
+          <div class="feature-desc">Baja de peso, gana masa o mejora tu rendimiento.</div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">🤝</div>
+        <div>
+          <div class="feature-title">Comunidad<br>que Motiva</div>
+          <div class="feature-desc">Un ambiente que te inspira a seguir.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ABOUT -->
+  <section id="nosotros" style="background:var(--dark)">
+    <div class="about">
+      <div>
+        <div class="section-tag">Sobre Nosotros</div>
+        <h2>Somos más que<span>un Gym</span></h2>
+        <p>
+          En Peru Gym no solo entrenas tu cuerpo, construyes
+          disciplina, confianza y una mejor versión de ti.
+        </p>
+        <div class="stats-row">
+          <div class="stat-item">
+            <div class="stat-num">1</div>
+            <div class="stat-label">Sede en todo el Perú</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-num">+10K</div>
+            <div class="stat-label">Miembros activos</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-num">+20</div>
+            <div class="stat-label">Clases grupales por semana</div>
+          </div>
+        </div>
+      </div>
+      <div class="about-images">
+        <img
+          class="about-img-main"
+          id="about-img"
+          src="https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80"
+          alt="Peru Gym entrenamiento"
+        >
+        <div class="about-logo-overlay">
+          <span>PERU<br>GYM</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLANS -->
+  <section class="plans-section" id="planes">
+    <div class="plans-header">
+      <div class="section-tag">Planes</div>
+      <h2>Elige tu plan, logra <span>tu mejor versión</span></h2>
+    </div>
+    <div class="plans-grid" id="plans-grid">
+      <!-- cargado dinámicamente -->
+      <div style="grid-column:1/-1;text-align:center;color:#666;padding:40px">Cargando planes...</div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer id="footer">
+    <p>© 2024 <strong>Peru Gym</strong>. Todos los derechos reservados.</p>
+    <p style="margin-top:8px">Más fuerte cada día 💪</p>
+  </footer>
+
+  <!-- ── Estilos del modal ──────────────────────────────────────────────────── -->
+  <style>
+    /* Overlay */
+    #modal-solicitud {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      animation: fadeInOverlay 0.2s ease;
+    }
+    @keyframes fadeInOverlay { from { opacity:0 } to { opacity:1 } }
+
+    /* Card */
+    .sol-card {
+      background: #111214;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 460px;
+      overflow: hidden;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04);
+      animation: slideUp 0.25s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    @keyframes slideUp { from { opacity:0; transform:translateY(24px) scale(0.97) } to { opacity:1; transform:translateY(0) scale(1) } }
+
+    /* Header */
+    .sol-header {
+      background: linear-gradient(135deg, #c0392b 0%, #e63946 60%, #ff6b6b 100%);
+      padding: 22px 24px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .sol-header::before {
+      content: '';
+      position: absolute;
+      top: -40px; right: -40px;
+      width: 120px; height: 120px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 50%;
+    }
+    .sol-header::after {
+      content: '';
+      position: absolute;
+      bottom: -30px; left: 30px;
+      width: 80px; height: 80px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 50%;
+    }
+    .sol-header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      position: relative;
+      z-index: 1;
+    }
+    .sol-plan-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .sol-header h3 {
+      color: #fff;
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0 0 4px;
+      letter-spacing: -0.3px;
+    }
+    .sol-header p {
+      color: rgba(255,255,255,0.75);
+      font-size: 13px;
+      margin: 0;
+    }
+    .sol-price-badge {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 10px;
+      padding: 6px 14px;
+      text-align: center;
+      flex-shrink: 0;
+      margin-left: 12px;
+    }
+    .sol-price-badge .amount {
+      display: block;
+      color: #fff;
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .sol-price-badge .period {
+      display: block;
+      color: rgba(255,255,255,0.7);
+      font-size: 10px;
+      margin-top: 2px;
+    }
+    .sol-close-btn {
+      position: absolute;
+      top: 16px; right: 16px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #fff;
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+      z-index: 2;
+    }
+    .sol-close-btn:hover { background: rgba(255,255,255,0.25); }
+
+    /* Body */
+    .sol-body { padding: 24px; }
+
+    /* Field */
+    .sol-field { margin-bottom: 16px; }
+    .sol-field label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #8a8f98;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 7px;
+    }
+    .sol-field label .req { color: #e63946; }
+    .sol-field label .opt {
+      font-size: 10px;
+      font-weight: 400;
+      color: #555;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .sol-input-wrap { position: relative; }
+    .sol-input-wrap .sol-icon {
+      position: absolute;
+      left: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #555;
+      display: flex;
+      align-items: center;
+      pointer-events: none;
+      transition: color 0.15s;
+    }
+    .sol-input-wrap input {
+      width: 100%;
+      padding: 11px 14px 11px 40px;
+      background: #1a1c1f;
+      border: 1.5px solid #2a2d32;
+      border-radius: 10px;
+      color: #f0f0f0;
+      font-size: 14px;
+      box-sizing: border-box;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      outline: none;
+    }
+    .sol-input-wrap input::placeholder { color: #3d4147; }
+    .sol-input-wrap input:focus {
+      border-color: #e63946;
+      box-shadow: 0 0 0 3px rgba(230,57,70,0.12);
+    }
+    .sol-input-wrap input:focus + .sol-icon,
+    .sol-input-wrap input:focus ~ .sol-icon { color: #e63946; }
+    .sol-input-wrap input.is-valid { border-color: #22c55e; }
+    .sol-input-wrap input.is-valid:focus { box-shadow: 0 0 0 3px rgba(34,197,94,0.12); }
+    .sol-input-wrap input.is-error { border-color: #e63946; }
+    .sol-input-wrap .sol-icon { pointer-events: none; }
+
+    /* Validation icon inside input */
+    .sol-val-icon {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      display: none;
+    }
+
+    /* Error message */
+    .sol-err {
+      display: none;
+      align-items: center;
+      gap: 4px;
+      color: #e63946;
+      font-size: 11px;
+      margin-top: 5px;
+      padding-left: 2px;
+    }
+    .sol-err.visible { display: flex; }
+
+    /* Divider */
+    .sol-divider {
+      border: none;
+      border-top: 1px solid #1e2024;
+      margin: 4px 0 18px;
+    }
+
+    /* Submit button */
+    .sol-btn {
+      width: 100%;
+      padding: 13px 20px;
+      background: linear-gradient(135deg, #c0392b, #e63946);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.2px;
+      transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 20px rgba(230,57,70,0.35);
+      position: relative;
+      overflow: hidden;
+    }
+    .sol-btn:hover:not(:disabled) {
+      opacity: 0.92;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 28px rgba(230,57,70,0.45);
+    }
+    .sol-btn:active:not(:disabled) { transform: translateY(0); }
+    .sol-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    .sol-btn .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    .sol-btn.loading .spinner { display: block; }
+    .sol-btn.loading .btn-text { opacity: 0.7; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .sol-footer-note {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #444;
+      margin-top: 12px;
+      text-align: center;
+    }
+
+    /* ── Modal de éxito ── */
+    .sol-success {
+      display: none;
+      padding: 40px 28px 36px;
+      text-align: center;
+    }
+    .sol-success-icon {
+      width: 72px; height: 72px;
+      background: linear-gradient(135deg, #16a34a, #22c55e);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      box-shadow: 0 8px 32px rgba(34,197,94,0.3);
+      animation: popIn 0.4s cubic-bezier(0.34,1.56,0.64,1) 0.1s both;
+    }
+    @keyframes popIn { from { opacity:0; transform:scale(0.5) } to { opacity:1; transform:scale(1) } }
+    .sol-success-icon svg { color: #fff; }
+    .sol-success h3 {
+      color: #f0f0f0;
+      font-size: 22px;
+      font-weight: 700;
+      margin: 0 0 10px;
+    }
+    .sol-success p {
+      color: #6b7280;
+      font-size: 14px;
+      line-height: 1.6;
+      margin: 0 0 8px;
+    }
+    .sol-success-name {
+      color: #e63946;
+      font-weight: 600;
+    }
+    .sol-success-steps {
+      background: #1a1c1f;
+      border: 1px solid #2a2d32;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin: 18px 0 24px;
+      text-align: left;
+    }
+    .sol-success-steps p {
+      font-size: 12px;
+      color: #6b7280;
+      margin: 0 0 8px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .sol-success-step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #9ca3af;
+      margin-bottom: 8px;
+    }
+    .sol-success-step:last-child { margin-bottom: 0; }
+    .sol-step-num {
+      width: 22px; height: 22px;
+      background: rgba(230,57,70,0.15);
+      border: 1px solid rgba(230,57,70,0.3);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: #e63946;
+      flex-shrink: 0;
+    }
+    .sol-btn-close {
+      width: 100%;
+      padding: 12px;
+      background: #1a1c1f;
+      border: 1.5px solid #2a2d32;
+      border-radius: 10px;
+      color: #9ca3af;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .sol-btn-close:hover { border-color: #e63946; color: #e63946; }
+  </style>
+
+  <!-- ── Modal: Solicitud de membresía ──────────────────────────────────────── -->
+  <div id="modal-solicitud">
+    <div class="sol-card">
+
+      <!-- Header -->
+      <div class="sol-header">
+        <button class="sol-close-btn" onclick="cerrarSolicitud()" aria-label="Cerrar">✕</button>
+        <div class="sol-plan-tag">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Plan seleccionado
+        </div>
+        <div class="sol-header-top">
+          <div>
+            <h3 id="sol-modal-title">Quiero unirme</h3>
+            <p id="sol-modal-sub">Déjanos tus datos y te contactamos</p>
+          </div>
+          <div class="sol-price-badge">
+            <span class="amount" id="sol-price-display">S/ 0</span>
+            <span class="period">/mes</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Form -->
+      <div class="sol-body" id="sol-form-wrap">
+        <input type="hidden" id="sol-plan-id">
+
+      <!-- Honeypot anti-bot: campo oculto, los bots lo rellenan, los humanos no lo ven -->
+        <input type="text" id="sol-website" name="website" tabindex="-1" autocomplete="off"
+          style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none"
+          aria-hidden="true">
+
+        <!-- Nombre -->
+        <div class="sol-field">
+          <label>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Nombre completo <span class="req">*</span>
+          </label>
+          <div class="sol-input-wrap">
+            <span class="sol-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </span>
+            <input type="text" id="sol-nombre" placeholder="Ej: Juan Pérez" autocomplete="name" oninput="validarCampo('nombre')">
+            <span class="sol-val-icon" id="sol-nombre-ok">✓</span>
+          </div>
+          <div class="sol-err" id="sol-nombre-err">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Ingresa tu nombre completo.
+          </div>
+        </div>
+
+        <!-- Teléfono -->
+        <div class="sol-field">
+          <label>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.8a16 16 0 0 0 6.29 6.29l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            Teléfono / WhatsApp <span class="req">*</span>
+          </label>
+          <div class="sol-input-wrap">
+            <span class="sol-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.8a16 16 0 0 0 6.29 6.29l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            </span>
+            <input type="tel" id="sol-telefono" placeholder="Ej: 987 654 321" autocomplete="tel" oninput="validarCampo('telefono')">
+            <span class="sol-val-icon" id="sol-telefono-ok">✓</span>
+          </div>
+          <div class="sol-err" id="sol-telefono-err">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span id="sol-telefono-err-msg">Ingresa tu número de teléfono.</span>
+          </div>
+        </div>
+
+        <!-- Email -->
+        <div class="sol-field" style="margin-bottom:20px">
+          <label>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            Email <span class="opt">(opcional)</span>
+          </label>
+          <div class="sol-input-wrap">
+            <span class="sol-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            </span>
+            <input type="email" id="sol-email" placeholder="tu@email.com" autocomplete="email" oninput="validarCampo('email')">
+            <span class="sol-val-icon" id="sol-email-ok">✓</span>
+          </div>
+          <div class="sol-err" id="sol-email-err">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Ingresa un email válido.
+          </div>
+        </div>
+
+        <hr class="sol-divider">
+
+        <!-- Botón enviar -->
+        <button class="sol-btn" id="sol-btn-enviar" onclick="enviarSolicitud()">
+          <div class="spinner"></div>
+          <span class="btn-text">Quiero que me contacten</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="btn-arrow"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </button>
+
+        <div class="sol-footer-note">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Tus datos están seguros. Solo los usamos para contactarte.
+        </div>
+      </div>
+
+      <!-- Éxito -->
+      <div class="sol-success" id="sol-success-wrap">
+        <div class="sol-success-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <h3>¡Solicitud recibida!</h3>
+        <p>Hola <span class="sol-success-name" id="sol-success-nombre"></span>, tu solicitud fue enviada correctamente.</p>
+        <p>Nuestro equipo se pondrá en contacto contigo a la brevedad.</p>
+
+        <div class="sol-success-steps">
+          <p>¿Qué sigue?</p>
+          <div class="sol-success-step">
+            <span class="sol-step-num">1</span>
+            Recibirás una llamada o mensaje de nuestro equipo.
+          </div>
+          <div class="sol-success-step">
+            <span class="sol-step-num">2</span>
+            Coordinaremos tu visita al gym para conocer las instalaciones.
+          </div>
+          <div class="sol-success-step">
+            <span class="sol-step-num">3</span>
+            Realizas el pago en sede y activas tu membresía ese mismo día.
+          </div>
+        </div>
+
+        <button class="sol-btn-close" onclick="cerrarSolicitud()">Cerrar</button>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // Cargar imágenes del landing
+    fetch('/api/landing')
+      .then(r => r.json())
+      .then(cfg => {
+        if (cfg.logo_url) {
+          document.getElementById('nav-logo-img').src = cfg.logo_url;
+          document.getElementById('nav-logo-img').style.display = 'block';
+          document.getElementById('nav-logo-text').style.display = 'none';
+        }
+        if (cfg.about_logo_url) {
+          const overlay = document.querySelector('.about-logo-overlay');
+          if (overlay) {
+            overlay.innerHTML = `<img src="${cfg.about_logo_url}" alt="Peru Gym" style="width:100%;height:100%;object-fit:contain;border-radius:50%;padding:16px">`;
+          }
+        }
+        if (cfg.hero_bg_url) {
+          document.getElementById('hero-bg').style.backgroundImage =
+            `linear-gradient(to right, rgba(10,10,10,0.95) 45%, rgba(10,10,10,0.3) 100%), url('${cfg.hero_bg_url}')`;
+        }
+        if (cfg.about_img_url) {
+          document.getElementById('about-img').src = cfg.about_img_url;
+        }
+      })
+      .catch(() => {});
+
+    // Cargar planes desde la API
+    fetch('/api/planes/public')
+      .then(r => r.json())
+      .then(plans => {
+        const grid = document.getElementById('plans-grid');
+        if (!plans.length) {
+          grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#666;padding:40px">Sin planes disponibles por el momento.</div>';
+          return;
+        }
+        grid.innerHTML = plans.map(p => {
+          const featured = p.destacado;
+          const features = p.caracteristicas || [];
+          return `
+            <div class="plan-card ${featured ? 'featured' : ''}">
+              ${featured ? '<div class="plan-badge">Más Popular</div>' : ''}
+              <div class="plan-name">${p.nombre}</div>
+              <div class="plan-sub">${p.descripcion || ''}</div>
+              <div class="plan-price"><sup>S/</sup> ${parseFloat(p.precio).toFixed(0)}<span>/mes</span></div>
+              <ul class="plan-features">
+                ${features.map(f => `<li>${f}</li>`).join('')}
+              </ul>
+              <button onclick="abrirSolicitud('${p._id}','${p.nombre.replace(/'/g,"\\'")}',${parseFloat(p.precio).toFixed(0)})" class="btn-plan ${featured ? 'btn-plan-red' : 'btn-plan-outline'}">Elegir Plan</button>
+            </div>`;
+        }).join('');
+      })
+      .catch(() => {
+        document.getElementById('plans-grid').innerHTML =
+          '<div style="grid-column:1/-1;text-align:center;color:#666;padding:40px">No se pudieron cargar los planes.</div>';
+      });
+
+    // ── Validación en tiempo real ─────────────────────────────────────────────
+    function setFieldState(campo, state) {
+      // state: 'idle' | 'valid' | 'error'
+      const input  = document.getElementById('sol-' + campo);
+      const err    = document.getElementById('sol-' + campo + '-err');
+      const ok     = document.getElementById('sol-' + campo + '-ok');
+      if (!input) return;
+      input.classList.remove('is-valid', 'is-error');
+      if (ok) { ok.style.display = 'none'; ok.style.color = '#22c55e'; }
+      if (err) err.classList.remove('visible');
+      if (state === 'valid') {
+        input.classList.add('is-valid');
+        if (ok) ok.style.display = 'block';
+      } else if (state === 'error') {
+        input.classList.add('is-error');
+        if (err) err.classList.add('visible');
+      }
+    }
+
+    function validarCampo(campo) {
+      const input = document.getElementById('sol-' + campo);
+      if (!input) return true;
+      const val = input.value.trim();
+
+      if (campo === 'nombre') {
+        if (!val) { setFieldState('nombre', 'idle'); return false; }
+        if (val.length < 3) {
+          const errEl = document.getElementById('sol-nombre-err');
+          if (errEl) errEl.textContent = 'El nombre debe tener al menos 3 caracteres.';
+          setFieldState('nombre', 'error'); return false;
+        }
+        if (val.length > 80) {
+          const errEl = document.getElementById('sol-nombre-err');
+          if (errEl) errEl.textContent = 'El nombre es demasiado largo.';
+          setFieldState('nombre', 'error'); return false;
+        }
+        if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/.test(val)) {
+          const errEl = document.getElementById('sol-nombre-err');
+          if (errEl) errEl.textContent = 'Solo se permiten letras y espacios.';
+          setFieldState('nombre', 'error'); return false;
+        }
+        setFieldState('nombre', 'valid'); return true;
+      }
+
+      if (campo === 'telefono') {
+        if (!val) { setFieldState('telefono', 'idle'); return false; }
+        // Solo dígitos para validar
+        const digits = val.replace(/\D/g, '');
+        const errMsg = document.getElementById('sol-telefono-err-msg');
+        if (digits.length !== 9) {
+          if (errMsg) errMsg.textContent = 'El teléfono debe tener exactamente 9 dígitos.';
+          setFieldState('telefono', 'error'); return false;
+        }
+        if (!digits.startsWith('9')) {
+          if (errMsg) errMsg.textContent = 'El número debe empezar con 9 (celular peruano).';
+          setFieldState('telefono', 'error'); return false;
+        }
+        setFieldState('telefono', 'valid'); return true;
+      }
+
+      if (campo === 'email') {
+        if (!val) { setFieldState('email', 'idle'); return true; } // opcional
+        const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+        if (!emailOk) { setFieldState('email', 'error'); return false; }
+        setFieldState('email', 'valid'); return true;
+      }
+
+      return true;
+    }
+
+    // ── Abrir modal ───────────────────────────────────────────────────────────
+    function abrirSolicitud(planId, planNombre, planPrecio) {
+      document.getElementById('sol-plan-id').value = planId;
+      document.getElementById('sol-modal-title').textContent = planNombre;
+      document.getElementById('sol-modal-sub').textContent = 'Déjanos tus datos y te contactamos hoy';
+      document.getElementById('sol-price-display').textContent = 'S/ ' + planPrecio;
+
+      // Reset campos
+      ['nombre','telefono','email'].forEach(c => {
+        const el = document.getElementById('sol-' + c);
+        if (el) el.value = '';
+        setFieldState(c, 'idle');
+      });
+
+      // Reset botón
+      const btn = document.getElementById('sol-btn-enviar');
+      btn.disabled = false;
+      btn.classList.remove('loading');
+
+      // Mostrar form, ocultar éxito
+      document.getElementById('sol-form-wrap').style.display = 'block';
+      document.getElementById('sol-success-wrap').style.display = 'none';
+
+      const modal = document.getElementById('modal-solicitud');
+      modal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+
+      // Focus al primer campo
+      setTimeout(() => document.getElementById('sol-nombre').focus(), 100);
+    }
+
+    function cerrarSolicitud() {
+      document.getElementById('modal-solicitud').style.display = 'none';
+      document.body.style.overflow = '';
+    }
+
+    // Cerrar al hacer clic fuera
+    document.getElementById('modal-solicitud').addEventListener('click', function(e) {
+      if (e.target === this) cerrarSolicitud();
+    });
+
+    // Cerrar con Escape
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') cerrarSolicitud();
+    });
+
+    // ── Enviar solicitud ──────────────────────────────────────────────────────
+    async function enviarSolicitud() {
+      // Validar todos los campos
+      const nombreOk   = validarCampo('nombre');
+      const telefonoOk = validarCampo('telefono');
+      const emailOk    = validarCampo('email');
+
+      // Forzar error visual en campos vacíos requeridos
+      if (!document.getElementById('sol-nombre').value.trim()) setFieldState('nombre', 'error');
+      if (!document.getElementById('sol-telefono').value.trim()) setFieldState('telefono', 'error');
+
+      if (!nombreOk || !telefonoOk || !emailOk) {
+        // Shake animation en el primer campo con error
+        const firstErr = document.querySelector('.sol-input-wrap input.is-error');
+        if (firstErr) {
+          firstErr.style.animation = 'none';
+          firstErr.offsetHeight; // reflow
+          firstErr.style.animation = 'shake 0.35s ease';
+          setTimeout(() => firstErr.style.animation = '', 400);
+          firstErr.focus();
+        }
+        return;
+      }
+
+      const nombre   = document.getElementById('sol-nombre').value.trim();
+      const telefono = document.getElementById('sol-telefono').value.trim();
+      const email    = document.getElementById('sol-email').value.trim();
+      const planId   = document.getElementById('sol-plan-id').value;
+      // Honeypot: campo oculto — si tiene valor, es un bot, no enviamos
+      const website  = document.getElementById('sol-website').value;
+
+      // Bloquear botón
+      const btn = document.getElementById('sol-btn-enviar');
+      btn.disabled = true;
+      btn.classList.add('loading');
+      btn.querySelector('.btn-text').textContent = 'Enviando solicitud...';
+
+      try {
+        const res = await fetch('/api/solicitudes/public', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nombre,
+            telefono: telefono.replace(/\D/g, ''), // enviar solo dígitos
+            email: email || undefined,
+            plan_id: planId,
+            website,  // honeypot — el servidor lo rechaza si tiene valor
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al enviar');
+
+        // Mostrar éxito
+        document.getElementById('sol-success-nombre').textContent = nombre.split(' ')[0];
+        document.getElementById('sol-form-wrap').style.display = 'none';
+        document.getElementById('sol-success-wrap').style.display = 'block';
+
+      } catch (err) {
+        // Restaurar botón en caso de error
+        btn.disabled = false;
+        btn.classList.remove('loading');
+        btn.querySelector('.btn-text').textContent = 'Quiero que me contacten';
+
+        // Mapear errores del servidor a campos específicos
+        const msg = err.message || '';
+        if (msg.toLowerCase().includes('nombre')) {
+          setFieldState('nombre', 'error');
+          const errEl = document.getElementById('sol-nombre-err');
+          if (errEl) errEl.querySelector && (errEl.textContent = msg);
+        } else if (msg.toLowerCase().includes('teléfono') || msg.toLowerCase().includes('número')) {
+          setFieldState('telefono', 'error');
+          const errMsg = document.getElementById('sol-telefono-err-msg');
+          if (errMsg) errMsg.textContent = msg;
+        } else if (msg.toLowerCase().includes('email')) {
+          setFieldState('email', 'error');
+        } else if (msg.toLowerCase().includes('espera') || msg.toLowerCase().includes('intentos')) {
+          // Rate limit
+          mostrarErrorEnvio('⏳ ' + msg);
+        } else {
+          mostrarErrorEnvio(msg || 'No se pudo enviar. Por favor intenta de nuevo.');
+        }
+      }
+    }
+
+    function mostrarErrorEnvio(texto) {
+      const existing = document.getElementById('sol-send-error');
+      if (existing) existing.remove();
+      const errDiv = document.createElement('div');
+      errDiv.id = 'sol-send-error';
+      errDiv.style.cssText = 'background:rgba(230,57,70,0.1);border:1px solid rgba(230,57,70,0.3);border-radius:8px;padding:10px 14px;font-size:13px;color:#e63946;margin-top:12px;text-align:center;line-height:1.4';
+      errDiv.textContent = texto;
+      const btn = document.getElementById('sol-btn-enviar');
+      btn.parentNode.insertBefore(errDiv, btn.nextSibling);
+      setTimeout(() => errDiv.remove(), 5000);
+    }
+
+    // Shake keyframe (inyectado dinámicamente)
+    const shakeStyle = document.createElement('style');
+    shakeStyle.textContent = `@keyframes shake {
+      0%,100%{transform:translateX(0)}
+      20%{transform:translateX(-6px)}
+      40%{transform:translateX(6px)}
+      60%{transform:translateX(-4px)}
+      80%{transform:translateX(4px)}
+    }`;
+    document.head.appendChild(shakeStyle);
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Solicitudes - PeruGym</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .estado-badge-pendiente  { background:rgba(255,193,7,0.15);  color:#856404;  border:1px solid #ffc107; }
+    .estado-badge-contactado { background:rgba(13,110,253,0.12); color:#084298;  border:1px solid #0d6efd; }
+    .estado-badge-convertido { background:rgba(25,135,84,0.12);  color:#0a3622;  border:1px solid #198754; }
+    .estado-badge-descartado { background:rgba(108,117,125,0.12);color:#495057;  border:1px solid #6c757d; }
+    .estado-badge { font-size:11px; padding:2px 10px; border-radius:20px; font-weight:600; display:inline-block; }
+    .summary-bar { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
+    .summary-item { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:10px 18px; display:flex; flex-direction:column; align-items:center; min-width:100px; }
+    .summary-num  { font-size:24px; font-weight:700; }
+    .summary-lbl  { font-size:11px; color:var(--text-light); margin-top:2px; }
+    .summary-item.pend  { border-color:#ffc107; }
+    .summary-item.cont  { border-color:#0d6efd; }
+    .summary-item.conv  { border-color:#198754; }
+    .summary-item.desc  { border-color:#6c757d; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <div class="topbar" id="topbar"></div>
+    <div class="page-content">
+
+      <!-- Resumen de estados -->
+      <div class="summary-bar" id="summary-bar">
+        <div class="summary-item pend"><div class="summary-num" id="cnt-pendiente">-</div><div class="summary-lbl">🟡 Pendientes</div></div>
+        <div class="summary-item cont"><div class="summary-num" id="cnt-contactado">-</div><div class="summary-lbl">🔵 Contactados</div></div>
+        <div class="summary-item conv"><div class="summary-num" id="cnt-convertido">-</div><div class="summary-lbl">🟢 Convertidos</div></div>
+        <div class="summary-item desc"><div class="summary-num" id="cnt-descartado">-</div><div class="summary-lbl">⚫ Descartados</div></div>
+      </div>
+
+      <!-- Barra de filtros -->
+      <div class="search-bar">
+        <select id="filter-estado" class="form-control" style="width:180px">
+          <option value="">Todos los estados</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="contactado">Contactado</option>
+          <option value="convertido">Convertido</option>
+          <option value="descartado">Descartado</option>
+        </select>
+        <button class="btn btn-outline" id="btn-refresh" style="display:inline-flex;align-items:center;gap:6px">
+          <span id="icon-refresh-sol"></span> Actualizar
+        </button>
+      </div>
+
+      <!-- Tabla -->
+      <div class="card">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Nombre</th>
+                <th>Teléfono</th>
+                <th>Plan Solicitado</th>
+                <th>Estado</th>
+                <th>Notas</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="solicitudes-table"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="pagination"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Ver / Editar estado ─────────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="modal-detalle">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <h3>Detalle de Solicitud</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-detalle')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="det-id">
+      <div style="background:var(--bg);border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;display:grid;grid-template-columns:1fr 1fr;gap:8px" id="det-info"></div>
+      <div class="form-group">
+        <label>Estado</label>
+        <select id="det-estado" class="form-control">
+          <option value="pendiente">Pendiente</option>
+          <option value="contactado">Contactado</option>
+          <option value="descartado">Descartado</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Notas internas</label>
+        <textarea id="det-notas" class="form-control" rows="3" placeholder="Ej: Llamé, viene mañana a las 3pm..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-detalle')">Cancelar</button>
+      <button class="btn btn-primary" onclick="withLoading(this, guardarEstado, 'Guardando...')">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Convertir a Cliente ─────────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="modal-convertir">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <h3>Convertir a Cliente</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-convertir')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="conv-id">
+
+      <!-- Banner caja cerrada -->
+      <div id="conv-banner-caja" class="hidden" style="background:rgba(220,53,69,0.10);border:1.5px solid var(--danger);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:13px;color:#721c24">
+        🔒 No hay caja abierta. <a href="/caja.html" style="font-weight:700;color:var(--danger)">Abrir caja →</a>
+      </div>
+
+      <!-- Resumen del lead -->
+      <div style="background:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px" id="conv-info"></div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>DNI <span style="color:var(--text-light);font-size:11px">(opcional)</span></label>
+          <input type="text" id="conv-dni" class="form-control" placeholder="12345678">
+        </div>
+        <div class="form-group">
+          <label>Fecha inicio membresía</label>
+          <input type="date" id="conv-inicio" class="form-control">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Método de pago</label>
+          <select id="conv-metodo" class="form-control">
+            <option value="efectivo">Efectivo</option>
+            <option value="tarjeta">Tarjeta</option>
+            <option value="transferencia">Transferencia</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Estado del pago</label>
+          <select id="conv-estado-pago" class="form-control">
+            <option value="pagado">Pagado ahora</option>
+            <option value="pendiente">Pendiente (deuda)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notas del pago <span style="color:var(--text-light);font-size:11px">(opcional)</span></label>
+        <textarea id="conv-notas" class="form-control" rows="2"></textarea>
+      </div>
+      <p style="font-size:12px;color:var(--text-light);margin-top:4px">
+        ✅ Se creará el cliente, la membresía y el pago automáticamente.
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-convertir')">Cancelar</button>
+      <button class="btn btn-success" id="btn-confirmar-conv" onclick="withLoading(this, confirmarConversion, 'Convirtiendo...')">
+        Confirmar y Crear Cliente
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/cache.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/icons.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+  initLayout('solicitudes', 'Solicitudes');
+  document.getElementById('icon-refresh-sol').innerHTML = icon('refresh');
+
+  let currentPage = 1;
+  let cajaActual = null;
+
+  // ── Verificar caja ──────────────────────────────────────────────────────────
+  async function checkCaja() {
+    try { cajaActual = await api.get('/caja/estado'); } catch { cajaActual = null; }
+  }
+
+  // ── Cargar resumen de estados ───────────────────────────────────────────────
+  async function loadStats(force = false) {
+    try {
+      const stats = await api.get('/solicitudes/stats', force);
+      document.getElementById('cnt-pendiente').textContent  = stats.pendiente;
+      document.getElementById('cnt-contactado').textContent = stats.contactado;
+      document.getElementById('cnt-convertido').textContent = stats.convertido;
+      document.getElementById('cnt-descartado').textContent = stats.descartado;
+      // Actualizar badge del sidebar
+      const badge = document.getElementById('nav-badge-solicitudes');
+      if (badge) {
+        badge.textContent = stats.pendiente;
+        badge.style.display = stats.pendiente > 0 ? 'inline-block' : 'none';
+      }
+    } catch {}
+  }
+
+  // ── Cargar tabla ────────────────────────────────────────────────────────────
+  async function loadSolicitudes(page = 1, force = false) {
+    currentPage = page;
+    const estado = document.getElementById('filter-estado').value;
+    let qs = `?page=${page}&limit=15`;
+    if (estado) qs += `&estado=${estado}`;
+    try {
+      const data = await api.get(`/solicitudes${qs}`, force);
+      document.getElementById('solicitudes-table').innerHTML = data.data.map(s => {
+        const estadoClass = {
+          pendiente:  'estado-badge-pendiente',
+          contactado: 'estado-badge-contactado',
+          convertido: 'estado-badge-convertido',
+          descartado: 'estado-badge-descartado',
+        }[s.estado] || '';
+
+        const whatsappUrl = `https://wa.me/51${s.telefono.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola ${s.nombre}, vi tu interés en el plan ${s.plan_nombre || ''}. ¿Cuándo puedes venir al gym?`)}`;
+
+        const acciones = s.estado !== 'convertido' && s.estado !== 'descartado'
+          ? `<button class="btn btn-sm btn-outline" title="Ver / Editar" onclick="abrirDetalle('${s.id}')">${icon('eye')}</button>
+             <a class="btn btn-sm btn-outline" href="${whatsappUrl}" target="_blank" title="WhatsApp" style="display:inline-flex;align-items:center">
+               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+             </a>
+             <button class="btn btn-sm btn-success" title="Convertir a cliente" onclick="abrirConvertir('${s.id}','${s.nombre.replace(/'/g,"\\'")}','${s.plan_nombre || ''}',${s.plan_precio || 0},'${s.telefono}','${s.email || ''}')">${icon('check')}</button>`
+          : s.estado === 'convertido'
+            ? `<a href="/clientes.html" class="btn btn-sm btn-outline" title="Ver clientes" style="display:inline-flex;align-items:center">${icon('clientes')}</a>`
+            : `<button class="btn btn-sm btn-outline" title="Ver detalle" onclick="abrirDetalle('${s.id}')">${icon('eye')}</button>`;
+
+        return `<tr>
+          <td style="font-size:12px;white-space:nowrap">${fmtDateTime(s.created_at)}</td>
+          <td><strong>${s.nombre}</strong></td>
+          <td>${s.telefono}</td>
+          <td>
+            <strong>${s.plan_nombre || '-'}</strong>
+            ${s.plan_precio ? `<div style="font-size:11px;color:var(--text-light)">${fmtMoney(s.plan_precio)}/mes</div>` : ''}
+          </td>
+          <td><span class="estado-badge ${estadoClass}">${s.estado}</span></td>
+          <td style="font-size:12px;color:var(--text-light);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.notas || ''}">${s.notas || '-'}</td>
+          <td style="display:flex;gap:4px;flex-wrap:wrap">${acciones}</td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="7" class="text-center" style="padding:30px;color:var(--text-light)">Sin solicitudes</td></tr>';
+
+      renderPagination(document.getElementById('pagination'), data.page, data.pages, loadSolicitudes);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  // ── Modal detalle / cambio de estado ───────────────────────────────────────
+  async function abrirDetalle(id) {
+    try {
+      // Buscar en los datos ya cargados para evitar un fetch extra
+      const estado = document.getElementById('filter-estado').value;
+      let qs = `?page=${currentPage}&limit=15`;
+      if (estado) qs += `&estado=${estado}`;
+      const data = await api.get(`/solicitudes${qs}`, false);
+      const s = data.data.find(x => x.id === id || x._id === id);
+      if (!s) return toast('Solicitud no encontrada', 'error');
+
+      document.getElementById('det-id').value = s.id;
+      document.getElementById('det-estado').value = s.estado;
+      document.getElementById('det-notas').value = s.notas || '';
+      document.getElementById('det-info').innerHTML = `
+        <div><span style="color:var(--text-light)">Nombre</span><br><strong>${s.nombre}</strong></div>
+        <div><span style="color:var(--text-light)">Teléfono</span><br><strong>${s.telefono}</strong></div>
+        <div><span style="color:var(--text-light)">Email</span><br>${s.email || '-'}</div>
+        <div><span style="color:var(--text-light)">Plan</span><br><strong>${s.plan_nombre || '-'}</strong></div>
+        <div><span style="color:var(--text-light)">Fecha solicitud</span><br>${fmtDateTime(s.created_at)}</div>
+        <div><span style="color:var(--text-light)">Atendido por</span><br>${s.atendido_por_nombre || 'Sin asignar'}</div>
+      `;
+      openModal('modal-detalle');
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function guardarEstado() {
+    const id = document.getElementById('det-id').value;
+    const estado = document.getElementById('det-estado').value;
+    const notas = document.getElementById('det-notas').value;
+    try {
+      await api.put(`/solicitudes/${id}/estado`, { estado, notas });
+      toast('Solicitud actualizada');
+      closeModal('modal-detalle');
+      loadSolicitudes(currentPage, true);
+      loadStats(true);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  // ── Modal convertir ─────────────────────────────────────────────────────────
+  function abrirConvertir(id, nombre, planNombre, planPrecio, telefono, email) {
+    document.getElementById('conv-id').value = id;
+    document.getElementById('conv-dni').value = '';
+    document.getElementById('conv-inicio').value = new Date().toISOString().split('T')[0];
+    document.getElementById('conv-metodo').value = 'efectivo';
+    document.getElementById('conv-estado-pago').value = 'pagado';
+    document.getElementById('conv-notas').value = '';
+    document.getElementById('conv-info').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><span style="color:var(--text-light)">Cliente</span><br><strong>${nombre}</strong></div>
+        <div><span style="color:var(--text-light)">Teléfono</span><br>${telefono}</div>
+        <div><span style="color:var(--text-light)">Email</span><br>${email || '-'}</div>
+        <div><span style="color:var(--text-light)">Plan</span><br><strong>${planNombre}</strong> — ${fmtMoney(planPrecio)}</div>
+      </div>
+    `;
+
+    const banner = document.getElementById('conv-banner-caja');
+    const btnConv = document.getElementById('btn-confirmar-conv');
+    if (!cajaActual) {
+      banner.classList.remove('hidden');
+      btnConv.disabled = true;
+    } else {
+      banner.classList.add('hidden');
+      btnConv.disabled = false;
+    }
+    openModal('modal-convertir');
+  }
+
+  async function confirmarConversion() {
+    if (!cajaActual) { toast('Abre la caja antes de convertir', 'warning'); return; }
+    const id = document.getElementById('conv-id').value;
+    try {
+      await api.post(`/solicitudes/${id}/convertir`, {
+        dni:             document.getElementById('conv-dni').value || null,
+        fecha_inicio:    document.getElementById('conv-inicio').value,
+        metodo_pago:     document.getElementById('conv-metodo').value,
+        estado_pago:     document.getElementById('conv-estado-pago').value,
+        notas_membresia: document.getElementById('conv-notas').value || null,
+        caja_id:         cajaActual.id,
+      }, false, { invalidate: ['solicitudes', 'clientes', 'membresias', 'pagos'] });
+      toast('¡Cliente creado con membresía y pago registrados!', 'success');
+      closeModal('modal-convertir');
+      loadSolicitudes(currentPage, true);
+      loadStats(true);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  // ── Polling: detectar nuevas solicitudes en segundo plano ──────────────────
+  let _lastPendingCount = null;
+  let _pollingTimer = null;
+
+  async function pollNuevasSolicitudes() {
+    try {
+      // Solo el poll fuerza fetch real para detectar cambios
+      const stats = await api.get('/solicitudes/stats', true);
+      const nuevasCantidad = stats.pendiente;
+
+      if (_lastPendingCount !== null && nuevasCantidad > _lastPendingCount) {
+        const diff = nuevasCantidad - _lastPendingCount;
+        gymCache.invalidate('solicitudes');
+        await loadSolicitudes(currentPage, true);
+        await loadStats(true);
+        toast(`🔔 ${diff} nueva${diff > 1 ? 's' : ''} solicitud${diff > 1 ? 'es' : ''} recibida${diff > 1 ? 's' : ''}`, 'success');
+      }
+
+      _lastPendingCount = nuevasCantidad;
+    } catch {
+      // Silencioso
+    }
+  }
+
+  function startPolling(intervalMs = 45000) {
+    stopPolling();
+    _pollingTimer = setInterval(pollNuevasSolicitudes, intervalMs);
+  }
+
+  function stopPolling() {
+    if (_pollingTimer) { clearInterval(_pollingTimer); _pollingTimer = null; }
+  }
+
+  // Pausar polling cuando la pestaña no está visible (ahorra requests)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopPolling();
+    else startPolling();
+  });
+
+  // ── Eventos ─────────────────────────────────────────────────────────────────
+  document.getElementById('filter-estado').onchange = () => loadSolicitudes(1);
+  document.getElementById('btn-refresh').onclick = () => {
+    gymCache.invalidate('solicitudes');
+    loadStats(true);
+    loadSolicitudes(currentPage, true);
+  };
+
+  // ── Init ────────────────────────────────────────────────────────────────────
+  checkCaja().then(async () => {
+    await loadStats();
+    await loadSolicitudes();
+    // Guardar conteo inicial y arrancar polling
+    try {
+      const stats = await api.get('/solicitudes/stats', true);
+      _lastPendingCount = stats.pendiente;
+    } catch {}
+    startPolling();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Dashboard - PeruGym</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <div class="topbar" id="topbar"></div>
+    <div class="page-content">
+
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card"><div class="stat-icon purple" id="si-members"></div><div><div class="stat-value" id="stat-members">-</div><div class="stat-label">Clientes Activos</div></div></div>
+        <div class="stat-card"><div class="stat-icon green" id="si-income"></div><div><div class="stat-value" id="stat-income">-</div><div class="stat-label">Ingresos del Mes</div></div></div>
+        <div class="stat-card"><div class="stat-icon orange" id="si-attendance"></div><div><div class="stat-value" id="stat-attendance">-</div><div class="stat-label">Asistencia Hoy</div></div></div>
+        <div class="stat-card"><div class="stat-icon red" id="si-pending"></div><div><div class="stat-value" id="stat-pending">-</div><div class="stat-label">Pagos Pendientes</div></div></div>
+        <div class="stat-card"><div class="stat-icon blue" id="si-engym"></div><div><div class="stat-value" id="stat-engym">-</div><div class="stat-label">En el Gym Ahora</div></div></div>      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px" id="mid-grid">
+        <div class="card">
+          <div class="flex-between mb-2">
+            <h3 style="font-size:15px;display:flex;align-items:center;gap:6px" id="h-vencer"></h3>
+            <a href="/membresias.html" style="font-size:12px;color:var(--primary)">Ver todas</a>
+          </div>
+          <div class="expiring-list" id="expiring-list">
+            <p style="color:var(--text-light);font-size:13px">Cargando...</p>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="font-size:15px;margin-bottom:16px;display:flex;align-items:center;gap:6px" id="h-planes"></h3>
+          <div id="plan-chart"></div>
+        </div>
+      </div>
+
+      <!-- Widget solicitudes pendientes -->
+      <div class="card" id="card-solicitudes" style="margin-bottom:20px;display:none">
+        <div class="flex-between mb-2">
+          <h3 style="font-size:15px;display:flex;align-items:center;gap:6px" id="h-solicitudes"></h3>
+          <a href="/solicitudes.html" style="font-size:12px;color:var(--primary)">Ver todas</a>
+        </div>
+        <div id="solicitudes-list">
+          <p style="color:var(--text-light);font-size:13px">Cargando...</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="flex-between mb-2">
+          <h3 style="font-size:15px;display:flex;align-items:center;gap:6px" id="h-pagos"></h3>
+          <a href="/pagos.html" style="font-size:12px;color:var(--primary)">Ver todos</a>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Cliente</th><th>Monto</th><th>Fecha</th><th>Estado</th></tr></thead>
+            <tbody id="recent-payments"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="/js/cache.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/icons.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+  initLayout('dashboard', 'Dashboard');
+
+  // Stat icons
+  document.getElementById('si-members').innerHTML    = icon('clientes', 'font-size:24px');
+  document.getElementById('si-income').innerHTML     = icon('caja', 'font-size:24px');
+  document.getElementById('si-attendance').innerHTML = icon('asistencia', 'font-size:24px');
+  document.getElementById('si-pending').innerHTML    = icon('pagos', 'font-size:24px');
+  document.getElementById('si-engym').innerHTML      = icon('checkin', 'font-size:24px');
+  document.getElementById('h-vencer').innerHTML      = icon('warning') + ' Membresías por Vencer';
+  document.getElementById('h-planes').innerHTML      = icon('planes') + ' Clientes por Plan';
+  document.getElementById('h-pagos').innerHTML       = icon('pagos') + ' Pagos Recientes';
+  document.getElementById('h-solicitudes').innerHTML = icon('solicitudes') + ' Solicitudes Pendientes';
+
+  async function loadDashboard() {
+    // Mostrar datos cacheados inmediatamente si existen (sin esperar el await)
+    const cached = gymCache.get('/dashboard');
+    if (cached) renderDashboard(cached);
+
+    try {
+      const data = await api.get('/dashboard');
+      renderDashboard(data);
+    } catch (err) { toast(err.message, 'error'); }
+
+    // Cargar solicitudes pendientes (independiente del dashboard)
+    try {
+      const stats = await api.get('/solicitudes/stats', true);
+      if (stats.pendiente > 0 || stats.contactado > 0) {
+        document.getElementById('card-solicitudes').style.display = 'block';
+        const pending = await api.get('/solicitudes?estado=pendiente&limit=5', true);
+        const contacted = stats.pendiente === 0
+          ? await api.get('/solicitudes?estado=contactado&limit=5', true)
+          : { data: [] };
+        const items = [...pending.data, ...contacted.data].slice(0, 5);
+        document.getElementById('solicitudes-list').innerHTML = items.length
+          ? items.map(s => `
+            <div class="expiring-item">
+              <div>
+                <strong>${s.nombre}</strong>
+                <div style="font-size:11px;color:var(--text-light)">${s.plan_nombre || 'Sin plan'} — ${s.telefono}</div>
+              </div>
+              <span class="badge ${s.estado === 'pendiente' ? 'badge-warning' : 'badge-info'}">${s.estado}</span>
+            </div>`).join('')
+          : '<p style="color:var(--text-light);font-size:13px">Sin solicitudes activas</p>';
+      }
+    } catch {}
+  }
+
+  function renderDashboard(data) {
+      document.getElementById('stat-members').textContent    = data.stats.clientesActivos;
+      document.getElementById('stat-income').textContent     = fmtMoney(data.stats.ingresosDelMes);
+      document.getElementById('stat-attendance').textContent = data.stats.asistenciaHoy;
+      document.getElementById('stat-pending').textContent    = data.stats.pagosPendientes;
+      document.getElementById('stat-engym').textContent      = data.stats.enElGym;
+
+      const expiringEl = document.getElementById('expiring-list');
+      if (data.membresiasVencenPronto.length === 0) {
+        expiringEl.innerHTML = '<p style="color:var(--text-light);font-size:13px">Sin membresías próximas a vencer</p>';
+      } else {
+        expiringEl.innerHTML = data.membresiasVencenPronto.map(m => {
+          const days = daysUntil(m.fecha_fin);
+          return `<div class="expiring-item">
+            <div>
+              <strong>${m.nombre}</strong>
+              <div style="font-size:11px;color:var(--text-light)">${m.plan_nombre || 'Sin plan'}</div>
+            </div>
+            <span class="badge badge-warning">${days === 0 ? 'Hoy' : `${days}d`}</span>
+          </div>`;
+        }).join('');
+      }
+
+      const planEl = document.getElementById('plan-chart');
+      const maxCount = Math.max(...data.clientesPorPlan.map(p => parseInt(p.count)), 1);
+      planEl.innerHTML = data.clientesPorPlan.map(p => `
+        <div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+            <span>${p.nombre}</span><span>${p.count}</span>
+          </div>
+          <div style="background:var(--bg);border-radius:4px;height:8px">
+            <div style="background:var(--primary);height:8px;border-radius:4px;width:${(p.count/maxCount*100).toFixed(0)}%"></div>
+          </div>
+        </div>
+      `).join('') || '<p style="color:var(--text-light);font-size:13px">Sin datos</p>';
+
+      document.getElementById('recent-payments').innerHTML = data.pagosRecientes.map(p => `
+        <tr>
+          <td>${p.cliente_nombre || '-'}</td>
+          <td>${fmtMoney(p.monto)}</td>
+          <td>${fmtDate(p.fecha_pago)}</td>
+          <td><span class="badge ${p.estado === 'pagado' ? 'badge-success' : 'badge-warning'}">${p.estado}</span></td>
+        </tr>
+      `).join('') || '<tr><td colspan="4" class="text-center" style="color:var(--text-light)">Sin pagos recientes</td></tr>';
+  }
+
+  loadDashboard();
+</script>
+</body>
+</html>

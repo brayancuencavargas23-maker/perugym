@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Pagos - PeruGym</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <div class="topbar" id="topbar"></div>
+    <div class="page-content">
+      <!-- Banner: caja cerrada -->
+      <div id="banner-caja-cerrada" class="hidden" style="background:rgba(220,53,69,0.10);border:1.5px solid var(--danger);border-radius:var(--radius);padding:12px 18px;margin-bottom:16px;display:flex;align-items:center;gap:10px;font-size:13px;color:#721c24">
+        <span style="font-size:18px">🔒</span>
+        <span>No hay caja abierta. No se pueden confirmar pagos. <a href="/caja.html" style="font-weight:700;color:var(--danger)">Abrir caja →</a></span>
+      </div>
+      <div class="search-bar">
+        <select id="filter-estado" class="form-control" style="width:150px">
+          <option value="">Todos</option>
+          <option value="pagado">Pagado</option>
+          <option value="pendiente">Pendiente</option>
+        </select>
+        <select id="filter-metodo" class="form-control" style="width:160px">
+          <option value="">Todos los métodos</option>
+          <option value="efectivo">Efectivo</option>
+          <option value="tarjeta">Tarjeta</option>
+          <option value="transferencia">Transferencia</option>
+        </select>
+        <input type="date" id="filter-from" class="form-control" style="width:160px">
+        <input type="date" id="filter-to" class="form-control" style="width:160px">
+        <button class="btn btn-outline" onclick="loadPagos(1)" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-filter-pag"></span> Filtrar</button>
+        <button class="btn btn-success" onclick="exportarPagos()" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-excel-pag"></span> Exportar Excel</button>
+      </div>
+      <div class="card">
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Cliente</th><th>Plan</th><th>Monto</th><th>Método</th><th>Fecha</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="pagos-table"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="pagination"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Confirmar pago pendiente -->
+<div class="modal-overlay hidden" id="modal-confirmar">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Confirmar Pago</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-confirmar')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="confirmar-pago-id">
+      <div id="confirmar-info" style="background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px"></div>
+      <!-- Info de caja activa -->
+      <div id="confirmar-caja-info" style="background:rgba(40,167,69,0.08);border:1px solid var(--success);border-radius:8px;padding:8px 14px;margin-bottom:12px;font-size:12px;color:#155724"></div>
+      <div class="form-group">
+        <label>Método de pago</label>
+        <select id="confirmar-metodo" class="form-control">
+          <option value="efectivo">Efectivo</option>
+          <option value="tarjeta">Tarjeta</option>
+          <option value="transferencia">Transferencia</option>
+        </select>
+      </div>
+      <p style="font-size:12px;color:var(--text-light);margin-top:8px">Al confirmar, el pago pasará a estado "pagado" y la membresía asociada se activará automáticamente.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-confirmar')">Cancelar</button>
+      <button class="btn btn-primary" onclick="withLoading(this, confirmarPago, 'Confirmando...')">Confirmar Pago</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/cache.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/icons.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+  initLayout('pagos', 'Pagos');
+  document.getElementById('icon-filter-pag').innerHTML = icon('search');
+  document.getElementById('icon-excel-pag').innerHTML  = icon('excel');
+  let currentPage = 1;
+  let cajaActual = null;
+
+  async function checkCaja() {
+    try { cajaActual = await api.get('/caja/estado'); } catch (e) { cajaActual = null; }
+    const banner = document.getElementById('banner-caja-cerrada');
+    banner.classList.toggle('hidden', !!cajaActual);
+  }
+
+  async function loadPagos(page = 1) {
+    currentPage = page;
+    const estado = document.getElementById('filter-estado').value;
+    const metodo = document.getElementById('filter-metodo').value;
+    const from = document.getElementById('filter-from').value;
+    const to = document.getElementById('filter-to').value;
+    let qs = `?page=${page}&limit=15`;
+    if (estado) qs += `&estado=${estado}`;
+    if (metodo) qs += `&metodo_pago=${metodo}`;
+    if (from) qs += `&from=${from}`;
+    if (to) qs += `&to=${to}`;
+    try {
+      const data = await api.get(`/pagos${qs}`);
+      document.getElementById('pagos-table').innerHTML = data.data.map(p => `
+        <tr>
+          <td>${p.cliente_nombre || '-'}</td>
+          <td>${p.plan_nombre || '-'}</td>
+          <td style="font-weight:600">${fmtMoney(p.monto)}</td>
+          <td>${p.metodo_pago || '-'}</td>
+          <td>${fmtDate(p.fecha_pago)}</td>
+          <td><span class="badge ${p.estado === 'pagado' ? 'badge-success' : 'badge-warning'}">${p.estado}</span></td>
+          <td style="display:flex;gap:4px">
+            ${p.estado === 'pendiente'
+              ? `<button class="btn btn-sm btn-primary" title="Confirmar pago" onclick="abrirConfirmar('${p.id}','${p.cliente_nombre}',${p.monto})" style="display:inline-flex;align-items:center;gap:4px">${icon('check')} Confirmar</button>`
+              : ''}
+            <button class="btn btn-sm btn-danger" title="Eliminar" onclick="withLoading(this, () => deletePago('${p.id}'), 'Eliminando...')">${icon('trash')}</button>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="7" class="text-center" style="padding:30px;color:var(--text-light)">Sin pagos</td></tr>';
+      renderPagination(document.getElementById('pagination'), data.page, data.pages, loadPagos);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function abrirConfirmar(id, cliente, monto) {
+    if (!cajaActual) {
+      toast('No hay caja abierta. Abre la caja antes de confirmar pagos.', 'warning');
+      return;
+    }
+    document.getElementById('confirmar-pago-id').value = id;
+    document.getElementById('confirmar-info').innerHTML =
+      `Cliente: <strong>${cliente}</strong> &nbsp;|&nbsp; Monto: <strong>${fmtMoney(monto)}</strong>`;
+    document.getElementById('confirmar-caja-info').innerHTML =
+      `🟢 Caja abierta por <strong>${cajaActual.usuario_nombre}</strong> desde ${fmtDateTime(cajaActual.apertura)}`;
+    document.getElementById('confirmar-metodo').value = 'efectivo';
+    openModal('modal-confirmar');
+  }
+
+  async function confirmarPago() {
+    if (!cajaActual) { toast('No hay caja abierta', 'warning'); return; }
+    const id = document.getElementById('confirmar-pago-id').value;
+    try {
+      const pagoActualizado = await api.put(`/pagos/${id}/confirmar`, {
+        metodo_pago: document.getElementById('confirmar-metodo').value,
+        caja_id: cajaActual.id,
+      }, {
+        patch: { ns: 'pagos', id },
+        // membresias: estado cambió → invalidar
+        invalidate: ['membresias'],
+      });
+      // Patch quirúrgico en clientes: solo actualizar el estado de membresía
+      // del cliente afectado sin borrar toda la lista
+      if (pagoActualizado?.cliente_id) {
+        const clienteId = pagoActualizado.cliente_id?._id
+          || pagoActualizado.cliente_id?.id
+          || String(pagoActualizado.cliente_id);
+        gymCache.patchItem('clientes', clienteId, (c) => ({
+          ...c,
+          membresia_estado: 'activo',
+        }));
+      }
+      toast('Pago confirmado y membresía activada');
+      closeModal('modal-confirmar');
+      loadPagos(currentPage);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function deletePago(id) {
+    const ok = await confirmDialog({
+      title: 'Eliminar pago',
+      message: 'Esta acción no se puede deshacer. El registro de pago será eliminado permanentemente.',
+      confirmText: 'Sí, eliminar',
+      type: 'danger'
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/pagos/${id}`, {
+        remove: { ns: 'pagos', id },
+      });
+      toast('Pago eliminado');
+      loadPagos(currentPage);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  document.getElementById('filter-estado').onchange = () => loadPagos(1);
+  document.getElementById('filter-metodo').onchange = () => loadPagos(1);
+
+  function exportarPagos() {
+    const estado = document.getElementById('filter-estado').value;
+    const metodo = document.getElementById('filter-metodo').value;
+    const from   = document.getElementById('filter-from').value;
+    const to     = document.getElementById('filter-to').value;
+    let qs = '?';
+    if (from)   qs += `from=${from}&`;
+    if (to)     qs += `to=${to}&`;
+    if (estado) qs += `estado=${estado}&`;
+    if (metodo) qs += `metodo_pago=${metodo}&`;
+    api.download(`/reports/pagos/excel${qs}`, 'pagos.xlsx').then(() => toast('Descarga iniciada')).catch(err => toast(err.message, 'error'));
+  }
+
+  loadPagos();
+  checkCaja();
+</script>
+</body>
+</html>

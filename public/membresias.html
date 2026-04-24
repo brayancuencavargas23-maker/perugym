@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Membresías - PeruGym</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <div class="topbar" id="topbar"></div>
+    <div class="page-content">
+      <!-- Banner: caja cerrada -->
+      <div id="banner-caja-cerrada" class="hidden" style="background:rgba(220,53,69,0.10);border:1.5px solid var(--danger);border-radius:var(--radius);padding:12px 18px;margin-bottom:16px;display:flex;align-items:center;gap:10px;font-size:13px;color:#721c24">
+        <span style="font-size:18px">🔒</span>
+        <span>No hay caja abierta. Los botones de pago están deshabilitados. <a href="/caja.html" style="font-weight:700;color:var(--danger)">Abrir caja →</a></span>
+      </div>
+
+      <div class="search-bar">
+        <select id="filter-estado" class="form-control" style="width:160px">
+          <option value="">Todos los estados</option>
+          <option value="activo">Activo</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="vencido">Vencido</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+        <button class="btn btn-outline" id="btn-vencen" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-warning-mem"></span> Vencen pronto</button>
+        <button class="btn btn-success" onclick="exportarMembresias()" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-excel-mem"></span> Exportar Excel</button>
+        <button class="btn btn-primary" id="btn-new" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-plus-mem"></span> Nueva Membresía</button>
+      </div>
+      <div class="card">
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Cliente</th><th>Plan</th><th>Inicio</th><th>Vencimiento</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="membresias-table"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="pagination"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Nueva Membresía (suscripción atómica) -->
+<div class="modal-overlay hidden" id="modal-nueva">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Nueva Membresía</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-nueva')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Cliente *</label>
+        <select id="mem-cliente" class="form-control" required onchange="onClienteChange()"></select>
+        <small id="mem-cliente-error" class="text-danger hidden">Selecciona un cliente.</small>
+      </div>
+      <div id="alerta-activa" class="alert alert-warning hidden" style="margin:8px 0;padding:10px 14px;border-radius:8px;background:#fff3cd;color:#856404;font-size:13px"></div>
+      <div class="form-group">
+        <label>Plan *</label>
+        <select id="mem-plan" class="form-control" required onchange="onPlanChange()"></select>
+        <small id="mem-plan-error" class="text-danger hidden">Selecciona un plan.</small>
+      </div>
+      <div id="plan-info" class="hidden" style="background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Fecha inicio *</label>
+          <input type="date" id="mem-inicio" class="form-control" required>
+          <small id="mem-inicio-error" class="text-danger hidden">Ingresa la fecha de inicio.</small>
+        </div>
+        <div class="form-group">
+          <label>Fecha fin (calculada)</label>
+          <input type="date" id="mem-fin" class="form-control" readonly style="background:var(--bg)">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Método de pago</label>
+          <select id="mem-metodo" class="form-control">
+            <option value="efectivo">Efectivo</option>
+            <option value="tarjeta">Tarjeta</option>
+            <option value="transferencia">Transferencia</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Estado del pago</label>
+          <select id="mem-estado-pago" class="form-control">
+            <option value="pagado">Pagado ahora</option>
+            <option value="pendiente">Pendiente (deuda)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>Notas</label><textarea id="mem-notas" class="form-control" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-nueva')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-guardar-nueva" onclick="withLoading(this, suscribir, 'Guardando...')">Confirmar y Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Cambiar Plan -->
+<div class="modal-overlay hidden" id="modal-cambio">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Cambiar Plan</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-cambio')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="cambio-mem-id">
+      <div id="cambio-info" style="background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px"></div>
+      <div class="form-group">
+        <label>Nuevo Plan *</label>
+        <select id="cambio-plan" class="form-control" required onchange="onCambioPlanChange()"></select>
+        <small id="cambio-plan-error" class="text-danger hidden">Selecciona un plan.</small>
+      </div>
+      <div id="cambio-plan-info" class="hidden" style="background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Método de pago</label>
+          <select id="cambio-metodo" class="form-control">
+            <option value="efectivo">Efectivo</option>
+            <option value="tarjeta">Tarjeta</option>
+            <option value="transferencia">Transferencia</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Estado del pago</label>
+          <select id="cambio-estado-pago" class="form-control">
+            <option value="pagado">Pagado ahora</option>
+            <option value="pendiente">Pendiente (deuda)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>Notas</label><textarea id="cambio-notas" class="form-control" rows="2"></textarea></div>
+      <p style="font-size:12px;color:var(--text-light);margin-top:8px">⚠️ La membresía actual quedará cancelada y se creará una nueva desde hoy.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-cambio')">Cancelar</button>
+      <button class="btn btn-primary" onclick="withLoading(this, cambiarPlan, 'Guardando...')">Confirmar Cambio</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Renovar -->
+<div class="modal-overlay hidden" id="modal-renovar">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Renovar Membresía</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-renovar')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="renovar-mem-id">
+      <div id="renovar-info" style="background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Método de pago</label>
+          <select id="renovar-metodo" class="form-control">
+            <option value="efectivo">Efectivo</option>
+            <option value="tarjeta">Tarjeta</option>
+            <option value="transferencia">Transferencia</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Estado del pago</label>
+          <select id="renovar-estado-pago" class="form-control">
+            <option value="pagado">Pagado ahora</option>
+            <option value="pendiente">Pendiente (deuda)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>Notas</label><textarea id="renovar-notas" class="form-control" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-renovar')">Cancelar</button>
+      <button class="btn btn-primary" onclick="withLoading(this, renovar, 'Renovando...')">Confirmar Renovación</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Editar estado -->
+<div class="modal-overlay hidden" id="modal-editar">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Editar Membresía</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-editar')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-mem-id">
+      <div class="form-group">
+        <label>Estado</label>
+        <select id="edit-estado" class="form-control">
+          <option value="activo">Activo</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="vencido">Vencido</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Fecha fin</label>
+        <input type="date" id="edit-fin" class="form-control">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-editar')">Cancelar</button>
+      <button class="btn btn-primary" onclick="withLoading(this, guardarEdicion)">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/cache.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/icons.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+  initLayout('membresias', 'Membresías');
+  document.getElementById('icon-warning-mem').innerHTML = icon('warning');
+  document.getElementById('icon-plus-mem').innerHTML    = icon('plus');
+  document.getElementById('icon-excel-mem').innerHTML   = icon('excel');
+  let currentPage = 1;
+  let vencenFilter = false;
+  let planesCache = [];
+  let cajaActual = null; // caja abierta activa
+
+  // ── Verificar estado de caja al cargar ──────────────────────────────────────
+  async function checkCaja() {
+    try { cajaActual = await api.get('/caja/estado'); } catch (e) { cajaActual = null; }
+    const banner = document.getElementById('banner-caja-cerrada');
+    const btnNew = document.getElementById('btn-new');
+    if (!cajaActual) {
+      banner.classList.remove('hidden');
+      btnNew.disabled = true;
+      btnNew.title = 'Abre la caja antes de registrar membresías';
+    } else {
+      banner.classList.add('hidden');
+      btnNew.disabled = false;
+      btnNew.title = '';
+    }
+  }
+
+  async function loadSelects() {
+    const [clientes, planes] = await Promise.all([api.get('/clientes?limit=500'), api.get('/planes')]);
+    planesCache = planes;
+
+    const cSel = document.getElementById('mem-cliente');
+    cSel.innerHTML = '<option value="">Seleccionar cliente</option>' +
+      clientes.data.map(c => `<option value="${c._id || c.id}">${c.nombre}${c.dni ? ' - ' + c.dni : ''}</option>`).join('');
+
+    const planOpts = '<option value="">Seleccionar plan</option>' +
+      planes.map(p => `<option value="${p._id || p.id}" data-dias="${p.duracion_dias}" data-precio="${p.precio}">${p.nombre} — ${fmtMoney(p.precio)} (${p.duracion_dias} días)</option>`).join('');
+
+    document.getElementById('mem-plan').innerHTML = planOpts;
+    document.getElementById('cambio-plan').innerHTML = planOpts;
+  }
+
+  async function onClienteChange() {
+    const clienteId = document.getElementById('mem-cliente').value;
+    const alerta = document.getElementById('alerta-activa');
+    const btnGuardar = document.getElementById('btn-guardar-nueva');
+    alerta.classList.add('hidden');
+    btnGuardar.disabled = false;
+    if (!clienteId) return;
+    try {
+      const data = await api.get(`/membresias?cliente_id=${clienteId}&estado=activo&limit=1`);
+      if (data.data.length > 0) {
+        const m = data.data[0];
+        alerta.textContent = `⚠️ Este cliente ya tiene una membresía activa: ${m.plan_nombre} — vence el ${fmtDate(m.fecha_fin)}. Cancélala antes de asignar una nueva.`;
+        alerta.classList.remove('hidden');
+        btnGuardar.disabled = true;
+      }
+    } catch (e) {}
+  }
+
+  function onPlanChange() {
+    const sel = document.getElementById('mem-plan');
+    const opt = sel.options[sel.selectedIndex];
+    const info = document.getElementById('plan-info');
+    const inicio = document.getElementById('mem-inicio').value;
+    if (!opt || !opt.value) { info.classList.add('hidden'); document.getElementById('mem-fin').value = ''; return; }
+    const dias = parseInt(opt.dataset.dias);
+    const precio = parseFloat(opt.dataset.precio);
+    info.innerHTML = `Precio: <strong>${fmtMoney(precio)}</strong> &nbsp;|&nbsp; Duración: <strong>${dias} días</strong>`;
+    info.classList.remove('hidden');
+    if (inicio) calcularFechaFin(inicio, dias, 'mem-fin');
+  }
+
+  function onCambioPlanChange() {
+    const sel = document.getElementById('cambio-plan');
+    const opt = sel.options[sel.selectedIndex];
+    const info = document.getElementById('cambio-plan-info');
+    if (!opt || !opt.value) { info.classList.add('hidden'); return; }
+    info.innerHTML = `Precio: <strong>${fmtMoney(opt.dataset.precio)}</strong> &nbsp;|&nbsp; Duración: <strong>${opt.dataset.dias} días</strong>`;
+    info.classList.remove('hidden');
+  }
+
+  document.getElementById('mem-inicio').addEventListener('change', () => {
+    const sel = document.getElementById('mem-plan');
+    const opt = sel.options[sel.selectedIndex];
+    if (opt && opt.value) calcularFechaFin(document.getElementById('mem-inicio').value, parseInt(opt.dataset.dias), 'mem-fin');
+  });
+
+  function calcularFechaFin(fechaInicio, dias, targetId) {
+    const d = new Date(fechaInicio);
+    d.setDate(d.getDate() + dias);
+    document.getElementById(targetId).value = d.toISOString().split('T')[0];
+  }
+
+  async function loadMembresias(page = 1) {
+    currentPage = page;
+    const estado = document.getElementById('filter-estado').value;
+    let qs = `?page=${page}&limit=15`;
+    if (estado) qs += `&estado=${estado}`;
+    if (vencenFilter) qs += `&vencen_pronto=true`;
+    try {
+      const data = await api.get(`/membresias${qs}`);
+      // Construir set de cliente_ids que ya tienen membresía activa en esta página
+      const clientesConActiva = new Set(
+        data.data.filter(m => m.estado === 'activo' || m.estado === 'pendiente').map(m => m.cliente_id)
+      );
+      document.getElementById('membresias-table').innerHTML = data.data.map(m => {
+        const days = daysUntil(m.fecha_fin);
+        const expClass = days !== null && days <= 7 && days >= 0 ? 'badge-warning' : days !== null && days < 0 ? 'badge-danger' : 'badge-info';
+        const estadoClass = { activo: 'badge-success', vencido: 'badge-danger', cancelado: 'badge-warning', pendiente: 'badge-warning' }[m.estado] || 'badge-info';
+        const esActivo = m.estado === 'activo';
+        // Solo mostrar renovar si está vencido/cancelado Y el cliente NO tiene ya otra activa/pendiente
+        const puedeRenovar = (m.estado === 'vencido' || m.estado === 'cancelado') && !clientesConActiva.has(m.cliente_id);
+        const cajaBloqueado = !cajaActual;
+        const disabledAttr = cajaBloqueado ? 'disabled title="Abre la caja primero"' : '';
+        return `<tr>
+          <td>
+            <div class="member-cell">
+              ${m.foto_url
+                ? `<img src="${m.foto_url}" class="member-avatar">`
+                : `<div class="member-avatar" style="display:flex;align-items:center;justify-content:center">${avatarInitials(m.cliente_nombre)}</div>`}
+              <div><div style="font-weight:600">${m.cliente_nombre}</div></div>
+            </div>
+          </td>
+          <td>${m.plan_nombre}<div style="font-size:11px;color:var(--text-light)">${fmtMoney(m.precio)}</div></td>
+          <td>${fmtDate(m.fecha_inicio)}</td>
+          <td><span class="badge ${expClass}">${fmtDate(m.fecha_fin)}</span></td>
+          <td><span class="badge ${estadoClass}">${m.estado}</span></td>
+          <td style="display:flex;gap:4px;flex-wrap:wrap">
+            ${esActivo ? `<button class="btn btn-sm btn-outline" ${disabledAttr} onclick="abrirCambioPlan('${m.id}','${m.plan_nombre}','${m.cliente_nombre}')">${icon('refresh')}</button>` : ''}
+            ${puedeRenovar ? `<button class="btn btn-sm btn-outline" ${disabledAttr} onclick="abrirRenovar('${m.id}','${m.plan_nombre}','${m.cliente_nombre}',${m.precio})">${icon('renew')}</button>` : ''}
+            ${m.estado !== 'cancelado' ? `<button class="btn btn-sm btn-outline" title="Editar" onclick="abrirEditar('${m.id}','${m.estado}','${m.fecha_fin?.split('T')[0]}')">${icon('edit')}</button>` : ''}
+          </td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="6" class="text-center" style="padding:30px;color:var(--text-light)">Sin membresías</td></tr>';
+      renderPagination(document.getElementById('pagination'), data.page, data.pages, loadMembresias);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  // --- Nueva membresía ---
+  document.getElementById('btn-new').onclick = () => {
+    if (!cajaActual) { toast('Abre la caja antes de registrar membresías', 'warning'); return; }
+    document.getElementById('mem-cliente').value = '';
+    document.getElementById('mem-plan').value = '';
+    document.getElementById('mem-inicio').value = new Date().toISOString().split('T')[0];
+    document.getElementById('mem-fin').value = '';
+    document.getElementById('mem-metodo').value = 'efectivo';
+    document.getElementById('mem-estado-pago').value = 'pagado';
+    document.getElementById('mem-notas').value = '';
+    document.getElementById('alerta-activa').classList.add('hidden');
+    document.getElementById('plan-info').classList.add('hidden');
+    document.getElementById('btn-guardar-nueva').disabled = false;
+    ['mem-cliente-error','mem-plan-error','mem-inicio-error'].forEach(id => document.getElementById(id).classList.add('hidden'));
+    openModal('modal-nueva');
+  };
+
+  async function suscribir() {
+    if (!cajaActual) { toast('No hay caja abierta. Abre la caja antes de registrar membresías.', 'warning'); return; }
+    const clienteId = document.getElementById('mem-cliente').value;
+    const planId = document.getElementById('mem-plan').value;
+    const inicio = document.getElementById('mem-inicio').value;
+    let valid = true;
+
+    if (!clienteId) { document.getElementById('mem-cliente-error').classList.remove('hidden'); valid = false; }
+    else document.getElementById('mem-cliente-error').classList.add('hidden');
+    if (!planId) { document.getElementById('mem-plan-error').classList.remove('hidden'); valid = false; }
+    else document.getElementById('mem-plan-error').classList.add('hidden');
+    if (!inicio) { document.getElementById('mem-inicio-error').classList.remove('hidden'); valid = false; }
+    else document.getElementById('mem-inicio-error').classList.add('hidden');
+    if (!valid) return;
+
+    try {
+      const result = await api.post('/membresias/suscribir', {
+        cliente_id: clienteId,
+        plan_id: planId,
+        fecha_inicio: inicio,
+        metodo_pago: document.getElementById('mem-metodo').value,
+        estado_pago: document.getElementById('mem-estado-pago').value,
+        caja_id: cajaActual.id,
+        notas: document.getElementById('mem-notas').value || null,
+      }, false, {
+        // membresias y pagos: registros nuevos → invalidar
+        invalidate: ['membresias', 'pagos'],
+      });
+      // Patch quirúrgico en clientes: solo actualizar el estado de membresía
+      // del cliente afectado sin borrar toda la lista
+      if (result?.membresia) {
+        const mem = result.membresia;
+        gymCache.patchItem('clientes', clienteId, (c) => ({
+          ...c,
+          membresia_estado: mem.estado,
+          fecha_fin: mem.fecha_fin,
+          plan_nombre: planesCache.find(p => (p._id || p.id) === planId)?.nombre || c.plan_nombre,
+        }));
+      }
+      toast('Membresía y pago registrados correctamente');
+      closeModal('modal-nueva');
+      loadMembresias(currentPage);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+  function abrirCambioPlan(id, planActual, cliente) {
+    if (!cajaActual) { toast('Abre la caja antes de cambiar el plan', 'warning'); return; }
+    document.getElementById('cambio-mem-id').value = id;
+    document.getElementById('cambio-info').innerHTML = `Cliente: <strong>${cliente}</strong> &nbsp;|&nbsp; Plan actual: <strong>${planActual}</strong>`;
+    document.getElementById('cambio-plan').value = '';
+    document.getElementById('cambio-plan-info').classList.add('hidden');
+    document.getElementById('cambio-metodo').value = 'efectivo';
+    document.getElementById('cambio-estado-pago').value = 'pagado';
+    document.getElementById('cambio-notas').value = '';
+    document.getElementById('cambio-plan-error').classList.add('hidden');
+    openModal('modal-cambio');
+  }
+
+  async function cambiarPlan() {
+    if (!cajaActual) { toast('No hay caja abierta', 'warning'); return; }
+    const planId = document.getElementById('cambio-plan').value;
+    if (!planId) { document.getElementById('cambio-plan-error').classList.remove('hidden'); return; }
+    document.getElementById('cambio-plan-error').classList.add('hidden');
+    const id = document.getElementById('cambio-mem-id').value;
+    try {
+      const result = await api.post(`/membresias/${id}/cambiar-plan`, {
+        plan_id: planId,
+        metodo_pago: document.getElementById('cambio-metodo').value,
+        estado_pago: document.getElementById('cambio-estado-pago').value,
+        caja_id: cajaActual.id,
+        notas: document.getElementById('cambio-notas').value || null,
+      }, false, {
+        invalidate: ['membresias', 'pagos'],
+      });
+      if (result?.membresia) {
+        const mem = result.membresia;
+        gymCache.patchItem('clientes', String(mem.cliente_id), (c) => ({
+          ...c,
+          membresia_estado: mem.estado,
+          fecha_fin: mem.fecha_fin,
+          plan_nombre: planesCache.find(p => (p._id || p.id) === planId)?.nombre || c.plan_nombre,
+        }));
+      }
+      toast('Plan cambiado correctamente');
+      closeModal('modal-cambio');
+      loadMembresias(currentPage);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  // --- Renovar ---
+  function abrirRenovar(id, plan, cliente, precio) {
+    if (!cajaActual) { toast('Abre la caja antes de renovar membresías', 'warning'); return; }
+    document.getElementById('renovar-mem-id').value = id;
+    document.getElementById('renovar-info').innerHTML = `Cliente: <strong>${cliente}</strong> &nbsp;|&nbsp; Plan: <strong>${plan}</strong> &nbsp;|&nbsp; Monto: <strong>${fmtMoney(precio)}</strong>`;
+    document.getElementById('renovar-metodo').value = 'efectivo';
+    document.getElementById('renovar-estado-pago').value = 'pagado';
+    document.getElementById('renovar-notas').value = '';
+    openModal('modal-renovar');
+  }
+
+  async function renovar() {
+    if (!cajaActual) { toast('No hay caja abierta', 'warning'); return; }
+    const id = document.getElementById('renovar-mem-id').value;
+    try {
+      const result = await api.post(`/membresias/${id}/renovar`, {
+        metodo_pago: document.getElementById('renovar-metodo').value,
+        estado_pago: document.getElementById('renovar-estado-pago').value,
+        caja_id: cajaActual.id,
+        notas: document.getElementById('renovar-notas').value || null,
+      }, false, {
+        invalidate: ['membresias', 'pagos'],
+      });
+      if (result?.membresia) {
+        const mem = result.membresia;
+        gymCache.patchItem('clientes', String(mem.cliente_id), (c) => ({
+          ...c,
+          membresia_estado: mem.estado,
+          fecha_fin: mem.fecha_fin,
+        }));
+      }
+      toast('Membresía renovada correctamente');
+      closeModal('modal-renovar');
+      loadMembresias(currentPage);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  // --- Editar estado manual ---
+  function abrirEditar(id, estado, fecha_fin) {
+    document.getElementById('edit-mem-id').value = id;
+    document.getElementById('edit-estado').value = estado;
+    document.getElementById('edit-fin').value = fecha_fin || '';
+    openModal('modal-editar');
+  }
+
+  async function guardarEdicion() {
+    const id = document.getElementById('edit-mem-id').value;
+    try {
+      await api.put(`/membresias/${id}`, {
+        estado: document.getElementById('edit-estado').value,
+        fecha_fin: document.getElementById('edit-fin').value || null,
+      }, {
+        // Actualiza solo el ítem editado en caché
+        patch: { ns: 'membresias', id },
+      });
+      toast('Membresía actualizada');
+      closeModal('modal-editar');
+      loadMembresias(currentPage);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  document.getElementById('btn-vencen').onclick = () => {
+    vencenFilter = !vencenFilter;
+    document.getElementById('btn-vencen').classList.toggle('btn-warning', vencenFilter);
+    loadMembresias(1);
+  };
+  document.getElementById('filter-estado').onchange = () => loadMembresias(1);
+
+  function exportarMembresias() {
+    const estado = document.getElementById('filter-estado').value;
+    let qs = '?';
+    if (estado)      qs += `estado=${estado}&`;
+    if (vencenFilter) qs += `vencen_pronto=true&`;
+    api.download(`/reports/membresias/excel${qs}`, 'membresias.xlsx').then(() => toast('Descarga iniciada')).catch(err => toast(err.message, 'error'));
+  }
+
+  loadSelects().then(() => {
+    // Preseleccionar cliente si viene por query param (desde clientes.html)
+    const params = new URLSearchParams(window.location.search);
+    const clienteId = params.get('cliente_id');
+    if (clienteId) {
+      document.getElementById('mem-cliente').value = clienteId;
+      onClienteChange();
+      openModal('modal-nueva');
+    }
+  });
+  checkCaja().then(() => loadMembresias());
+</script>
+</body>
+</html>

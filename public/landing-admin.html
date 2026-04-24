@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Landing - PeruGym</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .img-section { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+    .img-card { background: var(--card); border-radius: 12px; padding: 20px; border: 1px solid var(--border); }
+    .img-card h3 { font-size: 14px; margin-bottom: 4px; }
+    .img-card p  { font-size: 12px; color: var(--text-light); margin-bottom: 14px; }
+    .img-preview {
+      width: 100%; height: 160px; border-radius: 8px; object-fit: cover;
+      background: var(--bg); border: 2px dashed var(--border);
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; margin-bottom: 12px; cursor: pointer; position: relative;
+    }
+    .img-preview img { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; }
+    .img-preview .placeholder { color: var(--text-light); font-size: 13px; text-align: center; padding: 20px; }
+    .img-preview .overlay {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.5);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity 0.2s; border-radius: 6px;
+      color: #fff; font-size: 13px; gap: 6px;
+    }
+    .img-preview:hover .overlay { opacity: 1; }
+    input[type="file"] { display: none; }
+    .logo-preview { background: #111; }
+    .logo-preview img { object-fit: contain; padding: 10px; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <div class="topbar" id="topbar"></div>
+    <div class="page-content">
+
+      <div class="card mb-3">
+        <div class="flex-between">
+          <div>
+            <h2 style="font-size:16px;margin-bottom:4px">Imágenes del Landing</h2>
+            <p style="font-size:13px;color:var(--text-light)">Haz clic en una imagen para cambiarla. Guarda al terminar.</p>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <a href="/" target="_blank" class="btn btn-outline btn-sm" style="display:inline-flex;align-items:center;gap:4px">
+              <span id="icon-view"></span> Ver landing
+            </a>
+            <button class="btn btn-primary" id="btn-save" style="display:inline-flex;align-items:center;gap:6px">
+              <span id="icon-save"></span> Guardar cambios
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="img-section">
+
+        <!-- LOGO NAVBAR -->
+        <div class="img-card">
+          <h3>Logo — Header (Navbar)</h3>
+          <p>Aparece en la barra de navegación superior.</p>
+          <div class="img-preview logo-preview" id="prev-logo" onclick="document.getElementById('file-logo').click()">
+            <img id="img-logo" src="" alt="Logo navbar" style="display:none">
+            <div class="placeholder" id="ph-logo">Sin imagen<br><small>Clic para subir</small></div>
+            <div class="overlay"><span id="icon-cam-logo"></span> Cambiar</div>
+          </div>
+          <input type="file" id="file-logo" accept="image/*">
+          <p style="font-size:11px;color:var(--text-light);margin:0">Recomendado: PNG transparente, fondo oscuro</p>
+        </div>
+
+        <!-- LOGO NOSOTROS -->
+        <div class="img-card">
+          <h3>Logo — Sección Nosotros</h3>
+          <p>Aparece en el overlay circular sobre la foto de "Nosotros".</p>
+          <div class="img-preview logo-preview" id="prev-about-logo" onclick="document.getElementById('file-about-logo').click()">
+            <img id="img-about-logo" src="" alt="Logo nosotros" style="display:none">
+            <div class="placeholder" id="ph-about-logo">Sin imagen<br><small>Clic para subir</small></div>
+            <div class="overlay"><span id="icon-cam-about-logo"></span> Cambiar</div>
+          </div>
+          <input type="file" id="file-about-logo" accept="image/*">
+          <p style="font-size:11px;color:var(--text-light);margin:0">Recomendado: PNG transparente, cuadrado</p>
+        </div>
+
+        <!-- HERO BG -->
+        <div class="img-card">
+          <h3>Fondo del Hero</h3>
+          <p>Imagen de fondo de la sección principal del landing.</p>
+          <div class="img-preview" id="prev-hero" onclick="document.getElementById('file-hero').click()">
+            <img id="img-hero" src="" alt="Hero" style="display:none">
+            <div class="placeholder" id="ph-hero">Sin imagen<br><small>Clic para subir</small></div>
+            <div class="overlay"><span id="icon-cam-hero"></span> Cambiar</div>
+          </div>
+          <input type="file" id="file-hero" accept="image/*">
+          <p style="font-size:11px;color:var(--text-light);margin:0">Recomendado: 1920×1080px, oscura o con overlay</p>
+        </div>
+
+        <!-- ABOUT IMG -->
+        <div class="img-card">
+          <h3>Imagen "Nosotros"</h3>
+          <p>Foto principal de la sección "Somos más que un Gym".</p>
+          <div class="img-preview" id="prev-about" onclick="document.getElementById('file-about').click()">
+            <img id="img-about" src="" alt="Nosotros" style="display:none">
+            <div class="placeholder" id="ph-about">Sin imagen<br><small>Clic para subir</small></div>
+            <div class="overlay"><span id="icon-cam-about"></span> Cambiar</div>
+          </div>
+          <input type="file" id="file-about" accept="image/*">
+          <p style="font-size:11px;color:var(--text-light);margin:0">Recomendado: 800×600px, personas entrenando</p>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/cache.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/icons.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+  initLayout('landing-admin', 'Landing');
+  document.getElementById('icon-view').innerHTML    = icon('landing');
+  document.getElementById('icon-save').innerHTML    = icon('check');
+  document.getElementById('icon-cam-logo').innerHTML       = icon('camera');
+  document.getElementById('icon-cam-about-logo').innerHTML = icon('camera');
+  document.getElementById('icon-cam-hero').innerHTML       = icon('camera');
+  document.getElementById('icon-cam-about').innerHTML      = icon('camera');
+
+  const pending = { logo: null, about_logo: null, hero_bg: null, about_img: null };
+
+  function setPreview(imgEl, phEl, src) {
+    if (src) {
+      imgEl.src = src;
+      imgEl.style.display = 'block';
+      phEl.style.display  = 'none';
+    } else {
+      imgEl.style.display = 'none';
+      phEl.style.display  = 'block';
+    }
+  }
+
+  async function loadConfig() {
+    try {
+      const cfg = await fetch('/api/landing').then(r => r.json());
+      setPreview(document.getElementById('img-logo'),       document.getElementById('ph-logo'),       cfg.logo_url);
+      setPreview(document.getElementById('img-about-logo'), document.getElementById('ph-about-logo'), cfg.about_logo_url);
+      setPreview(document.getElementById('img-hero'),       document.getElementById('ph-hero'),       cfg.hero_bg_url);
+      setPreview(document.getElementById('img-about'),      document.getElementById('ph-about'),      cfg.about_img_url);
+    } catch (e) { toast('Error cargando configuración', 'error'); }
+  }
+
+  function bindFileInput(inputId, imgId, phId, key) {
+    document.getElementById(inputId).addEventListener('change', function() {
+      const file = this.files[0];
+      if (!file) return;
+      pending[key] = file;
+      const reader = new FileReader();
+      reader.onload = e => setPreview(document.getElementById(imgId), document.getElementById(phId), e.target.result);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  bindFileInput('file-logo',       'img-logo',       'ph-logo',       'logo');
+  bindFileInput('file-about-logo', 'img-about-logo', 'ph-about-logo', 'about_logo');
+  bindFileInput('file-hero',       'img-hero',       'ph-hero',       'hero_bg');
+  bindFileInput('file-about',      'img-about',      'ph-about',      'about_img');
+
+  document.getElementById('btn-save').addEventListener('click', async () => {
+    const hasPending = Object.values(pending).some(v => v !== null);
+    if (!hasPending) { toast('No hay cambios para guardar', 'warning'); return; }
+
+    const btn = document.getElementById('btn-save');
+    btn.disabled = true;
+    btn.textContent = 'Guardando...';
+
+    try {
+      const form = new FormData();
+      if (pending.logo)       form.append('logo',       pending.logo);
+      if (pending.about_logo) form.append('about_logo', pending.about_logo);
+      if (pending.hero_bg)    form.append('hero_bg',    pending.hero_bg);
+      if (pending.about_img)  form.append('about_img',  pending.about_img);
+
+      const res = await fetch('/api/landing', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${api.getToken()}` },
+        body: form
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Error');
+
+      pending.logo = pending.about_logo = pending.hero_bg = pending.about_img = null;
+      toast('Imágenes guardadas correctamente', 'success');
+    } catch (e) {
+      toast(e.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = icon('check') + ' Guardar cambios';
+    }
+  });
+
+  loadConfig();
+</script>
+</body>
+</html>

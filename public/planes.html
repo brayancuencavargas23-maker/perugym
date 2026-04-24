@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Planes - PeruGym</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .landing-badge { background: rgba(108,99,255,0.15); color: var(--primary); border: 1px solid var(--primary); font-size: 11px; padding: 2px 8px; border-radius: 20px; }
+    .featured-badge { background: rgba(255,193,7,0.15); color: #856404; border: 1px solid #ffc107; font-size: 11px; padding: 2px 8px; border-radius: 20px; }
+    .plan-card-admin { border-top: 4px solid var(--primary); transition: box-shadow 0.2s; }
+    .plan-card-admin.is-featured { border-top-color: #ffc107; }
+    .features-textarea { font-size: 13px; resize: vertical; }
+    .features-hint { font-size: 11px; color: var(--text-light); margin-top: 4px; }
+    .toggle-row { display: flex; gap: 20px; }
+    .toggle-item { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+    .price-display { font-size: 28px; font-weight: 700; color: var(--primary); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <div class="topbar" id="topbar"></div>
+    <div class="page-content">
+      <div class="flex-between mb-2" style="margin-bottom:20px">
+        <p style="font-size:13px;color:var(--text-light)">Gestiona los planes y configura cuáles aparecen en la página principal.</p>
+        <div style="display:flex;gap:10px">
+          <a href="/" target="_blank" class="btn btn-outline btn-sm" style="display:inline-flex;align-items:center;gap:4px"><span id="icon-landing-pl"></span> Ver landing</a>
+          <button class="btn btn-primary" id="btn-new" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-plus-pl"></span> Nuevo Plan</button>
+        </div>
+      </div>
+      <div id="plans-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="modal-overlay">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-header">
+      <h3 id="modal-title">Nuevo Plan</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-overlay')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="plan-id">
+      <div class="form-row">
+        <div class="form-group"><label>Nombre *</label><input type="text" id="p-name" class="form-control" required></div>
+        <div class="form-group"><label>Subtítulo</label><input type="text" id="p-desc" class="form-control"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Precio (S/) *</label><input type="number" id="p-price" class="form-control" step="0.01" required></div>
+        <div class="form-group"><label>Duración (días) *</label><input type="number" id="p-days" class="form-control" required></div>
+      </div>
+      <div class="form-group">
+        <label>Beneficios (uno por línea)</label>
+        <textarea id="p-features" class="form-control features-textarea" rows="5"></textarea>
+        <div class="features-hint">✏️ Un beneficio por línea. Aparecerán con ✓ en la landing.</div>
+      </div>
+      <div class="form-group">
+        <label style="margin-bottom:10px;display:block">Landing</label>
+        <div class="toggle-row">
+          <label class="toggle-item"><input type="checkbox" id="p-show-landing"> <span style="display:inline-flex;align-items:center;gap:4px" id="icon-landing-toggle"></span> Mostrar en landing</label>
+          <label class="toggle-item"><input type="checkbox" id="p-featured"> <span>Popular</span></label>
+        </div>
+      </div>
+      <div class="form-group hidden" id="active-group">
+        <label class="toggle-item"><input type="checkbox" id="p-active"> <span>Plan activo</span></label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-overlay')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save-plan" onclick="withLoading(this, savePlan)">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/cache.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/icons.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+  initLayout('planes', 'Planes');
+  document.getElementById('icon-landing-pl').innerHTML     = icon('landing');
+  document.getElementById('icon-plus-pl').innerHTML        = icon('plus');
+  document.getElementById('icon-landing-toggle').innerHTML = icon('landing');
+  const user = JSON.parse(localStorage.getItem('gym_user') || '{}');
+
+  async function loadPlans() {
+    try {
+      const plans = await api.get('/planes');
+      const grid = document.getElementById('plans-grid');
+      if (!plans.length) { grid.innerHTML = '<p style="color:var(--text-light)">Sin planes registrados</p>'; return; }
+      grid.innerHTML = plans.map(p => {
+        const feats = (p.caracteristicas || []);
+        const featHtml = feats.length
+          ? '<ul style="list-style:none;margin-bottom:16px;display:flex;flex-direction:column;gap:5px">' +
+            feats.map(f => '<li style="font-size:12px;color:var(--text-light);display:flex;gap:6px"><span style="color:var(--primary);font-weight:700">✓</span>' + f + '</li>').join('') +
+            '</ul>'
+          : '<p style="font-size:12px;color:var(--text-light);margin-bottom:16px">Sin beneficios definidos</p>';
+        const editBtn = user.role === 'admin'
+          ? '<div style="display:flex;gap:8px"><button class="btn btn-outline btn-sm" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:4px" onclick="editPlan(\'' + p._id + '\')">' + icon('edit') + ' Editar</button><button class="btn btn-danger btn-sm" style="display:inline-flex;align-items:center" onclick="withLoading(this, () => deletePlan(\'' + p._id + '\'), \'Eliminando...\')">'+icon('trash')+'</button></div>'
+          : '';
+        return '<div class="card plan-card-admin ' + (p.destacado ? 'is-featured' : '') + '">' +
+          '<div class="flex-between mb-1"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+          '<h3 style="font-size:18px;text-transform:uppercase">' + p.nombre + '</h3>' +
+          (p.mostrar_landing ? '<span class="landing-badge" style="display:inline-flex;align-items:center;gap:3px">' + icon('landing') + ' Landing</span>' : '') +
+          (p.destacado ? '<span class="featured-badge">Popular</span>' : '') +
+          '</div><span class="badge ' + (p.activo ? 'badge-success' : 'badge-danger') + '">' + (p.activo ? 'Activo' : 'Inactivo') + '</span></div>' +
+          '<p style="font-size:12px;color:var(--text-light);margin-bottom:8px">' + (p.descripcion || '') + '</p>' +
+          '<div class="price-display">S/ ' + parseFloat(p.precio).toFixed(2) + '<span style="font-size:14px;font-weight:400;color:var(--text-light)">/mes</span></div>' +
+          '<div style="font-size:12px;color:var(--text-light);margin:6px 0 12px;display:flex;align-items:center;gap:4px">' + icon('calendar') + ' ' + p.duracion_dias + ' días</div>' +
+          featHtml + editBtn + '</div>';
+      }).join('');
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  document.getElementById('btn-new').onclick = () => {
+    if (user.role !== 'admin') return toast('Solo administradores pueden crear planes', 'warning');
+    document.getElementById('plan-id').value = '';
+    document.getElementById('p-name').value = '';
+    document.getElementById('p-desc').value = '';
+    document.getElementById('p-price').value = '';
+    document.getElementById('p-days').value = 30;
+    document.getElementById('p-features').value = '';
+    document.getElementById('p-show-landing').checked = false;
+    document.getElementById('p-featured').checked = false;
+    document.getElementById('active-group').classList.add('hidden');
+    document.getElementById('modal-title').textContent = 'Nuevo Plan';
+    openModal('modal-overlay');
+  };
+
+  async function editPlan(id) {
+    const plans = await api.get('/planes');
+    const p = plans.find(x => x._id === id || x.id === id);
+    if (!p) return;
+    document.getElementById('plan-id').value = p._id || p.id;
+    document.getElementById('p-name').value = p.nombre;
+    document.getElementById('p-desc').value = p.descripcion || '';
+    document.getElementById('p-price').value = p.precio;
+    document.getElementById('p-days').value = p.duracion_dias;
+    document.getElementById('p-features').value = (p.caracteristicas || []).join('\n');
+    document.getElementById('p-show-landing').checked = p.mostrar_landing;
+    document.getElementById('p-featured').checked = p.destacado;
+    document.getElementById('p-active').checked = p.activo;
+    document.getElementById('active-group').classList.remove('hidden');
+    document.getElementById('modal-title').textContent = 'Editar Plan';
+    openModal('modal-overlay');
+  }
+
+  async function savePlan() {
+    const id = document.getElementById('plan-id').value;
+    const body = {
+      nombre: document.getElementById('p-name').value,
+      precio: document.getElementById('p-price').value,
+      duracion_dias: document.getElementById('p-days').value,
+      descripcion: document.getElementById('p-desc').value,
+      caracteristicas: document.getElementById('p-features').value.split('\n').map(f => f.trim()).filter(Boolean),
+      mostrar_landing: document.getElementById('p-show-landing').checked,
+      destacado: document.getElementById('p-featured').checked,
+      activo: id ? document.getElementById('p-active').checked : true,
+    };
+    if (!body.nombre || !body.precio || !body.duracion_dias) return toast('Completa los campos requeridos', 'warning');
+    try {
+      if (id) await api.put('/planes/' + id, body, { patch: { ns: 'planes', id } });
+      else await api.post('/planes', body, false, { invalidate: ['planes'] });
+      toast(id ? 'Plan actualizado' : 'Plan creado');
+      closeModal('modal-overlay');
+      loadPlans();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function deletePlan(id) {
+    const ok = await confirmDialog({
+      title: 'Eliminar plan',
+      message: '¿Eliminar este plan? Esta acción no se puede deshacer.',
+      confirmText: 'Sí, eliminar',
+      type: 'danger'
+    });
+    if (!ok) return;
+    try {
+      await api.delete('/planes/' + id, { remove: { ns: 'planes', id } });
+      toast('Plan eliminado');
+      loadPlans();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  loadPlans();
+</script>
+</body>
+</html>

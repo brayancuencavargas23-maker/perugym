@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Usuarios - GymPro</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <div class="topbar" id="topbar"></div>
+    <div class="page-content">
+      <div style="text-align:right;margin-bottom:16px">
+        <button class="btn btn-primary" id="btn-new" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-plus-usr"></span> Nuevo Usuario</button>
+      </div>
+      <div class="card">
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Usuario</th><th>Email</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="users-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Nuevo Usuario</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-overlay')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="user-id">
+      <div class="form-row">
+        <div class="form-group"><label>Usuario *</label><input type="text" id="u-name" class="form-control" required></div>
+        <div class="form-group"><label>Email *</label><input type="email" id="u-email" class="form-control" required></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Rol</label>
+          <select id="u-role" class="form-control">
+            <option value="recepcionista">Recepcionista</option>
+            <option value="entrenador">Entrenador</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Contraseña <span id="pass-hint" style="font-size:11px;color:var(--text-light)">(requerida)</span></label>
+          <input type="password" id="u-password" class="form-control">
+        </div>
+      </div>
+      <div class="form-group hidden" id="active-group">
+        <label><input type="checkbox" id="u-active"> Usuario activo</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-overlay')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save-user" onclick="withLoading(this, saveUser)">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="modal-permisos">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="permisos-title">Permisos</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-permisos')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="permisos-user-id">
+      <p style="margin-bottom:12px;color:var(--text-light);font-size:13px">Selecciona las gestiones a las que tendrá acceso este usuario:</p>
+      <div id="permisos-checks" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-permisos')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save-permisos" onclick="withLoading(this, savePermisos)">Guardar Permisos</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/cache.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/icons.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+  initLayout('users', 'Usuarios del Sistema');
+  document.getElementById('icon-plus-usr').innerHTML = icon('plus');
+
+  async function loadUsers() {
+    try {
+      const users = await api.get('/auth/users');
+      document.getElementById('users-table').innerHTML = users.map(u => `
+        <tr>
+          <td><div style="display:flex;align-items:center;gap:8px">
+            <div style="width:32px;height:32px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:bold">${avatarInitials(u.name)}</div>
+            ${u.name}
+          </div></td>
+          <td>${u.email}</td>
+          <td><span class="badge badge-info">${u.role}</span></td>
+          <td><span class="badge ${u.active ? 'badge-success' : 'badge-danger'}">${u.active ? 'Activo' : 'Inactivo'}</span></td>
+          <td>
+            <button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center" onclick="editUser('${u.id}')">${icon('edit')}</button>
+            ${u.role !== 'admin' ? `<button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center;gap:4px" onclick="openPermisos('${u.id}', '${u.name}', ${JSON.stringify(u.permisos || []).replace(/"/g, '&quot;')})">${icon('key')} Permisos</button>` : ''}
+            <button class="btn btn-sm btn-danger" style="display:inline-flex;align-items:center" onclick="withLoading(this, () => deleteUser('${u.id}', '${u.name}'), 'Eliminando...')">${icon('trash')}</button>
+          </td>
+        </tr>
+      `).join('');
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  document.getElementById('btn-new').onclick = () => {
+    document.getElementById('user-id').value = '';
+    document.getElementById('u-name').value = '';
+    document.getElementById('u-email').value = '';
+    document.getElementById('u-role').value = 'recepcionista';
+    document.getElementById('u-password').value = '';
+    document.getElementById('active-group').classList.add('hidden');
+    document.getElementById('pass-hint').textContent = '(requerida)';
+    document.getElementById('modal-title').textContent = 'Nuevo Usuario';
+    openModal('modal-overlay');
+  };
+
+  async function editUser(id) {
+    const users = await api.get('/auth/users');
+    const u = users.find(x => x.id === id);
+    if (!u) return;
+    document.getElementById('user-id').value = u.id;
+    document.getElementById('u-name').value = u.name;
+    document.getElementById('u-email').value = u.email;
+    document.getElementById('u-role').value = u.role;
+    document.getElementById('u-password').value = '';
+    document.getElementById('u-active').checked = u.active;
+    document.getElementById('active-group').classList.remove('hidden');
+    document.getElementById('pass-hint').textContent = '(dejar vacío para no cambiar)';
+    document.getElementById('modal-title').textContent = 'Editar Usuario';
+    openModal('modal-overlay');
+  }
+
+  async function saveUser() {
+    const id = document.getElementById('user-id').value;
+    const body = {
+      name: document.getElementById('u-name').value,
+      email: document.getElementById('u-email').value,
+      role: document.getElementById('u-role').value,
+      active: document.getElementById('u-active').checked,
+    };
+    const pass = document.getElementById('u-password').value;
+    if (pass) body.password = pass;
+    if (!id && !pass) return toast('La contraseña es requerida', 'warning');
+
+    try {
+      if (id) await api.put(`/auth/users/${id}`, body, { patch: { ns: 'auth', id } });
+      else await api.post('/auth/users', body, false, { invalidate: ['auth'] });
+      toast(id ? 'Usuario actualizado' : 'Usuario creado');
+      closeModal('modal-overlay');
+      loadUsers();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function deleteUser(id, name) {
+    const ok = await confirmDialog({
+      title: 'Eliminar usuario',
+      message: `¿Eliminar al usuario <strong>${name}</strong>? Esta acción no se puede deshacer.`,
+      confirmText: 'Sí, eliminar',
+      type: 'danger'
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/auth/users/${id}`, { remove: { ns: 'auth', id } });
+      toast('Usuario eliminado');
+      loadUsers();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  const GESTIONES = [
+    { key: 'dashboard',  label: 'Dashboard' },
+    { key: 'clientes',   label: 'Clientes' },
+    { key: 'membresias', label: 'Membresías' },
+    { key: 'pagos',      label: 'Pagos' },
+    { key: 'planes',     label: 'Planes' },
+    { key: 'asistencia', label: 'Asistencia' },
+    { key: 'productos',  label: 'Productos' },
+    { key: 'caja',       label: 'Caja' },
+    { key: 'reports',    label: 'Reportes' },
+  ];
+
+  function openPermisos(id, name, permisos) {
+    document.getElementById('permisos-user-id').value = id;
+    document.getElementById('permisos-title').textContent = `Permisos — ${name}`;
+    const current = Array.isArray(permisos) ? permisos : [];
+    document.getElementById('permisos-checks').innerHTML = GESTIONES.map(g => `
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px;border:1px solid var(--border);border-radius:6px">
+        <input type="checkbox" value="${g.key}" ${current.includes(g.key) ? 'checked' : ''}>
+        ${g.label}
+      </label>
+    `).join('');
+    openModal('modal-permisos');
+  }
+
+  async function savePermisos() {
+    const id = document.getElementById('permisos-user-id').value;
+    const checks = document.querySelectorAll('#permisos-checks input[type=checkbox]');
+    const permisos = Array.from(checks).filter(c => c.checked).map(c => c.value);
+    try {
+      await api.put(`/auth/users/${id}/permisos`, { permisos }, {
+        patch: { ns: 'auth', id },
+      });
+      toast('Permisos actualizados');
+      closeModal('modal-permisos');
+      loadUsers();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  loadUsers();
+</script>
+</body>
+</html>

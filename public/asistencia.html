@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Asistencia - PeruGym</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <div class="topbar" id="topbar"></div>
+    <div class="page-content">
+
+      <!-- Check-in rapido -->
+      <div class="card mb-2" style="margin-bottom:20px">
+        <h3 style="font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:6px" id="h-checkin"></h3>
+        <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+          <div class="form-group" style="flex:1;min-width:200px;margin:0">
+            <label>Seleccionar Cliente</label>
+            <select id="checkin-cliente" class="form-control">
+              <option value="">Seleccionar...</option>
+            </select>
+          </div>
+          <button class="btn btn-success" onclick="withLoading(this, doCheckin, 'Registrando...')" style="display:inline-flex;align-items:center;gap:6px" id="btn-checkin-el"></button>
+          <button class="btn btn-warning" onclick="withLoading(this, doCheckout, 'Registrando...')" style="display:inline-flex;align-items:center;gap:6px" id="btn-checkout-el"></button>
+        </div>
+      </div>
+
+      <!-- Resumen del dia -->
+      <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+        <div class="card" style="flex:1;min-width:140px;padding:16px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:var(--primary)" id="stat-total">-</div>
+          <div style="font-size:12px;color:var(--text-light);margin-top:4px">Visitas hoy</div>
+        </div>
+        <div class="card" style="flex:1;min-width:140px;padding:16px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#22c55e" id="stat-encurso">-</div>
+          <div style="font-size:12px;color:var(--text-light);margin-top:4px">En el gym ahora</div>
+        </div>
+        <div class="card" style="flex:1;min-width:140px;padding:16px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#f59e0b" id="stat-promedio">-</div>
+          <div style="font-size:12px;color:var(--text-light);margin-top:4px">Duración promedio</div>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="card" style="margin-bottom:16px;padding:16px">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+
+          <div class="form-group" style="margin:0;min-width:180px;flex:1">
+            <label style="font-size:12px">Buscar cliente</label>
+            <input type="text" id="filter-nombre" class="form-control" placeholder="Nombre del cliente...">
+          </div>
+
+          <div class="form-group" style="margin:0;min-width:160px">
+            <label style="font-size:12px">Cliente específico</label>
+            <select id="filter-cliente" class="form-control">
+              <option value="">Todos</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">Estado</label>
+            <select id="filter-estado" class="form-control" style="width:140px">
+              <option value="">Todos</option>
+              <option value="en_curso">En curso</option>
+              <option value="completado">Completado</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">Fecha exacta</label>
+            <input type="date" id="filter-date" class="form-control" style="width:160px">
+          </div>
+
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">Desde</label>
+            <input type="date" id="filter-from" class="form-control" style="width:150px">
+          </div>
+
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">Hasta</label>
+            <input type="date" id="filter-to" class="form-control" style="width:150px">
+          </div>
+
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">Duración mín (min)</label>
+            <input type="number" id="filter-dur-min" class="form-control" style="width:120px" placeholder="0" min="0">
+          </div>
+
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">Duración máx (min)</label>
+            <input type="number" id="filter-dur-max" class="form-control" style="width:120px" placeholder="∞" min="0">
+          </div>
+
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="loadAsistencia(1)" style="display:inline-flex;align-items:center;gap:6px" id="btn-filter-asis"></button>
+          <button class="btn btn-outline" onclick="clearFilters()" style="display:inline-flex;align-items:center;gap:6px" id="btn-clear-asis"></button>
+          <button class="btn btn-outline" onclick="exportarCSV()" style="display:inline-flex;align-items:center;gap:6px;margin-left:auto" id="btn-export-asis"></button>
+        </div>
+      </div>
+
+      <!-- Tabla -->
+      <div class="card">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-light)" id="result-info"></div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr><th>Cliente</th><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Duración</th><th>Acciones</th></tr>
+            </thead>
+            <tbody id="asistencia-table"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="pagination"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="/js/cache.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/icons.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+  initLayout('asistencia', 'Asistencia');
+  document.getElementById('h-checkin').innerHTML      = icon('checkin') + ' Check-in Rápido';
+  document.getElementById('btn-checkin-el').innerHTML = icon('checkin') + ' Check-in';
+  document.getElementById('btn-checkout-el').innerHTML= icon('checkout') + ' Check-out';
+  document.getElementById('btn-filter-asis').innerHTML= icon('search') + ' Filtrar';
+  document.getElementById('btn-clear-asis').innerHTML = icon('close') + ' Limpiar';
+  document.getElementById('btn-export-asis').innerHTML= icon('download') + ' Exportar Excel';
+
+  let currentPage = 1;
+
+  // Al cambiar fecha exacta, limpiar rango y viceversa
+  document.getElementById('filter-date').addEventListener('change', function() {
+    if (this.value) {
+      document.getElementById('filter-from').value = '';
+      document.getElementById('filter-to').value = '';
+    }
+  });
+  document.getElementById('filter-from').addEventListener('change', function() {
+    if (this.value) document.getElementById('filter-date').value = '';
+  });
+  document.getElementById('filter-to').addEventListener('change', function() {
+    if (this.value) document.getElementById('filter-date').value = '';
+  });
+
+  function buildQS(page, limit) {
+    const nombre     = document.getElementById('filter-nombre').value.trim();
+    const cliente_id = document.getElementById('filter-cliente').value;
+    const estado     = document.getElementById('filter-estado').value;
+    const fecha      = document.getElementById('filter-date').value;
+    const from       = document.getElementById('filter-from').value;
+    const to         = document.getElementById('filter-to').value;
+    const durMin     = document.getElementById('filter-dur-min').value;
+    const durMax     = document.getElementById('filter-dur-max').value;
+
+    let qs = '?';
+    if (page)       qs += 'page=' + page + '&limit=' + (limit || 20);
+    if (nombre)     qs += '&nombre=' + encodeURIComponent(nombre);
+    if (cliente_id) qs += '&cliente_id=' + cliente_id;
+    if (estado)     qs += '&estado=' + estado;
+    if (fecha)      qs += '&fecha=' + fecha;
+    if (from)       qs += '&from=' + from;
+    if (to)         qs += '&to=' + to;
+    if (durMin)     qs += '&duracion_min=' + durMin;
+    if (durMax)     qs += '&duracion_max=' + durMax;
+    return qs;
+  }
+
+  async function loadClientes() {
+    const data = await api.get('/clientes?activo=true&limit=500');
+    const opts = '<option value="">Todos</option>' +
+      data.data.map(c => '<option value="' + (c._id || c.id) + '">' + c.nombre + '</option>').join('');
+    document.getElementById('filter-cliente').innerHTML = opts;
+
+    document.getElementById('checkin-cliente').innerHTML =
+      '<option value="">Seleccionar cliente...</option>' +
+      data.data.map(c => '<option value="' + (c._id || c.id) + '">' + c.nombre + '</option>').join('');
+  }
+
+  async function loadAsistencia(page) {
+    page = page || 1;
+    currentPage = page;
+    try {
+      const data = await api.get('/asistencia' + buildQS(page, 20));
+
+      // Actualizar stats
+      if (data.stats) {
+        document.getElementById('stat-total').textContent    = data.stats.total_hoy || 0;
+        document.getElementById('stat-encurso').textContent  = data.stats.en_curso || 0;
+        document.getElementById('stat-promedio').textContent = data.stats.promedio_min ? data.stats.promedio_min + ' min' : '-';
+      }
+
+      // Info de resultados
+      document.getElementById('result-info').textContent =
+        data.total + ' registro' + (data.total !== 1 ? 's' : '') + ' encontrado' + (data.total !== 1 ? 's' : '');
+
+      document.getElementById('asistencia-table').innerHTML = data.data.map(function(a) {
+        const durMin = a.salida
+          ? Math.round((new Date(a.salida) - new Date(a.entrada)) / 60000)
+          : null;
+        const duration = durMin !== null
+          ? durMin + ' min'
+          : '<span class="badge badge-info">En curso</span>';
+        const avatar = a.foto_url
+          ? '<img src="' + a.foto_url + '" class="member-avatar" alt="">'
+          : '<div class="member-avatar" style="display:flex;align-items:center;justify-content:center">' + avatarInitials(a.cliente_nombre) + '</div>';
+        return '<tr>' +
+          '<td><div class="member-cell">' + avatar + '<span>' + (a.cliente_nombre || '-') + '</span></div></td>' +
+          '<td>' + fmtDate(a.fecha) + '</td>' +
+          '<td>' + fmtDateTime(a.entrada) + '</td>' +
+          '<td>' + (a.salida ? fmtDateTime(a.salida) : '-') + '</td>' +
+          '<td>' + duration + '</td>' +
+          '<td>' + (!a.salida ? '<button class="btn btn-sm btn-warning" style="display:inline-flex;align-items:center;gap:4px" onclick="withLoading(this, () => checkoutById(\'' + a.id + '\'), \'Registrando...\')">' + icon('checkout') + ' Checkout</button>' : '') + '</td>' +
+          '</tr>';
+      }).join('') || '<tr><td colspan="6" class="text-center" style="padding:30px;color:var(--text-light)">Sin registros</td></tr>';
+
+      renderPagination(document.getElementById('pagination'), data.page, data.pages, loadAsistencia);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  function clearFilters() {
+    document.getElementById('filter-nombre').value   = '';
+    document.getElementById('filter-cliente').value  = '';
+    document.getElementById('filter-estado').value   = '';
+    document.getElementById('filter-date').value     = '';
+    document.getElementById('filter-from').value     = '';
+    document.getElementById('filter-to').value       = '';
+    document.getElementById('filter-dur-min').value  = '';
+    document.getElementById('filter-dur-max').value  = '';
+    loadAsistencia(1);
+  }
+
+  function exportarCSV() {
+    const qs = buildQS(null, null).replace('?', '');
+    const token = api.getToken();
+    // Descarga directa con token en header no es posible via <a>, usamos fetch
+    fetch('/api/asistencia/export?' + qs, { headers: { Authorization: 'Bearer ' + token } })
+      .then(function(res) {
+        if (!res.ok) throw new Error('Error al exportar');
+        return res.blob();
+      })
+      .then(function(blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'asistencias.xlsx';
+        a.click();
+        URL.revokeObjectURL(url);
+      })
+      .catch(function(err) { toast(err.message, 'error'); });
+  }
+
+  async function doCheckin() {
+    const cliente_id = document.getElementById('checkin-cliente').value;
+    if (!cliente_id) return toast('Selecciona un cliente', 'warning');
+    try {
+      const nueva = await api.post('/asistencia/checkin', { cliente_id: cliente_id });
+      // Prepend quirúrgico: agrega el nuevo registro al inicio del caché
+      // sin borrar toda la lista de asistencia
+      if (nueva) gymCache.prependItem('asistencia', nueva);
+      toast('Check-in registrado');
+      loadAsistencia(currentPage);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function doCheckout() {
+    const cliente_id = document.getElementById('checkin-cliente').value;
+    if (!cliente_id) return toast('Selecciona un cliente', 'warning');
+    try {
+      // El backend devuelve la asistencia con populate — usamos patch con el id devuelto
+      const updated = await api.put('/asistencia/checkout/cliente/' + cliente_id, {});
+      if (updated) gymCache.patchItem('asistencia', updated.id || updated._id, () => updated);
+      toast('Check-out registrado');
+      loadAsistencia(currentPage);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function checkoutById(id) {
+    try {
+      await api.put('/asistencia/checkout/' + id, {}, {
+        patch: { ns: 'asistencia', id },
+      });
+      toast('Check-out registrado');
+      loadAsistencia(currentPage);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  loadClientes();
+  loadAsistencia(1);
+</script>
+</body>
+</html>
