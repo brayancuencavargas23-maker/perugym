@@ -499,12 +499,90 @@ footer strong { color: var(--red); }
   color: #fff;
   font-size: 24px;
   cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: background 0.2s;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 36px;
+  height: 36px;
+}
+
+.hamburger-nav:hover { background: rgba(255,255,255,0.08); }
+
+.hamburger-nav span {
+  display: block;
+  height: 2px;
+  background: #fff;
+  border-radius: 2px;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  transform-origin: center;
+}
+
+/* Estado abierto → X */
+.hamburger-nav.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.hamburger-nav.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.hamburger-nav.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* Overlay oscuro */
+.nav-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 98;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.nav-overlay.visible { display: block; }
+.nav-overlay.active  { opacity: 1; }
+
+/* Menú móvil desplegable */
+.nav-links {
+  display: flex;
+  gap: 32px;
+  list-style: none;
 }
 
 @media (max-width: 900px) {
   nav { padding: 14px 24px; }
-  .nav-links { display: none; }
-  .hamburger-nav { display: block; }
+
+  .nav-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: fixed;
+    top: 0; left: 0;
+    width: 75%;
+    max-width: 300px;
+    height: 100dvh;
+    height: 100vh; /* fallback */
+    background: #111;
+    border-right: 1px solid rgba(255,255,255,0.08);
+    z-index: 99;
+    padding: 80px 0 32px;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    overflow-y: auto;
+  }
+
+  .nav-links.open { transform: translateX(0); }
+
+  .nav-links li { border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+  .nav-links a {
+    display: block;
+    padding: 16px 28px;
+    font-size: 15px;
+    letter-spacing: 1.5px;
+  }
+
+  /* Ocultar "Iniciar sesión" del menú en desktop */
+  .nav-links-login { display: none; }
+
+  .hamburger-nav { display: flex; }
+
   .hero-content { padding: 0 24px; }
   .features-grid { grid-template-columns: 1fr 1fr; }
   .feature-item { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.06); }
@@ -518,5 +596,8 @@ footer strong { color: var(--red); }
   .features-grid { grid-template-columns: 1fr; }
   .hero-content h1 { font-size: 48px; }
   .stats-row { gap: 24px; }
+  /* Mostrar "Iniciar sesión" dentro del menú hamburguesa en móvil */
+  .nav-links-login { display: block; }
+  /* Ocultar el botón de la navbar (ya está en el menú) */
   .nav-actions .btn-outline-nav { display: none; }
 }

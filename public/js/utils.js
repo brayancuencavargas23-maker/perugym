@@ -140,14 +140,80 @@ function setActiveNav(page) {
 
 // Hamburger toggle
 function initHamburger() {
-  const btn = document.getElementById('hamburger');
+  const btn     = document.getElementById('hamburger');
   const sidebar = document.getElementById('sidebar');
-  if (btn && sidebar) {
-    btn.onclick = () => sidebar.classList.toggle('open');
-    document.addEventListener('click', e => {
-      if (!sidebar.contains(e.target) && e.target !== btn) sidebar.classList.remove('open');
-    });
+  if (!btn || !sidebar) return;
+
+  // Reemplazar el contenido del botón con el ícono animado de 3 líneas
+  btn.innerHTML = `
+    <span class="hamburger-icon" aria-hidden="true">
+      <span></span><span></span><span></span>
+    </span>`;
+  btn.setAttribute('aria-label', 'Abrir menú de navegación');
+  btn.setAttribute('aria-expanded', 'false');
+  btn.setAttribute('aria-controls', 'sidebar');
+
+  // Crear overlay si no existe
+  let overlay = document.getElementById('sidebar-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'sidebar-overlay';
+    overlay.className = 'sidebar-overlay';
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(overlay);
   }
+
+  function openSidebar() {
+    sidebar.classList.add('open');
+    btn.classList.add('is-open');
+    btn.setAttribute('aria-expanded', 'true');
+    btn.setAttribute('aria-label', 'Cerrar menú de navegación');
+    document.body.classList.add('sidebar-open');
+    // Activar overlay en dos pasos para que la transición CSS funcione
+    overlay.classList.add('visible');
+    requestAnimationFrame(() => overlay.classList.add('active'));
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    btn.classList.remove('is-open');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-label', 'Abrir menú de navegación');
+    document.body.classList.remove('sidebar-open');
+    overlay.classList.remove('active');
+    // Esperar a que termine la transición antes de ocultar
+    overlay.addEventListener('transitionend', () => overlay.classList.remove('visible'), { once: true });
+  }
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+  });
+
+  // Cerrar al hacer clic en el overlay
+  overlay.addEventListener('click', closeSidebar);
+
+  // Cerrar al hacer clic en un link del sidebar (navegación en móvil)
+  sidebar.querySelectorAll('.nav-item').forEach(link => {
+    link.addEventListener('click', () => {
+      if (window.innerWidth <= 768) closeSidebar();
+    });
+  });
+
+  // Cerrar con Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+      closeSidebar();
+      btn.focus();
+    }
+  });
+
+  // Cerrar si se redimensiona a desktop
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 768 && sidebar.classList.contains('open')) {
+      closeSidebar();
+    }
+  });
 }
 
 // Custom confirm dialog — replaces native confirm()

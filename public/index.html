@@ -16,19 +16,22 @@
         <span id="nav-logo-text">PERU<br>GYM</span>
       </div>
     </div>
-    <ul class="nav-links">
+    <ul class="nav-links" id="nav-links">
       <li><a href="#inicio">Inicio</a></li>
       <li><a href="#nosotros">Nosotros</a></li>
       <li><a href="#planes">Planes</a></li>
       <!--<li><a href="#nosotros">Sedes</a></li> -->
       <!--<li><a href="#planes">Clases</a></li> -->
       <li><a href="#footer">Contacto</a></li>
+      <li class="nav-links-login"><a href="/login.html">Iniciar sesión</a></li>
     </ul>
     <div class="nav-actions">
       <a href="/login.html" class="btn-outline-nav">Iniciar sesión</a>
       <a href="#planes" class="btn-red">Únete ahora</a>
     </div>
-    <button class="hamburger-nav">☰</button>
+    <button class="hamburger-nav" id="hamburger-nav" aria-label="Abrir menú" aria-expanded="false" aria-controls="nav-links">
+      <span></span><span></span><span></span>
+    </button>
   </nav>
 
   <!-- HERO -->
@@ -916,6 +919,64 @@
       80%{transform:translateX(4px)}
     }`;
     document.head.appendChild(shakeStyle);
+
+    // ── Menú hamburguesa (landing) ────────────────────────────────────────────
+    (function() {
+      const btn   = document.getElementById('hamburger-nav');
+      const menu  = document.getElementById('nav-links');
+      if (!btn || !menu) return;
+
+      // Crear overlay
+      const overlay = document.createElement('div');
+      overlay.className = 'nav-overlay';
+      overlay.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(overlay);
+
+      function openMenu() {
+        menu.classList.add('open');
+        btn.classList.add('open');
+        btn.setAttribute('aria-expanded', 'true');
+        btn.setAttribute('aria-label', 'Cerrar menú');
+        document.body.style.overflow = 'hidden';
+        overlay.classList.add('visible');
+        requestAnimationFrame(() => overlay.classList.add('active'));
+      }
+
+      function closeMenu() {
+        menu.classList.remove('open');
+        btn.classList.remove('open');
+        btn.setAttribute('aria-expanded', 'false');
+        btn.setAttribute('aria-label', 'Abrir menú');
+        document.body.style.overflow = '';
+        overlay.classList.remove('active');
+        overlay.addEventListener('transitionend', () => overlay.classList.remove('visible'), { once: true });
+      }
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        menu.classList.contains('open') ? closeMenu() : openMenu();
+      });
+
+      overlay.addEventListener('click', closeMenu);
+
+      // Cerrar al hacer clic en un link del menú
+      menu.querySelectorAll('a').forEach(link => {
+        link.addEventListener('click', closeMenu);
+      });
+
+      // Cerrar con Escape
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && menu.classList.contains('open')) {
+          closeMenu();
+          btn.focus();
+        }
+      });
+
+      // Cerrar si se amplía a desktop
+      window.addEventListener('resize', () => {
+        if (window.innerWidth > 900 && menu.classList.contains('open')) closeMenu();
+      });
+    })();
   </script>
 
 </body>

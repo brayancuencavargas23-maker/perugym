@@ -113,7 +113,7 @@ function initLayout(activePage, pageTitle) {
 
   document.getElementById('topbar').innerHTML = `
     <div style="display:flex;align-items:center;gap:12px">
-      <button class="hamburger" id="hamburger">${icon('menu')}</button>
+      <button class="hamburger" id="hamburger" aria-label="Abrir menú de navegación" aria-expanded="false" aria-controls="sidebar"></button>
       <h1>${pageTitle}</h1>
     </div>
     <div class="topbar-actions" id="topbar-actions"></div>
