@@ -204,10 +204,11 @@ router.get('/pagos/excel', async (req, res) => {
     ];
 
     const wb = buildStyledWorkbook('REPORTE DE PAGOS', 'Pagos', headers, rows, extra);
+    const buffer = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="pagos.xlsx"');
-    await wb.xlsx.write(res);
-    res.end();
+    res.setHeader('Content-Length', buffer.length);
+    res.end(buffer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -248,10 +249,11 @@ router.get('/clientes/excel', async (req, res) => {
     ];
 
     const wb = buildStyledWorkbook('REPORTE DE CLIENTES', 'Clientes', headers, rows, 'PeruGym - Centro de Entrenamiento y Fitness');
+    const buffer = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="clientes.xlsx"');
-    await wb.xlsx.write(res);
-    res.end();
+    res.setHeader('Content-Length', buffer.length);
+    res.end(buffer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -304,10 +306,11 @@ router.get('/asistencia/excel', async (req, res) => {
     ];
 
     const wb = buildStyledWorkbook('REPORTE CONSOLIDADO DE ASISTENCIAS', 'Asistencias', headers, rows, extra);
+    const buffer = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="asistencias.xlsx"');
-    await wb.xlsx.write(res);
-    res.end();
+    res.setHeader('Content-Length', buffer.length);
+    res.end(buffer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -359,10 +362,11 @@ router.get('/membresias/excel', async (req, res) => {
     ];
 
     const wb = buildStyledWorkbook('REPORTE DE MEMBRESÍAS', 'Membresías', headers, rows, 'PeruGym - Centro de Entrenamiento y Fitness');
+    const buffer = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="membresias.xlsx"');
-    await wb.xlsx.write(res);
-    res.end();
+    res.setHeader('Content-Length', buffer.length);
+    res.end(buffer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -404,10 +408,11 @@ router.get('/pagos-pendientes/excel', async (req, res) => {
 
     const wb = buildStyledWorkbook('REPORTE DE PAGOS PENDIENTES', 'Pagos Pendientes', headers, rows,
       `PeruGym - Centro de Entrenamiento y Fitness  |  Total pendiente: S/ ${totalMonto.toFixed(2)}`);
+    const buffer = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="pagos-pendientes.xlsx"');
-    await wb.xlsx.write(res);
-    res.end();
+    res.setHeader('Content-Length', buffer.length);
+    res.end(buffer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -439,10 +444,11 @@ router.get('/stock/excel', async (req, res) => {
     ];
 
     const wb = buildStyledWorkbook('REPORTE DE STOCK DE PRODUCTOS', 'Stock Productos', headers, rows, 'PeruGym - Centro de Entrenamiento y Fitness');
+    const buffer = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="stock-productos.xlsx"');
-    await wb.xlsx.write(res);
-    res.end();
+    res.setHeader('Content-Length', buffer.length);
+    res.end(buffer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -509,10 +515,11 @@ router.get('/caja/excel', async (req, res) => {
     ];
 
     const wb = buildStyledWorkbook('RESUMEN DE CAJA', 'Resumen Caja', headers, rows, extra);
+    const buffer = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="resumen-caja.xlsx"');
-    await wb.xlsx.write(res);
-    res.end();
+    res.setHeader('Content-Length', buffer.length);
+    res.end(buffer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -568,10 +575,11 @@ router.get('/ventas/excel', async (req, res) => {
     ];
 
     const wb = buildStyledWorkbook('REPORTE DE VENTAS', 'Ventas', headers, rows, extra);
+    const buffer = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="ventas.xlsx"');
-    await wb.xlsx.write(res);
-    res.end();
+    res.setHeader('Content-Length', buffer.length);
+    res.end(buffer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
