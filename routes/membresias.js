@@ -19,7 +19,7 @@ async function autoVencer() {
 
 // ── GET / — listar membresías ─────────────────────────────────────────────────
 router.get('/', async (req, res) => {
-  const { cliente_id, estado, vencen_pronto, page = 1, limit = 20 } = req.query;
+  const { cliente_id, estado, vencen_pronto, nombre, page = 1, limit = 20 } = req.query;
   const filter = {};
 
   try {
@@ -32,6 +32,16 @@ router.get('/', async (req, res) => {
       const in7 = new Date(); in7.setDate(in7.getDate() + 7);
       filter.fecha_fin = { $gte: now, $lte: in7 };
       filter.estado = 'activo';
+    }
+
+    // Filtro por nombre de cliente: buscar primero los clientes que coincidan
+    if (nombre) {
+      const Cliente = require('../models/Cliente');
+      const clientes = await Cliente.find(
+        { nombre: { $regex: nombre, $options: 'i' } },
+        '_id'
+      );
+      filter.cliente_id = { $in: clientes.map(c => c._id) };
     }
 
     const total = await Membresia.countDocuments(filter);
@@ -253,6 +263,41 @@ router.put('/:id', [
       plan_nombre: mem.plan_id?.nombre,
       precio: mem.plan_id?.precio,
     });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── DELETE /:id — cancelar membresía ─────────────────────────────────────────
+router.delete('/:id', [
+  param('id').isMongoId().withMessage('ID de membresía inválido.'),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+  try {
+    const mem = await Membresia.findById(req.params.id);
+    if (!mem) return res.status(404).json({ error: 'Membresía no encontrada.' });
+    if (mem.estado === 'cancelado') return res.status(400).json({ error: 'La membresía ya está cancelada.' });
+    mem.estado = 'cancelado';
+    await mem.save();
+    res.json({ message: 'Membresía cancelada correctamente.' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── GET /:id/pagos — historial de pagos de una membresía ─────────────────────
+router.get('/:id/pagos', [
+  param('id').isMongoId().withMessage('ID de membresía inválido.'),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+  try {
+    const pagos = await Pago.find({ membresia_id: req.params.id })
+      .populate('cliente_id', 'nombre')
+      .sort({ fecha_pago: -1 });
+    const data = pagos.map(p => ({
+      ...p.toObject(),
+      id: p._id,
+      cliente_nombre: p.cliente_id?.nombre,
+    }));
+    res.json(data);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

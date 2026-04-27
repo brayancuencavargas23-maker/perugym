@@ -95,6 +95,7 @@
   document.getElementById('icon-plus-usr').innerHTML = icon('plus');
 
   async function loadUsers() {
+    showTableSkeleton('users-table', 5);
     try {
       const users = await api.get('/auth/users');
       document.getElementById('users-table').innerHTML = users.map(u => `

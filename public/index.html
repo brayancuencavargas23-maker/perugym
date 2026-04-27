@@ -642,60 +642,78 @@
   </div>
 
   <script>
-    // Cargar imágenes del landing
-    fetch('/api/landing')
-      .then(r => r.json())
-      .then(cfg => {
-        if (cfg.logo_url) {
-          document.getElementById('nav-logo-img').src = cfg.logo_url;
-          document.getElementById('nav-logo-img').style.display = 'block';
-          document.getElementById('nav-logo-text').style.display = 'none';
-        }
-        if (cfg.about_logo_url) {
-          const overlay = document.querySelector('.about-logo-overlay');
-          if (overlay) {
-            overlay.innerHTML = `<img src="${cfg.about_logo_url}" alt="Peru Gym" style="width:100%;height:100%;object-fit:contain;border-radius:50%;padding:16px">`;
-          }
-        }
-        if (cfg.hero_bg_url) {
-          document.getElementById('hero-bg').style.backgroundImage =
-            `linear-gradient(to right, rgba(10,10,10,0.95) 45%, rgba(10,10,10,0.3) 100%), url('${cfg.hero_bg_url}')`;
-        }
-        if (cfg.about_img_url) {
-          document.getElementById('about-img').src = cfg.about_img_url;
-        }
-      })
-      .catch(() => {});
+    // ── Optimiza URLs de Cloudinary automáticamente ───────────────────────────
+    // Inserta transformaciones en la URL para reducir peso de imagen:
+    // w_ = ancho máximo, q_auto = calidad automática, f_auto = formato óptimo (webp/avif)
+    function cloudinaryOpt(url, width = 800) {
+      if (!url || !url.includes('res.cloudinary.com')) return url;
+      // Si ya tiene /upload/... insertamos las transformaciones después de /upload/
+      return url.replace('/upload/', `/upload/w_${width},q_auto,f_auto/`);
+    }
 
-    // Cargar planes desde la API
-    fetch('/api/planes/public')
-      .then(r => r.json())
-      .then(plans => {
-        const grid = document.getElementById('plans-grid');
-        if (!plans.length) {
-          grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#666;padding:40px">Sin planes disponibles por el momento.</div>';
-          return;
+    // ── Skeleton para planes mientras carga ───────────────────────────────────
+    document.getElementById('plans-grid').innerHTML = Array.from({ length: 3 }, () => `
+      <div style="background:#1a1a1a;border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:14px;min-height:320px">
+        <div style="height:22px;width:55%;border-radius:6px;background:linear-gradient(90deg,#2a2a2a 25%,#333 50%,#2a2a2a 75%);background-size:400px 100%;animation:_sk 1.4s ease-in-out infinite"></div>
+        <div style="height:14px;width:70%;border-radius:6px;background:linear-gradient(90deg,#2a2a2a 25%,#333 50%,#2a2a2a 75%);background-size:400px 100%;animation:_sk 1.4s ease-in-out infinite"></div>
+        <div style="height:36px;width:45%;border-radius:6px;background:linear-gradient(90deg,#2a2a2a 25%,#333 50%,#2a2a2a 75%);background-size:400px 100%;animation:_sk 1.4s ease-in-out infinite;margin:8px 0"></div>
+        <div style="height:12px;width:80%;border-radius:6px;background:linear-gradient(90deg,#2a2a2a 25%,#333 50%,#2a2a2a 75%);background-size:400px 100%;animation:_sk 1.4s ease-in-out infinite"></div>
+        <div style="height:12px;width:65%;border-radius:6px;background:linear-gradient(90deg,#2a2a2a 25%,#333 50%,#2a2a2a 75%);background-size:400px 100%;animation:_sk 1.4s ease-in-out infinite"></div>
+        <div style="height:12px;width:72%;border-radius:6px;background:linear-gradient(90deg,#2a2a2a 25%,#333 50%,#2a2a2a 75%);background-size:400px 100%;animation:_sk 1.4s ease-in-out infinite"></div>
+        <div style="height:44px;border-radius:8px;background:linear-gradient(90deg,#2a2a2a 25%,#333 50%,#2a2a2a 75%);background-size:400px 100%;animation:_sk 1.4s ease-in-out infinite;margin-top:auto"></div>
+      </div>
+    `).join('') + '<style>@keyframes _sk{0%{background-position:-400px 0}100%{background-position:400px 0}}</style>';
+
+    // ── Cargar landing e imágenes en paralelo ─────────────────────────────────
+    Promise.all([
+      fetch('/api/landing').then(r => r.json()).catch(() => ({})),
+      fetch('/api/planes/public').then(r => r.json()).catch(() => []),
+    ]).then(([cfg, plans]) => {
+
+      // ── Imágenes del landing ──
+      if (cfg.logo_url) {
+        document.getElementById('nav-logo-img').src = cloudinaryOpt(cfg.logo_url, 120);
+        document.getElementById('nav-logo-img').style.display = 'block';
+        document.getElementById('nav-logo-text').style.display = 'none';
+      }
+      if (cfg.about_logo_url) {
+        const overlay = document.querySelector('.about-logo-overlay');
+        if (overlay) {
+          overlay.innerHTML = `<img src="${cloudinaryOpt(cfg.about_logo_url, 200)}" alt="Peru Gym" loading="lazy" style="width:100%;height:100%;object-fit:contain;border-radius:50%;padding:16px">`;
         }
-        grid.innerHTML = plans.map(p => {
-          const featured = p.destacado;
-          const features = p.caracteristicas || [];
-          return `
-            <div class="plan-card ${featured ? 'featured' : ''}">
-              ${featured ? '<div class="plan-badge">Más Popular</div>' : ''}
-              <div class="plan-name">${p.nombre}</div>
-              <div class="plan-sub">${p.descripcion || ''}</div>
-              <div class="plan-price"><sup>S/</sup> ${parseFloat(p.precio).toFixed(0)}<span>/mes</span></div>
-              <ul class="plan-features">
-                ${features.map(f => `<li>${f}</li>`).join('')}
-              </ul>
-              <button onclick="abrirSolicitud('${p._id}','${p.nombre.replace(/'/g,"\\'")}',${parseFloat(p.precio).toFixed(0)})" class="btn-plan ${featured ? 'btn-plan-red' : 'btn-plan-outline'}">Elegir Plan</button>
-            </div>`;
-        }).join('');
-      })
-      .catch(() => {
-        document.getElementById('plans-grid').innerHTML =
-          '<div style="grid-column:1/-1;text-align:center;color:#666;padding:40px">No se pudieron cargar los planes.</div>';
-      });
+      }
+      if (cfg.hero_bg_url) {
+        document.getElementById('hero-bg').style.backgroundImage =
+          `linear-gradient(to right, rgba(10,10,10,0.95) 45%, rgba(10,10,10,0.3) 100%), url('${cloudinaryOpt(cfg.hero_bg_url, 1400)}')`;
+      }
+      if (cfg.about_img_url) {
+        const aboutImg = document.getElementById('about-img');
+        aboutImg.src = cloudinaryOpt(cfg.about_img_url, 800);
+        aboutImg.loading = 'lazy';
+      }
+
+      // ── Planes ──
+      const grid = document.getElementById('plans-grid');
+      if (!plans.length) {
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#666;padding:40px">Sin planes disponibles por el momento.</div>';
+        return;
+      }
+      grid.innerHTML = plans.map(p => {
+        const featured = p.destacado;
+        const features = p.caracteristicas || [];
+        return `
+          <div class="plan-card ${featured ? 'featured' : ''}">
+            ${featured ? '<div class="plan-badge">Más Popular</div>' : ''}
+            <div class="plan-name">${p.nombre}</div>
+            <div class="plan-sub">${p.descripcion || ''}</div>
+            <div class="plan-price"><sup>S/</sup> ${parseFloat(p.precio).toFixed(0)}<span>/mes</span></div>
+            <ul class="plan-features">
+              ${features.map(f => `<li>${f}</li>`).join('')}
+            </ul>
+            <button onclick="abrirSolicitud('${p._id}','${p.nombre.replace(/'/g,"\\'")}',${parseFloat(p.precio).toFixed(0)})" class="btn-plan ${featured ? 'btn-plan-red' : 'btn-plan-outline'}">Elegir Plan</button>
+          </div>`;
+      }).join('');
+    });
 
     // ── Validación en tiempo real ─────────────────────────────────────────────
     function setFieldState(campo, state) {

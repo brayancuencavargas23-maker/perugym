@@ -103,6 +103,7 @@
     let qs = `?page=${page}&limit=15`;
     if (search) qs += `&search=${encodeURIComponent(search)}`;
     if (activo) qs += `&activo=${activo}`;
+    if (page === 1 && !search && !activo) showTableSkeleton('clientes-table', 6);
     try {
       const data = await api.get(`/clientes${qs}`);
       document.getElementById('clientes-table').innerHTML = data.data.map(c => {

@@ -53,9 +53,14 @@ function buildStyledWorkbook(titulo, sheetName, headers, rows, extraInfo) {
   ws.getCell('A1').font  = { name: 'Calibri', size: 14, bold: true, color: { argb: WHITE } };
   ws.getCell('A1').alignment = { vertical: 'middle', horizontal: 'left', indent: 8 };
 
-  if (fs.existsSync(LOGO_PATH)) {
-    const logoId = wb.addImage({ filename: LOGO_PATH, extension: 'png' });
-    ws.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 95, height: 92 }, editAs: 'oneCell' });
+  try {
+    if (fs.existsSync(LOGO_PATH)) {
+      const logoBuffer = fs.readFileSync(LOGO_PATH);
+      const logoId = wb.addImage({ buffer: logoBuffer, extension: 'png' });
+      ws.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 95, height: 92 }, editAs: 'oneCell' });
+    }
+  } catch (_) {
+    // Logo no disponible en este entorno, se omite sin afectar el archivo
   }
 
   // Fila 2: subtítulo

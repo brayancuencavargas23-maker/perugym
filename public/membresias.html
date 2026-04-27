@@ -22,6 +22,7 @@
       </div>
 
       <div class="search-bar">
+        <input type="text" id="search-nombre" class="form-control" placeholder="Buscar por cliente..." style="width:200px" oninput="onSearchInput()">
         <select id="filter-estado" class="form-control" style="width:160px">
           <option value="">Todos los estados</option>
           <option value="activo">Activo</option>
@@ -36,7 +37,7 @@
       <div class="card">
         <div class="table-wrapper">
           <table>
-            <thead><tr><th>Cliente</th><th>Plan</th><th>Inicio</th><th>Vencimiento</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>Cliente</th><th>Plan</th><th>Inicio</th><th>Vencimiento</th><th>Estado</th><th>Pago</th><th>Acciones</th></tr></thead>
             <tbody id="membresias-table"></tbody>
           </table>
         </div>
@@ -137,6 +138,7 @@
         </div>
       </div>
       <div class="form-group"><label>Notas</label><textarea id="cambio-notas" class="form-control" rows="2"></textarea></div>
+      <div id="cambio-resumen" class="hidden" style="background:var(--bg);border:1.5px solid var(--primary);border-radius:8px;padding:10px 14px;margin-top:8px;font-size:13px"></div>
       <p style="font-size:12px;color:var(--text-light);margin-top:8px">⚠️ La membresía actual quedará cancelada y se creará una nueva desde hoy.</p>
     </div>
     <div class="modal-footer">
@@ -208,6 +210,83 @@
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-editar')">Cancelar</button>
       <button class="btn btn-primary" onclick="withLoading(this, guardarEdicion)">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Confirmar cancelación -->
+<div class="modal-overlay hidden" id="modal-cancelar">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h3>Cancelar Membresía</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-cancelar')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="cancelar-mem-id">
+      <div id="cancelar-info" style="background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px"></div>
+      <p style="font-size:13px;color:var(--text-light)">⚠️ Esta acción cancelará la membresía. No se puede deshacer automáticamente.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-cancelar')">Volver</button>
+      <button class="btn btn-danger" onclick="withLoading(this, confirmarCancelar, 'Cancelando...')">Sí, cancelar membresía</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Historial de pagos -->
+<div class="modal-overlay hidden" id="modal-pagos">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <h3>Historial de Pagos</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-pagos')">✕</button>
+    </div>
+    <div class="modal-body" style="padding:0">
+      <div id="pagos-loading" style="padding:24px;text-align:center;color:var(--text-light);font-size:13px">Cargando...</div>
+      <div id="pagos-lista" class="hidden">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="background:var(--bg)">
+              <th style="padding:10px 14px;text-align:left;font-weight:600">Fecha</th>
+              <th style="padding:10px 14px;text-align:left;font-weight:600">Monto</th>
+              <th style="padding:10px 14px;text-align:left;font-weight:600">Método</th>
+              <th style="padding:10px 14px;text-align:left;font-weight:600">Estado</th>
+              <th style="padding:10px 14px;text-align:left;font-weight:600">Notas</th>
+              <th style="padding:10px 14px;text-align:left;font-weight:600">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="pagos-table-body"></tbody>
+        </table>
+      </div>
+      <div id="pagos-empty" class="hidden" style="padding:24px;text-align:center;color:var(--text-light);font-size:13px">Sin pagos registrados para esta membresía.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-pagos')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Confirmar pago pendiente -->
+<div class="modal-overlay hidden" id="modal-confirmar-pago">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h3>Confirmar Pago</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-confirmar-pago')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="confirmar-pago-id">
+      <div id="confirmar-pago-info" style="background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px"></div>
+      <div class="form-group">
+        <label>Método de pago</label>
+        <select id="confirmar-pago-metodo" class="form-control">
+          <option value="efectivo">Efectivo</option>
+          <option value="tarjeta">Tarjeta</option>
+          <option value="transferencia">Transferencia</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-confirmar-pago')">Cancelar</button>
+      <button class="btn btn-primary" onclick="withLoading(this, ejecutarConfirmarPago, 'Confirmando...')">Confirmar Pago</button>
     </div>
   </div>
 </div>
@@ -293,9 +372,16 @@
     const sel = document.getElementById('cambio-plan');
     const opt = sel.options[sel.selectedIndex];
     const info = document.getElementById('cambio-plan-info');
-    if (!opt || !opt.value) { info.classList.add('hidden'); return; }
+    const resumen = document.getElementById('cambio-resumen');
+    if (!opt || !opt.value) { info.classList.add('hidden'); resumen.classList.add('hidden'); return; }
     info.innerHTML = `Precio: <strong>${fmtMoney(opt.dataset.precio)}</strong> &nbsp;|&nbsp; Duración: <strong>${opt.dataset.dias} días</strong>`;
     info.classList.remove('hidden');
+    // Calcular nueva fecha de vencimiento desde hoy
+    const hoy = new Date();
+    const nuevaFin = new Date(hoy);
+    nuevaFin.setDate(nuevaFin.getDate() + parseInt(opt.dataset.dias));
+    resumen.innerHTML = `📋 <strong>Resumen del cambio:</strong> Se cobrará <strong>${fmtMoney(opt.dataset.precio)}</strong> y la nueva membresía vencerá el <strong>${fmtDate(nuevaFin.toISOString())}</strong>.`;
+    resumen.classList.remove('hidden');
   }
 
   document.getElementById('mem-inicio').addEventListener('change', () => {
@@ -313,9 +399,12 @@
   async function loadMembresias(page = 1) {
     currentPage = page;
     const estado = document.getElementById('filter-estado').value;
+    const nombre = document.getElementById('search-nombre').value.trim();
     let qs = `?page=${page}&limit=15`;
     if (estado) qs += `&estado=${estado}`;
+    if (nombre) qs += `&nombre=${encodeURIComponent(nombre)}`;
     if (vencenFilter) qs += `&vencen_pronto=true`;
+    if (page === 1 && !estado && !nombre && !vencenFilter) showTableSkeleton('membresias-table', 7);
     try {
       const data = await api.get(`/membresias${qs}`);
       // Construir set de cliente_ids que ya tienen membresía activa en esta página
@@ -327,10 +416,24 @@
         const expClass = days !== null && days <= 7 && days >= 0 ? 'badge-warning' : days !== null && days < 0 ? 'badge-danger' : 'badge-info';
         const estadoClass = { activo: 'badge-success', vencido: 'badge-danger', cancelado: 'badge-warning', pendiente: 'badge-warning' }[m.estado] || 'badge-info';
         const esActivo = m.estado === 'activo';
+        const esPendiente = m.estado === 'pendiente';
         // Solo mostrar renovar si está vencido/cancelado Y el cliente NO tiene ya otra activa/pendiente
         const puedeRenovar = (m.estado === 'vencido' || m.estado === 'cancelado') && !clientesConActiva.has(m.cliente_id);
         const cajaBloqueado = !cajaActual;
         const disabledAttr = cajaBloqueado ? 'disabled title="Abre la caja primero"' : '';
+
+        // Badge de estado de pago: buscar en pagos_estado si existe, sino inferir
+        let pagoBadge = '';
+        if (m.estado === 'cancelado') {
+          pagoBadge = '<span class="badge badge-warning">Cancelado</span>';
+        } else if (esPendiente) {
+          pagoBadge = '<span class="badge badge-danger">Deuda</span>';
+        } else if (esActivo) {
+          pagoBadge = '<span class="badge badge-success">Pagado</span>';
+        } else {
+          pagoBadge = '<span class="badge badge-info">—</span>';
+        }
+
         return `<tr>
           <td>
             <div class="member-cell">
@@ -344,14 +447,124 @@
           <td>${fmtDate(m.fecha_inicio)}</td>
           <td><span class="badge ${expClass}">${fmtDate(m.fecha_fin)}</span></td>
           <td><span class="badge ${estadoClass}">${m.estado}</span></td>
+          <td>${pagoBadge}</td>
           <td style="display:flex;gap:4px;flex-wrap:wrap">
-            ${esActivo ? `<button class="btn btn-sm btn-outline" ${disabledAttr} onclick="abrirCambioPlan('${m.id}','${m.plan_nombre}','${m.cliente_nombre}')">${icon('refresh')}</button>` : ''}
-            ${puedeRenovar ? `<button class="btn btn-sm btn-outline" ${disabledAttr} onclick="abrirRenovar('${m.id}','${m.plan_nombre}','${m.cliente_nombre}',${m.precio})">${icon('renew')}</button>` : ''}
+            <button class="btn btn-sm btn-outline" title="Ver pagos" onclick="abrirHistorialPagos('${m.id}')">${icon('money')}</button>
+            ${esActivo ? `<button class="btn btn-sm btn-outline" title="Cambiar plan" ${disabledAttr} onclick="abrirCambioPlan('${m.id}','${m.plan_nombre}','${m.cliente_nombre}')">${icon('refresh')}</button>` : ''}
+            ${esPendiente ? `<button class="btn btn-sm btn-success" title="Marcar como pagado" ${disabledAttr} onclick="abrirConfirmarPago('${m.id}','${m.cliente_nombre}',${m.precio})">${icon('check')}</button>` : ''}
+            ${puedeRenovar ? `<button class="btn btn-sm btn-outline" title="Renovar" ${disabledAttr} onclick="abrirRenovar('${m.id}','${m.plan_nombre}','${m.cliente_nombre}',${m.precio})">${icon('renew')}</button>` : ''}
             ${m.estado !== 'cancelado' ? `<button class="btn btn-sm btn-outline" title="Editar" onclick="abrirEditar('${m.id}','${m.estado}','${m.fecha_fin?.split('T')[0]}')">${icon('edit')}</button>` : ''}
+            ${(esActivo || esPendiente) ? `<button class="btn btn-sm btn-danger" title="Cancelar membresía" onclick="abrirCancelar('${m.id}','${m.cliente_nombre}','${m.plan_nombre}')">${icon('cancel')}</button>` : ''}
           </td>
         </tr>`;
-      }).join('') || '<tr><td colspan="6" class="text-center" style="padding:30px;color:var(--text-light)">Sin membresías</td></tr>';
+      }).join('') || '<tr><td colspan="7" class="text-center" style="padding:30px;color:var(--text-light)">Sin membresías</td></tr>';
       renderPagination(document.getElementById('pagination'), data.page, data.pages, loadMembresias);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  // --- Búsqueda por nombre con debounce ---
+  let searchTimeout = null;
+  function onSearchInput() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => loadMembresias(1), 350);
+  }
+
+  // --- Cancelar membresía ---
+  function abrirCancelar(id, cliente, plan) {
+    document.getElementById('cancelar-mem-id').value = id;
+    document.getElementById('cancelar-info').innerHTML =
+      `Cliente: <strong>${cliente}</strong> &nbsp;|&nbsp; Plan: <strong>${plan}</strong>`;
+    openModal('modal-cancelar');
+  }
+
+  async function confirmarCancelar() {
+    const id = document.getElementById('cancelar-mem-id').value;
+    try {
+      await api.delete(`/membresias/${id}`, { invalidate: ['membresias'] });
+      toast('Membresía cancelada correctamente');
+      closeModal('modal-cancelar');
+      loadMembresias(currentPage);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  // --- Historial de pagos ---
+  async function abrirHistorialPagos(memId) {
+    document.getElementById('pagos-loading').classList.remove('hidden');
+    document.getElementById('pagos-lista').classList.add('hidden');
+    document.getElementById('pagos-empty').classList.add('hidden');
+    openModal('modal-pagos');
+    try {
+      const pagos = await api.get(`/membresias/${memId}/pagos`);
+      document.getElementById('pagos-loading').classList.add('hidden');
+      if (!pagos.length) {
+        document.getElementById('pagos-empty').classList.remove('hidden');
+        return;
+      }
+      document.getElementById('pagos-table-body').innerHTML = pagos.map(p => {
+        const estadoBadge = p.estado === 'pagado'
+          ? '<span class="badge badge-success">Pagado</span>'
+          : '<span class="badge badge-danger">Pendiente</span>';
+        const accionBtn = p.estado === 'pendiente' && cajaActual
+          ? `<button class="btn btn-sm btn-success" onclick="abrirConfirmarPagoDesdeHistorial('${p.id}',${p.monto})">${icon('check')}</button>`
+          : '—';
+        return `<tr>
+          <td style="padding:10px 14px">${fmtDate(p.fecha_pago)}</td>
+          <td style="padding:10px 14px"><strong>${fmtMoney(p.monto)}</strong></td>
+          <td style="padding:10px 14px">${p.metodo_pago || '—'}</td>
+          <td style="padding:10px 14px">${estadoBadge}</td>
+          <td style="padding:10px 14px;color:var(--text-light);font-size:12px">${p.notas || '—'}</td>
+          <td style="padding:10px 14px">${accionBtn}</td>
+        </tr>`;
+      }).join('');
+      document.getElementById('pagos-lista').classList.remove('hidden');
+    } catch (err) {
+      document.getElementById('pagos-loading').classList.add('hidden');
+      document.getElementById('pagos-empty').textContent = 'Error al cargar los pagos.';
+      document.getElementById('pagos-empty').classList.remove('hidden');
+    }
+  }
+
+  // --- Confirmar pago pendiente (desde tabla principal) ---
+  function abrirConfirmarPago(memId, cliente, monto) {
+    if (!cajaActual) { toast('Abre la caja antes de confirmar pagos', 'warning'); return; }
+    // Necesitamos el pago_id: lo buscamos al abrir el historial
+    // Usamos el memId para buscar el pago pendiente
+    document.getElementById('confirmar-pago-id').value = '';
+    document.getElementById('confirmar-pago-info').innerHTML =
+      `Cliente: <strong>${cliente}</strong> &nbsp;|&nbsp; Monto: <strong>${fmtMoney(monto)}</strong>`;
+    document.getElementById('confirmar-pago-metodo').value = 'efectivo';
+    // Buscar el pago pendiente de esta membresía
+    api.get(`/membresias/${memId}/pagos`).then(pagos => {
+      const pendiente = pagos.find(p => p.estado === 'pendiente');
+      if (!pendiente) { toast('No se encontró un pago pendiente para esta membresía', 'warning'); return; }
+      document.getElementById('confirmar-pago-id').value = pendiente.id;
+      openModal('modal-confirmar-pago');
+    }).catch(err => toast(err.message, 'error'));
+  }
+
+  // --- Confirmar pago desde historial ---
+  function abrirConfirmarPagoDesdeHistorial(pagoId, monto) {
+    if (!cajaActual) { toast('Abre la caja antes de confirmar pagos', 'warning'); return; }
+    document.getElementById('confirmar-pago-id').value = pagoId;
+    document.getElementById('confirmar-pago-info').innerHTML =
+      `Monto a confirmar: <strong>${fmtMoney(monto)}</strong>`;
+    document.getElementById('confirmar-pago-metodo').value = 'efectivo';
+    openModal('modal-confirmar-pago');
+  }
+
+  async function ejecutarConfirmarPago() {
+    if (!cajaActual) { toast('No hay caja abierta', 'warning'); return; }
+    const pagoId = document.getElementById('confirmar-pago-id').value;
+    if (!pagoId) { toast('No se encontró el pago', 'error'); return; }
+    try {
+      await api.put(`/pagos/${pagoId}/confirmar`, {
+        metodo_pago: document.getElementById('confirmar-pago-metodo').value,
+        caja_id: cajaActual.id,
+      }, { invalidate: ['membresias', 'pagos'] });
+      toast('Pago confirmado correctamente');
+      closeModal('modal-confirmar-pago');
+      closeModal('modal-pagos');
+      loadMembresias(currentPage);
     } catch (err) { toast(err.message, 'error'); }
   }
 

@@ -90,6 +90,7 @@
     // Mostrar datos cacheados inmediatamente si existen (sin esperar el await)
     const cached = gymCache.get('/dashboard');
     if (cached) renderDashboard(cached);
+    else showTableSkeleton('recent-payments', 4, 5);
 
     try {
       const data = await api.get('/dashboard');

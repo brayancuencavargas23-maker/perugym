@@ -8,6 +8,8 @@ router.get('/public', async (req, res) => {
     const planes = await Plan.find({ mostrar_landing: true, activo: true })
       .select('nombre precio descripcion caracteristicas destacado')
       .sort({ precio: 1 });
+    // Cache de 5 minutos en CDN/browser — los planes no cambian frecuentemente
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=60');
     res.json(planes);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

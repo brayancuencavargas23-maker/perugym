@@ -1,5 +1,5 @@
 // Toast notifications
-function toast(msg, type = 'success') {
+function toast(msg, type = 'success', duration = 3500) {
   let container = document.getElementById('toast-container');
   if (!container) {
     container = document.createElement('div');
@@ -7,16 +7,108 @@ function toast(msg, type = 'success') {
     container.className = 'toast-container';
     document.body.appendChild(container);
   }
+
+  const svgIcons = {
+    success: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>`,
+    error:   `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+    warning: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+    info:    `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  };
+  const labels = { success: 'Éxito', error: 'Error', warning: 'Advertencia', info: 'Información' };
+
   const t = document.createElement('div');
-  const icons = { success: '✅', error: '❌', warning: '⚠️' };
   t.className = `toast ${type}`;
-  t.innerHTML = `<span>${icons[type] || '💬'}</span> ${msg}`;
+  t.innerHTML = `
+    <span class="toast-icon">${svgIcons[type] || svgIcons.info}</span>
+    <div class="toast-body">
+      <div class="toast-title">${labels[type] || type}</div>
+      <div class="toast-msg">${msg}</div>
+    </div>
+    <button class="toast-close" aria-label="Cerrar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="toast-progress" style="animation-duration:${duration}ms"></div>
+  `;
+
   container.appendChild(t);
-  setTimeout(() => t.remove(), 3500);
+
+  // Cierre manual
+  const dismiss = () => {
+    if (t.classList.contains('toast-hiding')) return;
+    t.classList.add('toast-hiding');
+    t.addEventListener('animationend', () => t.remove(), { once: true });
+  };
+
+  t.querySelector('.toast-close').addEventListener('click', dismiss);
+
+  // Auto-dismiss
+  const timer = setTimeout(dismiss, duration);
+
+  // Pausar progreso al hacer hover
+  t.addEventListener('mouseenter', () => {
+    clearTimeout(timer);
+    t.querySelector('.toast-progress').style.animationPlayState = 'paused';
+  });
+  t.addEventListener('mouseleave', () => {
+    t.querySelector('.toast-progress').style.animationPlayState = 'running';
+    setTimeout(dismiss, 800);
+  });
 }
 
-// Modal helpers
-function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+// ── Skeleton loaders ─────────────────────────────────────────────────────────
+// Widths cycle para que cada columna tenga un ancho distinto y natural
+const _skeletonWidths = ['w-70', 'w-55', 'w-40', 'w-80', 'w-30', 'w-20', 'w-55', 'w-70'];
+
+/**
+ * showTableSkeleton — Rellena un <tbody> con filas skeleton animadas.
+ *
+ * @param {string} tbodyId  - ID del <tbody> a rellenar
+ * @param {number} cols     - Número de columnas de la tabla
+ * @param {number} [rows=6] - Filas skeleton a mostrar
+ *
+ * Uso: showTableSkeleton('clientes-table', 6);
+ *      const data = await api.get('/clientes');
+ *      // renderizar data → las filas skeleton desaparecen solas
+ */
+function showTableSkeleton(tbodyId, cols, rows = 6) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  tbody.innerHTML = Array.from({ length: rows }, (_, r) =>
+    `<tr class="skeleton-row">${
+      Array.from({ length: cols }, (_, c) =>
+        `<td><div class="skeleton-cell ${_skeletonWidths[(r + c) % _skeletonWidths.length]}"></div></td>`
+      ).join('')
+    }</tr>`
+  ).join('');
+}
+
+/**
+ * showCardsSkeleton — Rellena un contenedor con cards skeleton animadas.
+ * Útil para grids de planes, productos en tarjeta, etc.
+ *
+ * @param {string} containerId - ID del contenedor
+ * @param {number} [count=6]   - Número de cards skeleton
+ *
+ * Uso: showCardsSkeleton('plans-grid', 4);
+ *      const plans = await api.get('/planes');
+ *      // renderizar plans → las cards skeleton desaparecen solas
+ */
+function showCardsSkeleton(containerId, count = 6) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = Array.from({ length: count }, () => `
+    <div class="skeleton-card">
+      <div class="skeleton-line title"></div>
+      <div class="skeleton-line short"></div>
+      <div class="skeleton-line price"></div>
+      <div class="skeleton-line medium"></div>
+      <div class="skeleton-line full"></div>
+      <div class="skeleton-line short"></div>
+    </div>
+  `).join('');
+}
+
+
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
 // Format date

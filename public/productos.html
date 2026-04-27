@@ -141,7 +141,7 @@
     if (search)   qs += `&search=${encodeURIComponent(search)}`;
     if (category) qs += `&categoria=${encodeURIComponent(category)}`;
     if (active)   qs += `&activo=${active}`;
-
+    if (page === 1 && !search && !category && !active) showTableSkeleton('products-table', 6);
     try {
       const data = await api.get(`/productos${qs}`);
       allProducts = data.data;

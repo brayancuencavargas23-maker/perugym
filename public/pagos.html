@@ -108,6 +108,7 @@
     if (metodo) qs += `&metodo_pago=${metodo}`;
     if (from) qs += `&from=${from}`;
     if (to) qs += `&to=${to}`;
+    if (page === 1 && !estado && !metodo && !from && !to) showTableSkeleton('pagos-table', 7);
     try {
       const data = await api.get(`/pagos${qs}`);
       document.getElementById('pagos-table').innerHTML = data.data.map(p => `

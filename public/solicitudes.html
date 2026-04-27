@@ -209,6 +209,7 @@
     const estado = document.getElementById('filter-estado').value;
     let qs = `?page=${page}&limit=15`;
     if (estado) qs += `&estado=${estado}`;
+    if (page === 1 && !estado && !force) showTableSkeleton('solicitudes-table', 7);
     try {
       const data = await api.get(`/solicitudes${qs}`, force);
       document.getElementById('solicitudes-table').innerHTML = data.data.map(s => {

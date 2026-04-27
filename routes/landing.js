@@ -7,6 +7,8 @@ const { saveImage, deleteImage } = require('../config/storage');
 router.get('/', async (req, res) => {
   try {
     const config = await LandingConfig.findById('singleton');
+    // Cache de 5 minutos — la config del landing cambia raramente
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=60');
     res.json(config || {});
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

@@ -190,6 +190,7 @@
   async function loadAsistencia(page) {
     page = page || 1;
     currentPage = page;
+    if (page === 1) showTableSkeleton('asistencia-table', 6);
     try {
       const data = await api.get('/asistencia' + buildQS(page, 20));
 

@@ -90,6 +90,7 @@
   const user = JSON.parse(localStorage.getItem('gym_user') || '{}');
 
   async function loadPlans() {
+    showCardsSkeleton('plans-grid', 4);
     try {
       const plans = await api.get('/planes');
       const grid = document.getElementById('plans-grid');
