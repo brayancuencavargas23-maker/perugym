@@ -36,4 +36,18 @@ app.use('/api/reports',      require('../../routes/reports'));
 app.use('/api/landing',      require('../../routes/landing'));
 app.use('/api/solicitudes',  require('../../routes/solicitudes'));
 
-module.exports.handler = serverless(app);
+// binary: true hace que serverless-http codifique TODA respuesta en base64
+// antes de enviarla a Netlify/Lambda. Sin esto, los archivos binarios como
+// .xlsx (que son ZIPs internamente) se corrompen al convertirse a UTF-8.
+module.exports.handler = serverless(app, {
+  binary: (headers) => {
+    const ct = (headers['content-type'] || '').toLowerCase();
+    return (
+      ct.includes('spreadsheetml') ||   // .xlsx
+      ct.includes('octet-stream')   ||   // binario genérico
+      ct.includes('pdf')            ||   // PDF
+      ct.includes('zip')            ||   // ZIP
+      ct.includes('image/')              // imágenes
+    );
+  }
+});

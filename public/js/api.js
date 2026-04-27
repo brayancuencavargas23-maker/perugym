@@ -96,11 +96,27 @@ const api = {
   // ── Descarga de archivos (sin caché) ─────────────────────────────────────────
   download: async (path, filename) => {
     const res = await fetch(API_BASE + path, { headers: api.headers() });
+
+    // Si el servidor devuelve error, leerlo como JSON y lanzar el mensaje
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `Error ${res.status} al generar el reporte`);
+    }
+
     const blob = await res.blob();
+
+    // Verificar que el blob tenga contenido real (no un JSON de error disfrazado)
+    if (blob.size === 0) {
+      throw new Error('El archivo generado está vacío');
+    }
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = filename;
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   },
 

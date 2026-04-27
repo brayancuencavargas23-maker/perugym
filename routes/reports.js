@@ -207,7 +207,6 @@ router.get('/pagos/excel', async (req, res) => {
     const buffer = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="pagos.xlsx"');
-    res.setHeader('Content-Length', buffer.length);
     res.end(buffer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -252,7 +251,6 @@ router.get('/clientes/excel', async (req, res) => {
     const buffer = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="clientes.xlsx"');
-    res.setHeader('Content-Length', buffer.length);
     res.end(buffer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -309,7 +307,6 @@ router.get('/asistencia/excel', async (req, res) => {
     const buffer = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="asistencias.xlsx"');
-    res.setHeader('Content-Length', buffer.length);
     res.end(buffer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -365,7 +362,6 @@ router.get('/membresias/excel', async (req, res) => {
     const buffer = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="membresias.xlsx"');
-    res.setHeader('Content-Length', buffer.length);
     res.end(buffer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -411,7 +407,6 @@ router.get('/pagos-pendientes/excel', async (req, res) => {
     const buffer = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="pagos-pendientes.xlsx"');
-    res.setHeader('Content-Length', buffer.length);
     res.end(buffer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -447,7 +442,6 @@ router.get('/stock/excel', async (req, res) => {
     const buffer = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="stock-productos.xlsx"');
-    res.setHeader('Content-Length', buffer.length);
     res.end(buffer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -518,7 +512,6 @@ router.get('/caja/excel', async (req, res) => {
     const buffer = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="resumen-caja.xlsx"');
-    res.setHeader('Content-Length', buffer.length);
     res.end(buffer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -578,7 +571,6 @@ router.get('/ventas/excel', async (req, res) => {
     const buffer = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="ventas.xlsx"');
-    res.setHeader('Content-Length', buffer.length);
     res.end(buffer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
