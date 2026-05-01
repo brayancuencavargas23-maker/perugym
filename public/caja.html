@@ -68,6 +68,14 @@
             <div class="caja-info-value" style="color:var(--success)" id="info-ventas">S/ 0.00</div>
           </div>
           <div class="caja-info-item">
+            <div class="caja-info-label">Ingresos manuales</div>
+            <div class="caja-info-value" style="color:var(--success)" id="info-ingresos-manuales">S/ 0.00</div>
+          </div>
+          <div class="caja-info-item">
+            <div class="caja-info-label">Egresos manuales</div>
+            <div class="caja-info-value" style="color:var(--danger)" id="info-egresos-manuales">S/ 0.00</div>
+          </div>
+          <div class="caja-info-item">
             <div class="caja-info-label">Total en caja</div>
             <div class="caja-info-value" style="color:var(--primary)" id="info-total">S/ 0.00</div>
           </div>
@@ -82,6 +90,7 @@
           <div class="tabs" style="margin-bottom:0">
             <button class="tab active" id="tab-venta" onclick="switchTab('venta')" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-tab-venta"></span> Nueva Venta</button>
             <button class="tab" id="tab-ventas" onclick="switchTab('ventas')" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-tab-ventas"></span> Ventas del turno</button>
+            <button class="tab" id="tab-movimientos" onclick="switchTab('movimientos')" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-tab-movimientos"></span> Ingresos / Egresos</button>
           </div>
           <button id="btn-export-ventas" onclick="exportarVentasTurno()" style="display:none;align-items:center;gap:6px" class="btn btn-success"><span id="icon-tab-export"></span> Exportar Excel</button>
         </div>
@@ -129,6 +138,43 @@
                 <thead><tr><th>Producto</th><th>Miembro</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Hora</th><th></th></tr></thead>
                 <tbody id="turno-ventas-table"></tbody>
               </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ingresos / Egresos manuales -->
+        <div id="section-movimientos" class="hidden">
+          <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">
+            <!-- Formulario -->
+            <div class="card" style="flex:0 0 320px;min-width:280px">
+              <h3 style="font-size:15px;margin-bottom:16px">Registrar movimiento</h3>
+              <div class="form-group">
+                <label>Tipo *</label>
+                <div style="display:flex;gap:8px">
+                  <button id="btn-tipo-ingreso" class="btn btn-success" style="flex:1;font-weight:700" onclick="setTipoMovimiento('ingreso')">▲ Ingreso</button>
+                  <button id="btn-tipo-egreso" class="btn btn-outline" style="flex:1;font-weight:700;color:var(--danger);border-color:var(--danger)" onclick="setTipoMovimiento('egreso')">▼ Egreso</button>
+                </div>
+                <input type="hidden" id="mov-tipo" value="ingreso">
+              </div>
+              <div class="form-group">
+                <label>Monto (S/) *</label>
+                <input type="number" id="mov-monto" class="form-control" placeholder="0.00" step="0.01" min="0.01">
+              </div>
+              <div class="form-group">
+                <label>Concepto *</label>
+                <input type="text" id="mov-concepto" class="form-control" placeholder="Ej: Compra de insumos, Fondo inicial...">
+              </div>
+              <button class="btn btn-primary w-full" style="margin-top:4px;display:inline-flex;align-items:center;justify-content:center;gap:6px" onclick="withLoading(this, registrarMovimiento, 'Registrando...')"><span id="icon-confirm-mov"></span> Registrar</button>
+            </div>
+            <!-- Tabla de movimientos -->
+            <div class="card" style="flex:1;min-width:300px">
+              <h3 style="font-size:15px;margin-bottom:16px">Movimientos del turno</h3>
+              <div class="table-wrapper">
+                <table>
+                  <thead><tr><th>Tipo</th><th>Concepto</th><th>Monto</th><th>Hora</th><th>Usuario</th><th></th></tr></thead>
+                  <tbody id="movimientos-table"></tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -211,7 +257,7 @@
     <div class="modal-body">
       <div class="table-wrapper">
         <table>
-          <thead><tr><th>Producto</th><th>Miembro</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Hora</th></tr></thead>
+          <thead><tr><th>Tipo</th><th>Descripción</th><th>Miembro/Usuario</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Hora</th></tr></thead>
           <tbody id="detalle-table"></tbody>
         </table>
       </div>
@@ -229,8 +275,10 @@
   document.getElementById('icon-unlock-caja').innerHTML  = icon('unlock');
   document.getElementById('icon-tab-venta').innerHTML    = icon('cart');
   document.getElementById('icon-tab-ventas').innerHTML   = icon('planes');
+  document.getElementById('icon-tab-movimientos').innerHTML = icon('pagos');
   document.getElementById('icon-tab-export').innerHTML   = icon('excel');
   document.getElementById('icon-confirm-venta').innerHTML = icon('check');
+  document.getElementById('icon-confirm-mov').innerHTML  = icon('check');
   document.getElementById('h-historial').innerHTML       = icon('calendar') + ' Historial de Cajas';
   let cajaActual = null;
   let currentTabCaja = 'venta';
@@ -239,10 +287,13 @@
     currentTabCaja = tab;
     document.getElementById('section-venta').classList.toggle('hidden', tab !== 'venta');
     document.getElementById('section-ventas').classList.toggle('hidden', tab !== 'ventas');
+    document.getElementById('section-movimientos').classList.toggle('hidden', tab !== 'movimientos');
     document.getElementById('tab-venta').classList.toggle('active', tab === 'venta');
     document.getElementById('tab-ventas').classList.toggle('active', tab === 'ventas');
+    document.getElementById('tab-movimientos').classList.toggle('active', tab === 'movimientos');
     document.getElementById('btn-export-ventas').style.display = tab === 'ventas' ? 'inline-flex' : 'none';
     if (tab === 'ventas') loadTurnoVentas();
+    if (tab === 'movimientos') loadMovimientos();
   }
 
   async function anularVenta(id) {
@@ -295,11 +346,15 @@
         const totalVentas = detalle.ventas.filter(v => !v.anulada).reduce((s, v) => s + parseFloat(v.subtotal || 0), 0);
         const totalVentasAll = totalPagos + totalVentas;
         const inicial = parseFloat(caja.monto_inicial);
+        const ingresosManuales = parseFloat(caja.ingresos_manuales || 0);
+        const egresosManuales  = parseFloat(caja.egresos_manuales  || 0);
 
-        document.getElementById('info-inicial').textContent  = `S/ ${inicial.toFixed(2)}`;
-        document.getElementById('info-ventas').textContent   = `S/ ${totalVentasAll.toFixed(2)}`;
-        document.getElementById('info-total').textContent    = `S/ ${(inicial + totalVentasAll).toFixed(2)}`;
-        document.getElementById('info-apertura').textContent = fmtDateTime(caja.apertura);
+        document.getElementById('info-inicial').textContent           = `S/ ${inicial.toFixed(2)}`;
+        document.getElementById('info-ventas').textContent            = `S/ ${totalVentasAll.toFixed(2)}`;
+        document.getElementById('info-ingresos-manuales').textContent = `S/ ${ingresosManuales.toFixed(2)}`;
+        document.getElementById('info-egresos-manuales').textContent  = `S/ ${egresosManuales.toFixed(2)}`;
+        document.getElementById('info-total').textContent             = `S/ ${(inicial + totalVentasAll + ingresosManuales - egresosManuales).toFixed(2)}`;
+        document.getElementById('info-apertura').textContent          = fmtDateTime(caja.apertura);
 
         await loadVentaSelects();
       } else {        bar.className = 'caja-status-bar caja-cerrada';
@@ -455,16 +510,95 @@
     try {
       const detalle = await api.get(`/caja/${id}/detalle`);
       const rows = [
-        ...detalle.pagos.map(p => `<tr><td>💳 ${p.plan_nombre||'Membresía'}</td><td>${p.cliente_nombre||'-'}</td><td>1</td><td>S/ ${parseFloat(p.monto).toFixed(2)}</td><td style="font-weight:700;color:var(--success)">S/ ${parseFloat(p.monto).toFixed(2)}</td><td style="font-size:12px">${fmtDateTime(p.fecha_pago)}</td></tr>`),
-        ...detalle.ventas.map(v => `<tr style="${v.anulada ? 'opacity:0.45;text-decoration:line-through' : ''}"><td>🛒 ${v.producto_nombre||'-'}${v.anulada ? ' <span style="font-size:10px;color:var(--danger);font-weight:700;text-decoration:none">[ANULADA]</span>' : ''}</td><td>${v.cliente_nombre||'-'}</td><td>${v.cantidad}</td><td>S/ ${parseFloat(v.precio_unit).toFixed(2)}</td><td style="font-weight:700;color:${v.anulada ? 'var(--danger)' : 'var(--success)'}">S/ ${parseFloat(v.subtotal).toFixed(2)}</td><td style="font-size:12px">${fmtDateTime(v.fecha_venta)}</td></tr>`)
+        ...detalle.pagos.map(p => `<tr><td><span class="badge badge-info">Membresía</span></td><td>💳 ${p.plan_nombre||'Membresía'}</td><td>${p.cliente_nombre||'-'}</td><td>1</td><td>S/ ${parseFloat(p.monto).toFixed(2)}</td><td style="font-weight:700;color:var(--success)">S/ ${parseFloat(p.monto).toFixed(2)}</td><td style="font-size:12px">${fmtDateTime(p.fecha_pago)}</td></tr>`),
+        ...detalle.ventas.map(v => `<tr style="${v.anulada ? 'opacity:0.45;text-decoration:line-through' : ''}"><td><span class="badge badge-success">Venta</span></td><td>🛒 ${v.producto_nombre||'-'}${v.anulada ? ' <span style="font-size:10px;color:var(--danger);font-weight:700;text-decoration:none">[ANULADA]</span>' : ''}</td><td>${v.cliente_nombre||'-'}</td><td>${v.cantidad}</td><td>S/ ${parseFloat(v.precio_unit).toFixed(2)}</td><td style="font-weight:700;color:${v.anulada ? 'var(--danger)' : 'var(--success)'}">S/ ${parseFloat(v.subtotal).toFixed(2)}</td><td style="font-size:12px">${fmtDateTime(v.fecha_venta)}</td></tr>`),
+        ...(detalle.movimientos||[]).map(m => `<tr><td><span class="badge ${m.tipo==='ingreso' ? 'badge-success' : 'badge-danger'}">${m.tipo==='ingreso' ? '▲ Ingreso' : '▼ Egreso'}</span></td><td>${m.concepto}</td><td>${m.usuario_nombre||'-'}</td><td>-</td><td>-</td><td style="font-weight:700;color:${m.tipo==='ingreso' ? 'var(--success)' : 'var(--danger)'}">${m.tipo==='ingreso' ? '+' : '-'}S/ ${parseFloat(m.monto).toFixed(2)}</td><td style="font-size:12px">${fmtDateTime(m.fecha)}</td></tr>`),
       ];
       document.getElementById('detalle-table').innerHTML = rows.join('') ||
-        '<tr><td colspan="6" class="text-center" style="padding:20px;color:var(--text-light)">Sin movimientos</td></tr>';
+        '<tr><td colspan="7" class="text-center" style="padding:20px;color:var(--text-light)">Sin movimientos</td></tr>';
       openModal('modal-detalle');
     } catch (err) { toast(err.message, 'error'); }
   }
 
   document.getElementById('btn-abrir').onclick = () => openModal('modal-abrir');
+
+  function setTipoMovimiento(tipo) {
+    document.getElementById('mov-tipo').value = tipo;
+    const btnIngreso = document.getElementById('btn-tipo-ingreso');
+    const btnEgreso  = document.getElementById('btn-tipo-egreso');
+    if (tipo === 'ingreso') {
+      btnIngreso.className = 'btn btn-success';
+      btnEgreso.className  = 'btn btn-outline';
+      btnEgreso.style.cssText = 'flex:1;font-weight:700;color:var(--danger);border-color:var(--danger)';
+      btnIngreso.style.cssText = 'flex:1;font-weight:700';
+    } else {
+      btnEgreso.className  = 'btn btn-danger';
+      btnIngreso.className = 'btn btn-outline';
+      btnIngreso.style.cssText = 'flex:1;font-weight:700;color:var(--success);border-color:var(--success)';
+      btnEgreso.style.cssText  = 'flex:1;font-weight:700';
+    }
+  }
+
+  async function registrarMovimiento() {
+    if (!cajaActual) return toast('Debes abrir la caja primero', 'warning');
+    const tipo     = document.getElementById('mov-tipo').value;
+    const monto    = document.getElementById('mov-monto').value;
+    const concepto = document.getElementById('mov-concepto').value.trim();
+    if (!monto || parseFloat(monto) <= 0) return toast('Ingresa un monto válido', 'warning');
+    if (!concepto) return toast('El concepto es requerido', 'warning');
+    try {
+      await api.post(`/caja/${cajaActual.id}/movimientos`, { tipo, monto, concepto });
+      gymCache.invalidate('caja');
+      toast(`${tipo === 'ingreso' ? 'Ingreso' : 'Egreso'} registrado ✅`);
+      document.getElementById('mov-monto').value   = '';
+      document.getElementById('mov-concepto').value = '';
+      loadEstado();
+      loadMovimientos();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function loadMovimientos() {
+    if (!cajaActual) return;
+    try {
+      const movs = await api.get(`/caja/${cajaActual.id}/movimientos`);
+      const tbody = document.getElementById('movimientos-table');
+      if (!movs.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="padding:20px;color:var(--text-light)">Sin movimientos registrados</td></tr>';
+        return;
+      }
+      tbody.innerHTML = movs.map(m => `
+        <tr>
+          <td><span class="badge ${m.tipo === 'ingreso' ? 'badge-success' : 'badge-danger'}">${m.tipo === 'ingreso' ? '▲ Ingreso' : '▼ Egreso'}</span></td>
+          <td>${m.concepto}</td>
+          <td style="font-weight:700;color:${m.tipo === 'ingreso' ? 'var(--success)' : 'var(--danger)'}">
+            ${m.tipo === 'ingreso' ? '+' : '-'}S/ ${parseFloat(m.monto).toFixed(2)}
+          </td>
+          <td style="font-size:12px">${fmtDateTime(m.fecha)}</td>
+          <td style="font-size:12px">${m.usuario_nombre || '-'}</td>
+          <td>
+            <button class="btn btn-sm btn-danger" style="display:inline-flex;align-items:center;gap:4px" onclick="eliminarMovimiento('${m.id}')">${icon('trash')}</button>
+          </td>
+        </tr>
+      `).join('');
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function eliminarMovimiento(movId) {
+    const ok = await confirmDialog({
+      title: 'Eliminar movimiento',
+      message: '¿Eliminar este movimiento? Esta acción no se puede deshacer.',
+      confirmText: 'Sí, eliminar',
+      type: 'danger'
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/caja/${cajaActual.id}/movimientos/${movId}`);
+      gymCache.invalidate('caja');
+      toast('Movimiento eliminado', 'warning');
+      loadEstado();
+      loadMovimientos();
+    } catch (err) { toast(err.message, 'error'); }
+  }
 
   function exportarVentasTurno() {
     if (!cajaActual) return toast('No hay caja abierta', 'warning');
