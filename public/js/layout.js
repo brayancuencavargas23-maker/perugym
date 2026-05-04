@@ -2,6 +2,22 @@ function initLayout(activePage, pageTitle) {
   const user = requireAuth();
   if (!user) return;
 
+  // ── Restaurar sidebar desde caché para eliminar el flash entre páginas ─────
+  // Si ya existe el HTML del sidebar guardado en sessionStorage, lo inyectamos
+  // de inmediato (antes de reconstruirlo) para que el usuario no vea el sidebar
+  // vacío ni negro mientras los scripts terminan de ejecutarse.
+  const _cachedSidebar = sessionStorage.getItem('_sidebar_html');
+  if (_cachedSidebar) {
+    const sidebarEl = document.getElementById('sidebar');
+    if (sidebarEl && !sidebarEl.innerHTML.trim()) {
+      sidebarEl.innerHTML = _cachedSidebar;
+      // Actualizar el ítem activo inmediatamente
+      sidebarEl.querySelectorAll('.nav-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.page === activePage);
+      });
+    }
+  }
+
   // ── Secciones del sidebar ──────────────────────────────────────────────────
   const sections = [
     {
@@ -75,7 +91,7 @@ function initLayout(activePage, pageTitle) {
 
   document.getElementById('sidebar').innerHTML = `
     <div class="sidebar-header">
-      <img src="/imagenes/index/Gemini_Generated_Image_ov0xhjov0xhjov0x-removebg-preview.png" alt="PeruGym" class="sidebar-logo-img">
+      <img src="/imagenes/index/Gemini_Generated_Image_ov0xhjov0xhjov0x-removebg-preview.png" alt="PeruGym" class="sidebar-logo-img" width="42" height="42">
       <div>
         <h2>PeruGym</h2>
         <p>Sistema de Gestión</p>
@@ -101,14 +117,33 @@ function initLayout(activePage, pageTitle) {
     </div>
   `;
 
+  // Guardar el HTML del sidebar en sessionStorage para restaurarlo
+  // instantáneamente en la próxima navegación (elimina el flash)
+  // Se guarda sin el ítem activo para que cada página lo marque correctamente
+  sessionStorage.setItem('_sidebar_html', document.getElementById('sidebar').innerHTML);
+
   // Cargar badge de solicitudes pendientes
+  // Primero mostrar desde caché para evitar parpadeo en producción
+  const cachedStats = gymCache.get('/solicitudes/stats');
+  if (cachedStats) {
+    const badge = document.getElementById('nav-badge-solicitudes');
+    if (badge && cachedStats.pendiente > 0) {
+      badge.textContent = cachedStats.pendiente;
+      badge.style.display = 'inline-block';
+    }
+  }
   fetch('/api/solicitudes/stats', { headers: { Authorization: `Bearer ${localStorage.getItem('gym_token')}` } })
     .then(r => r.json())
     .then(stats => {
+      gymCache.set('/solicitudes/stats', stats);
       const badge = document.getElementById('nav-badge-solicitudes');
-      if (badge && stats.pendiente > 0) {
-        badge.textContent = stats.pendiente;
-        badge.style.display = 'inline-block';
+      if (badge) {
+        if (stats.pendiente > 0) {
+          badge.textContent = stats.pendiente;
+          badge.style.display = 'inline-block';
+        } else {
+          badge.style.display = 'none';
+        }
       }
     })
     .catch(() => {});
@@ -140,7 +175,7 @@ function logout() {
   // 3. Limpiar todo el almacenamiento local
   localStorage.removeItem('gym_token');
   localStorage.removeItem('gym_user');
-  sessionStorage.clear();
+  sessionStorage.clear(); // también borra _sidebar_html
 
   // 4. Reemplazar la entrada actual en el historial para que el botón
   //    "atrás" no regrese al panel. replace() no agrega nueva entrada.

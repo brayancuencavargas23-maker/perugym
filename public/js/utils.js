@@ -192,7 +192,7 @@ function _isTokenValid() {
 function _redirectToLogin() {
   localStorage.removeItem('gym_token');
   localStorage.removeItem('gym_user');
-  sessionStorage.clear();
+  sessionStorage.clear(); // también borra _sidebar_html
   if (typeof gymCache !== 'undefined') gymCache.clear();
   window.location.replace('/login.html');
 }

@@ -20,9 +20,14 @@
 
 # Cache para assets estáticos (CSS, JS, imágenes locales)
 [[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-store, no-cache, must-revalidate"
+
+[[headers]]
   for = "/css/*"
   [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+    Cache-Control = "no-cache, must-revalidate"
 
 [[headers]]
   for = "/js/*"

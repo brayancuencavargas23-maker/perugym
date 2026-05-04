@@ -72,6 +72,35 @@ body {
   z-index: 100;
   transition: transform 0.3s;
   border-right: 1px solid rgba(255,255,255,0.06);
+  /* Evitar flash de sidebar vacío antes de que JS lo llene */
+  overflow: hidden;
+}
+
+/* Skeleton del sidebar mientras JS no ha llenado el contenido */
+.sidebar:empty::before {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  background:
+    /* Header: avatar */
+    radial-gradient(circle, rgba(255,255,255,0.08) 21px, transparent 21px) 16px 18px / 42px 42px no-repeat,
+    /* Header: título */
+    linear-gradient(rgba(255,255,255,0.07) 10px, transparent 10px) 70px 22px / 100px 10px no-repeat,
+    linear-gradient(rgba(255,255,255,0.05) 8px, transparent 8px) 70px 38px / 70px 8px no-repeat,
+    /* Nav items */
+    linear-gradient(rgba(255,255,255,0.06) 12px, transparent 12px) 16px 90px / 180px 12px no-repeat,
+    linear-gradient(rgba(255,255,255,0.06) 12px, transparent 12px) 16px 118px / 160px 12px no-repeat,
+    linear-gradient(rgba(255,255,255,0.06) 12px, transparent 12px) 16px 146px / 170px 12px no-repeat,
+    linear-gradient(rgba(255,255,255,0.06) 12px, transparent 12px) 16px 190px / 140px 12px no-repeat,
+    linear-gradient(rgba(255,255,255,0.06) 12px, transparent 12px) 16px 218px / 165px 12px no-repeat,
+    linear-gradient(rgba(255,255,255,0.06) 12px, transparent 12px) 16px 246px / 155px 12px no-repeat;
+  animation: _sidebar-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes _sidebar-shimmer {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1;   }
 }
 
 /* Header */
