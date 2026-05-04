@@ -151,6 +151,7 @@ router.get('/:id/detalle', async (req, res) => {
           cliente_id: v.cliente_id?._id,
           anulada: v.anulada,
           anulada_at: v.anulada_at,
+          metodo_pago: v.metodo_pago || 'efectivo',
           cliente_nombre: v.cliente_id?.nombre,
           producto_nombre: item.producto_id?.nombre,
           cantidad: item.cantidad,

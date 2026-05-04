@@ -5,7 +5,7 @@ const pagoSchema = new mongoose.Schema({
   membresia_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Membresia' },
   caja_id:      { type: mongoose.Schema.Types.ObjectId, ref: 'Caja', default: null },
   monto:        { type: Number, required: true },
-  metodo_pago:  { type: String, enum: ['efectivo', 'tarjeta', 'transferencia'], default: 'efectivo' },
+  metodo_pago:  { type: String, enum: ['efectivo', 'yape', 'plin', 'transferencia'], default: 'efectivo' },
   estado:       { type: String, enum: ['pagado', 'pendiente'], default: 'pagado' },
   fecha_pago:   { type: Date, default: Date.now },
   notas:        { type: String, default: null },

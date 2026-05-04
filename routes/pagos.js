@@ -47,7 +47,7 @@ router.put(
   '/:id/confirmar',
   [
     param('id').isMongoId().withMessage('ID de pago inválido.'),
-    body('metodo_pago').optional().isIn(['efectivo', 'tarjeta', 'transferencia']).withMessage('Método de pago inválido.'),
+    body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']).withMessage('Método de pago inválido.'),
     body('caja_id').isMongoId().withMessage('caja_id inválido. Abre la caja antes de confirmar pagos.'),
   ],
   async (req, res) => {
@@ -99,7 +99,7 @@ router.put(
   [
     param('id').isMongoId().withMessage('ID de pago inválido.'),
     body('monto').optional().isFloat({ min: 0.01 }).withMessage('El monto debe ser mayor a 0.'),
-    body('metodo_pago').optional().isIn(['efectivo', 'tarjeta', 'transferencia']),
+    body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']),
     body('estado').optional().isIn(['pagado', 'pendiente']).withMessage('Estado inválido.'),
   ],
   async (req, res) => {

@@ -17,6 +17,7 @@ router.post(
     body('items.*.producto_id').isMongoId().withMessage('producto_id inválido.'),
     body('items.*.cantidad').isInt({ min: 1 }).withMessage('La cantidad debe ser un entero positivo.'),
     body('cliente_id').optional({ nullable: true }).isMongoId().withMessage('cliente_id inválido.'),
+    body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']).withMessage('Método de pago inválido.'),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -24,7 +25,7 @@ router.post(
       return res.status(400).json({ error: errors.array()[0].msg });
     }
 
-    const { cliente_id, items } = req.body;
+    const { cliente_id, items, metodo_pago } = req.body;
     const caja_id = req.cajaActual._id; // inyectado por requireCajaAbierta
 
     const session = await mongoose.startSession();
@@ -56,7 +57,7 @@ router.post(
       }
 
       const [venta] = await Venta.create(
-        [{ caja_id, cliente_id: cliente_id || null, items: ventaItems }],
+        [{ caja_id, cliente_id: cliente_id || null, metodo_pago: metodo_pago || 'efectivo', items: ventaItems }],
         { session }
       );
 

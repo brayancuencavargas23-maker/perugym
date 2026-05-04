@@ -72,7 +72,7 @@ router.post(
   [
     body('cliente_id').isMongoId().withMessage('cliente_id inválido.'),
     body('plan_id').isMongoId().withMessage('plan_id inválido.'),
-    body('metodo_pago').optional().isIn(['efectivo', 'tarjeta', 'transferencia']).withMessage('Método de pago inválido.'),
+    body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']).withMessage('Método de pago inválido.'),
     body('estado_pago').optional().isIn(['pagado', 'pendiente']).withMessage('Estado de pago inválido.'),
     body('fecha_inicio').optional().isISO8601().withMessage('Fecha de inicio inválida.'),
   ],
@@ -133,7 +133,7 @@ router.post(
   [
     param('id').isMongoId().withMessage('ID de membresía inválido.'),
     body('plan_id').isMongoId().withMessage('plan_id inválido.'),
-    body('metodo_pago').optional().isIn(['efectivo', 'tarjeta', 'transferencia']),
+    body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']),
     body('estado_pago').optional().isIn(['pagado', 'pendiente']),
   ],
   async (req, res) => {
@@ -189,7 +189,7 @@ router.post(
   requireCajaAbierta,
   [
     param('id').isMongoId().withMessage('ID de membresía inválido.'),
-    body('metodo_pago').optional().isIn(['efectivo', 'tarjeta', 'transferencia']),
+    body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']),
     body('estado_pago').optional().isIn(['pagado', 'pendiente']),
   ],
   async (req, res) => {

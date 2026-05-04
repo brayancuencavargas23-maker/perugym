@@ -15,12 +15,17 @@ const api = {
     if (body) opts.body = isFormData ? body : JSON.stringify(body);
 
     const res = await fetch(API_BASE + path, opts);
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 401) {
+      // Token inválido o expirado → forzar logout
       gymCache.clear();
       localStorage.removeItem('gym_token');
       localStorage.removeItem('gym_user');
       window.location.href = '/login.html';
       return;
+    }
+    if (res.status === 403) {
+      // Autenticado pero sin permiso → lanzar error sin cerrar sesión
+      throw new Error('No tienes permiso para realizar esta acción');
     }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Error en la solicitud');

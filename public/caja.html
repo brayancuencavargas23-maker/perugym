@@ -123,6 +123,15 @@
               </div>
             </div>
             <div class="form-group">
+              <label>Método de pago</label>
+              <select id="v-metodo" class="form-control">
+                <option value="efectivo">Efectivo</option>
+                <option value="yape">Yape</option>
+                <option value="plin">Plin</option>
+                <option value="transferencia">Transferencia</option>
+              </select>
+            </div>
+            <div class="form-group">
               <label>Notas</label>
               <input type="text" id="v-notes" class="form-control" placeholder="Opcional...">
             </div>
@@ -135,7 +144,7 @@
           <div class="card">
             <div class="table-wrapper">
               <table>
-                <thead><tr><th>Producto</th><th>Miembro</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Hora</th><th></th></tr></thead>
+                <thead><tr><th>Producto</th><th>Miembro</th><th>Método</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Hora</th><th></th></tr></thead>
                 <tbody id="turno-ventas-table"></tbody>
               </table>
             </div>
@@ -401,11 +410,13 @@
     const product_id = document.getElementById('v-product').value;
     const cliente_id = document.getElementById('v-member').value;
     const quantity   = parseInt(document.getElementById('v-qty').value) || 1;
+    const metodo_pago = document.getElementById('v-metodo').value;
     if (!product_id) return toast('Selecciona un producto', 'warning');
     try {
       const venta = await api.post('/ventas', {
         cliente_id: cliente_id || null,
         caja_id: cajaActual.id,
+        metodo_pago,
         items: [{ producto_id: product_id, cantidad: quantity }]
       });
 
@@ -428,6 +439,7 @@
       document.getElementById('v-qty').value = 1;
       document.getElementById('v-total').value = '';
       document.getElementById('v-notes').value = '';
+      document.getElementById('v-metodo').value = 'efectivo';
       document.getElementById('v-stock-info').textContent = '';
       loadEstado();
     } catch (err) { toast(err.message, 'error'); }
@@ -441,6 +453,7 @@
         <tr style="${v.anulada ? 'opacity:0.45;text-decoration:line-through' : ''}">
           <td>${v.producto_nombre || '-'}</td>
           <td>${v.cliente_nombre || '-'}</td>
+          <td><span class="badge badge-info">${v.metodo_pago || 'efectivo'}</span></td>
           <td style="text-align:center">${v.cantidad}</td>
           <td>S/ ${parseFloat(v.precio_unit).toFixed(2)}</td>
           <td style="font-weight:700;color:${v.anulada ? 'var(--danger)' : 'var(--success)'}">
@@ -453,7 +466,7 @@
               : ''}
           </td>
         </tr>
-      `).join('') || '<tr><td colspan="7" class="text-center" style="padding:20px;color:var(--text-light)">Sin ventas en este turno</td></tr>';
+      `).join('') || '<tr><td colspan="8" class="text-center" style="padding:20px;color:var(--text-light)">Sin ventas en este turno</td></tr>';
     } catch (err) { toast(err.message, 'error'); }
   }
 

@@ -47,6 +47,8 @@ function initLayout(activePage, pageTitle) {
     // Filtrar items de la sección
     const visibleItems = section.items.filter(item => {
       if (item.adminOnly) return isAdmin;
+      // dashboard siempre visible para cualquier usuario autenticado
+      if (item.page === 'dashboard') return true;
       return isAdmin || userPermisos.includes(item.page);
     });
     if (visibleItems.length === 0) return '';

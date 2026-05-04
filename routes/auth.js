@@ -40,7 +40,7 @@ router.get('/users', verifyToken, requireRole('admin'), async (req, res) => {
   try {
     const users = await Usuario.find({}, { password: 0 }).sort({ created_at: 1 });
     res.json(users.map(u => ({
-      id: u._id, name: u.usuario, email: u.email, role: u.rol,
+      id: u._id.toString(), name: u.usuario, email: u.email, role: u.rol,
       active: u.activo, permisos: u.permisos, created_at: u.created_at,
     })));
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -48,26 +48,64 @@ router.get('/users', verifyToken, requireRole('admin'), async (req, res) => {
 
 router.post('/users', verifyToken, requireRole('admin'), async (req, res) => {
   const { name, email, password, role } = req.body;
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: 'Nombre, email y contraseña son requeridos' });
+  }
   try {
     const hash = await bcrypt.hash(password, 10);
-    const user = await Usuario.create({ usuario: name, email, password: hash, rol: role });
-    res.status(201).json({ id: user._id, name: user.usuario, email: user.email, role: user.rol });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+    const user = await Usuario.create({ usuario: name, email, password: hash, rol: role || 'recepcionista' });
+    res.status(201).json({ id: user._id.toString(), name: user.usuario, email: user.email, role: user.rol });
+  } catch (err) {
+    if (err.code === 11000) {
+      const field = err.keyPattern?.usuario ? 'nombre de usuario' : 'email';
+      return res.status(409).json({ error: `Ya existe un usuario con ese ${field}` });
+    }
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.put('/users/:id', verifyToken, requireRole('admin'), async (req, res) => {
-  const { name, email, role, active, password } = req.body;
+  const { name, email, role, active } = req.body;
   try {
     const update = { usuario: name, email, rol: role, activo: active };
-    if (password) update.password = await bcrypt.hash(password, 10);
-    const user = await Usuario.findByIdAndUpdate(req.params.id, update, { new: true });
-    res.json({ id: user._id, name: user.usuario, email: user.email, role: user.rol, active: user.activo });
+    const user = await Usuario.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
+    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+    res.json({ id: user._id.toString(), name: user.usuario, email: user.email, role: user.rol, active: user.activo });
+  } catch (err) {
+    if (err.code === 11000) {
+      const field = err.keyPattern?.usuario ? 'nombre de usuario' : 'email';
+      return res.status(409).json({ error: `Ya existe un usuario con ese ${field}` });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Cambio de contraseña: requiere confirmar la contraseña actual del admin que hace la acción
+router.put('/users/:id/password', verifyToken, requireRole('admin'), async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'La contraseña actual y la nueva son requeridas' });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
+  }
+  try {
+    // Verificar la contraseña actual del admin que está haciendo el cambio (req.user.id viene del token)
+    const admin = await Usuario.findById(req.user.id);
+    if (!admin || !(await bcrypt.compare(currentPassword, admin.password))) {
+      return res.status(401).json({ error: 'Tu contraseña actual es incorrecta' });
+    }
+    const hash = await bcrypt.hash(newPassword, 10);
+    const user = await Usuario.findByIdAndUpdate(req.params.id, { password: hash }, { new: true });
+    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+    res.json({ message: 'Contraseña actualizada correctamente' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.delete('/users/:id', verifyToken, requireRole('admin'), async (req, res) => {
   try {
-    await Usuario.findByIdAndDelete(req.params.id);
+    const user = await Usuario.findByIdAndDelete(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
     res.json({ message: 'Usuario eliminado' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

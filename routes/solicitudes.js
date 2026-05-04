@@ -184,7 +184,7 @@ router.post(
   [
     param('id').isMongoId().withMessage('ID inválido.'),
     body('dni').optional({ checkFalsy: true }).trim(),
-    body('metodo_pago').optional().isIn(['efectivo', 'tarjeta', 'transferencia']),
+    body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']),
     body('estado_pago').optional().isIn(['pagado', 'pendiente']),
     body('fecha_inicio').optional().isISO8601().withMessage('Fecha de inicio inválida.'),
   ],

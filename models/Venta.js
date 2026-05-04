@@ -10,6 +10,7 @@ const ventaDetalleSchema = new mongoose.Schema({
 const ventaSchema = new mongoose.Schema({
   caja_id:     { type: mongoose.Schema.Types.ObjectId, ref: 'Caja', required: true },
   cliente_id:  { type: mongoose.Schema.Types.ObjectId, ref: 'Cliente', default: null },
+  metodo_pago: { type: String, enum: ['efectivo', 'yape', 'plin', 'transferencia'], default: 'efectivo' },
   fecha_venta: { type: Date, default: Date.now },
   anulada:     { type: Boolean, default: false },
   anulada_at:  { type: Date, default: null },

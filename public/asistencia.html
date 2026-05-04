@@ -8,6 +8,10 @@
   <meta http-equiv="Expires" content="0">
   <title>Asistencia - PeruGym</title>
   <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .checkin-opt:hover { background: var(--bg); }
+    .checkin-opt:last-child { border-bottom: none !important; }
+  </style>
 </head>
 <body>
 <div class="app-layout">
@@ -20,11 +24,11 @@
       <div class="card mb-2" style="margin-bottom:20px">
         <h3 style="font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:6px" id="h-checkin"></h3>
         <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
-          <div class="form-group" style="flex:1;min-width:200px;margin:0">
-            <label>Seleccionar Cliente</label>
-            <select id="checkin-cliente" class="form-control">
-              <option value="">Seleccionar...</option>
-            </select>
+          <div class="form-group" style="flex:1;min-width:220px;margin:0;position:relative">
+            <label>Buscar Cliente</label>
+            <input type="text" id="checkin-search" class="form-control" placeholder="Escribe el nombre..." autocomplete="off">
+            <input type="hidden" id="checkin-cliente">
+            <div id="checkin-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);z-index:100;max-height:220px;overflow-y:auto;margin-top:2px"></div>
           </div>
           <button class="btn btn-success" onclick="withLoading(this, doCheckin, 'Registrando...')" style="display:inline-flex;align-items:center;gap:6px" id="btn-checkin-el"></button>
           <button class="btn btn-warning" onclick="withLoading(this, doCheckout, 'Registrando...')" style="display:inline-flex;align-items:center;gap:6px" id="btn-checkout-el"></button>
@@ -178,14 +182,67 @@
 
   async function loadClientes() {
     const data = await api.get('/clientes?activo=true&limit=500');
+    // Guardar lista para el buscador de check-in
+    window._clientesCheckin = data.data;
+
+    // Poblar el select del filtro de tabla
     const opts = '<option value="">Todos</option>' +
       data.data.map(c => '<option value="' + (c._id || c.id) + '">' + c.nombre + '</option>').join('');
     document.getElementById('filter-cliente').innerHTML = opts;
 
-    document.getElementById('checkin-cliente').innerHTML =
-      '<option value="">Seleccionar cliente...</option>' +
-      data.data.map(c => '<option value="' + (c._id || c.id) + '">' + c.nombre + '</option>').join('');
+    // Inicializar buscador de check-in
+    initCheckinSearch(data.data);
   }
+
+  function initCheckinSearch(clientes) {
+    const input    = document.getElementById('checkin-search');
+    const hidden   = document.getElementById('checkin-cliente');
+    const dropdown = document.getElementById('checkin-dropdown');
+
+    function renderDropdown(lista) {
+      if (!lista.length) {
+        dropdown.innerHTML = '<div style="padding:10px 14px;color:var(--text-light);font-size:13px">Sin resultados</div>';
+        dropdown.style.display = 'block';
+        return;
+      }
+      dropdown.innerHTML = lista.slice(0, 10).map(c =>
+        `<div class="checkin-opt" data-id="${c._id || c.id}" data-name="${c.nombre}"
+          style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
+          onmousedown="selectCheckinCliente('${c._id || c.id}','${c.nombre.replace(/'/g,"\\'")}')">
+          ${c.nombre}
+        </div>`
+      ).join('');
+      dropdown.style.display = 'block';
+    }
+
+    input.addEventListener('input', function() {
+      hidden.value = '';
+      const q = this.value.trim().toLowerCase();
+      if (!q) { dropdown.style.display = 'none'; return; }
+      const filtered = clientes.filter(c => c.nombre.toLowerCase().includes(q));
+      renderDropdown(filtered);
+    });
+
+    input.addEventListener('focus', function() {
+      if (this.value.trim() && !hidden.value) {
+        const q = this.value.trim().toLowerCase();
+        const filtered = clientes.filter(c => c.nombre.toLowerCase().includes(q));
+        renderDropdown(filtered);
+      }
+    });
+
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('#checkin-search') && !e.target.closest('#checkin-dropdown')) {
+        dropdown.style.display = 'none';
+      }
+    });
+  }
+
+  window.selectCheckinCliente = function(id, name) {
+    document.getElementById('checkin-cliente').value = id;
+    document.getElementById('checkin-search').value  = name;
+    document.getElementById('checkin-dropdown').style.display = 'none';
+  };
 
   async function loadAsistencia(page) {
     page = page || 1;
@@ -266,10 +323,11 @@
     if (!cliente_id) return toast('Selecciona un cliente', 'warning');
     try {
       const nueva = await api.post('/asistencia/checkin', { cliente_id: cliente_id });
-      // Prepend quirúrgico: agrega el nuevo registro al inicio del caché
-      // sin borrar toda la lista de asistencia
       if (nueva) gymCache.prependItem('asistencia', nueva);
       toast('Check-in registrado');
+      // Limpiar buscador
+      document.getElementById('checkin-search').value = '';
+      document.getElementById('checkin-cliente').value = '';
       loadAsistencia(currentPage);
     } catch (err) { toast(err.message, 'error'); }
   }
@@ -278,10 +336,12 @@
     const cliente_id = document.getElementById('checkin-cliente').value;
     if (!cliente_id) return toast('Selecciona un cliente', 'warning');
     try {
-      // El backend devuelve la asistencia con populate — usamos patch con el id devuelto
       const updated = await api.put('/asistencia/checkout/cliente/' + cliente_id, {});
       if (updated) gymCache.patchItem('asistencia', updated.id || updated._id, () => updated);
       toast('Check-out registrado');
+      // Limpiar buscador
+      document.getElementById('checkin-search').value = '';
+      document.getElementById('checkin-cliente').value = '';
       loadAsistencia(currentPage);
     } catch (err) { toast(err.message, 'error'); }
   }

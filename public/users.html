@@ -47,13 +47,12 @@
           <label>Rol</label>
           <select id="u-role" class="form-control">
             <option value="recepcionista">Recepcionista</option>
-            <option value="entrenador">Entrenador</option>
             <option value="admin">Admin</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="pass-group">
           <label>Contraseña <span id="pass-hint" style="font-size:11px;color:var(--text-light)">(requerida)</span></label>
-          <input type="password" id="u-password" class="form-control">
+          <input type="password" id="u-password" class="form-control" autocomplete="new-password">
         </div>
       </div>
       <div class="form-group hidden" id="active-group">
@@ -85,6 +84,35 @@
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="modal-password">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h3 id="password-title">Cambiar Contraseña</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-password')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="password-user-id">
+      <p style="margin-bottom:16px;color:var(--text-light);font-size:13px">Confirma tu contraseña actual para poder cambiarla.</p>
+      <div class="form-group">
+        <label>Tu contraseña actual *</label>
+        <input type="password" id="p-current" class="form-control" autocomplete="current-password" placeholder="Tu contraseña de admin">
+      </div>
+      <div class="form-group">
+        <label>Nueva contraseña *</label>
+        <input type="password" id="p-new" class="form-control" autocomplete="new-password" placeholder="Mínimo 6 caracteres">
+      </div>
+      <div class="form-group">
+        <label>Confirmar nueva contraseña *</label>
+        <input type="password" id="p-confirm" class="form-control" autocomplete="new-password" placeholder="Repite la nueva contraseña">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-password')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save-password" onclick="withLoading(this, savePassword)">Cambiar Contraseña</button>
+    </div>
+  </div>
+</div>
+
 <script src="/js/cache.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/utils.js"></script>
@@ -97,7 +125,7 @@
   async function loadUsers() {
     showTableSkeleton('users-table', 5);
     try {
-      const users = await api.get('/auth/users');
+      const users = await api.get('/auth/users', true); // force=true para no usar caché con ids viejos
       document.getElementById('users-table').innerHTML = users.map(u => `
         <tr>
           <td><div style="display:flex;align-items:center;gap:8px">
@@ -109,6 +137,7 @@
           <td><span class="badge ${u.active ? 'badge-success' : 'badge-danger'}">${u.active ? 'Activo' : 'Inactivo'}</span></td>
           <td>
             <button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center" onclick="editUser('${u.id}')">${icon('edit')}</button>
+            <button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center;gap:4px" onclick="openPassword('${u.id}', '${u.name}')" title="Cambiar contraseña">${icon('lock')}</button>
             ${u.role !== 'admin' ? `<button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center;gap:4px" onclick="openPermisos('${u.id}', '${u.name}', ${JSON.stringify(u.permisos || []).replace(/"/g, '&quot;')})">${icon('key')} Permisos</button>` : ''}
             <button class="btn btn-sm btn-danger" style="display:inline-flex;align-items:center" onclick="withLoading(this, () => deleteUser('${u.id}', '${u.name}'), 'Eliminando...')">${icon('trash')}</button>
           </td>
@@ -125,6 +154,7 @@
     document.getElementById('u-password').value = '';
     document.getElementById('active-group').classList.add('hidden');
     document.getElementById('pass-hint').textContent = '(requerida)';
+    document.getElementById('pass-group').classList.remove('hidden');
     document.getElementById('modal-title').textContent = 'Nuevo Usuario';
     openModal('modal-overlay');
   };
@@ -140,7 +170,7 @@
     document.getElementById('u-password').value = '';
     document.getElementById('u-active').checked = u.active;
     document.getElementById('active-group').classList.remove('hidden');
-    document.getElementById('pass-hint').textContent = '(dejar vacío para no cambiar)';
+    document.getElementById('pass-group').classList.add('hidden'); // contraseña se cambia por separado
     document.getElementById('modal-title').textContent = 'Editar Usuario';
     openModal('modal-overlay');
   }
@@ -148,14 +178,19 @@
   async function saveUser() {
     const id = document.getElementById('user-id').value;
     const body = {
-      name: document.getElementById('u-name').value,
-      email: document.getElementById('u-email').value,
+      name: document.getElementById('u-name').value.trim(),
+      email: document.getElementById('u-email').value.trim(),
       role: document.getElementById('u-role').value,
       active: document.getElementById('u-active').checked,
     };
-    const pass = document.getElementById('u-password').value;
-    if (pass) body.password = pass;
-    if (!id && !pass) return toast('La contraseña es requerida', 'warning');
+    if (!body.name || !body.email) return toast('Nombre y email son requeridos', 'warning');
+
+    if (!id) {
+      // Nuevo usuario: requiere contraseña
+      const pass = document.getElementById('u-password').value;
+      if (!pass) return toast('La contraseña es requerida', 'warning');
+      body.password = pass;
+    }
 
     try {
       if (id) await api.put(`/auth/users/${id}`, body, { patch: { ns: 'auth', id } });
@@ -163,6 +198,33 @@
       toast(id ? 'Usuario actualizado' : 'Usuario creado');
       closeModal('modal-overlay');
       loadUsers();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  function openPassword(id, name) {
+    document.getElementById('password-user-id').value = id;
+    document.getElementById('password-title').textContent = `Cambiar contraseña — ${name}`;
+    document.getElementById('p-current').value = '';
+    document.getElementById('p-new').value = '';
+    document.getElementById('p-confirm').value = '';
+    openModal('modal-password');
+  }
+
+  async function savePassword() {
+    const id = document.getElementById('password-user-id').value;
+    const currentPassword = document.getElementById('p-current').value;
+    const newPassword = document.getElementById('p-new').value;
+    const confirmPassword = document.getElementById('p-confirm').value;
+
+    if (!currentPassword) return toast('Ingresa tu contraseña actual', 'warning');
+    if (!newPassword) return toast('Ingresa la nueva contraseña', 'warning');
+    if (newPassword.length < 6) return toast('La nueva contraseña debe tener al menos 6 caracteres', 'warning');
+    if (newPassword !== confirmPassword) return toast('Las contraseñas no coinciden', 'warning');
+
+    try {
+      await api.put(`/auth/users/${id}/password`, { currentPassword, newPassword });
+      toast('Contraseña actualizada correctamente');
+      closeModal('modal-password');
     } catch (err) { toast(err.message, 'error'); }
   }
 
