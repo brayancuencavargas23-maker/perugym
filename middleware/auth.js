@@ -14,6 +14,12 @@ const verifyToken = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    // El usuario desarrollador vive solo en el token (no está en la BD)
+    if (decoded.id === 'dev') {
+      req.user = decoded;
+      return next();
+    }
+
     // Verificar que el usuario siga existiendo y esté activo
     const user = await Usuario.findById(decoded.id).select('activo rol').lean();
     if (!user || !user.activo) {

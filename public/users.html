@@ -8,6 +8,8 @@
   <meta http-equiv="Expires" content="0">
   <title>Usuarios - GymPro</title>
   <link rel="stylesheet" href="/css/main.css">
+  <!-- SPA redirect: si se accede directamente, redirigir al shell -->
+  <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
 </head>
 <body>
 <div class="app-layout">
@@ -119,13 +121,17 @@
 <script src="/js/icons.js"></script>
 <script src="/js/layout.js"></script>
 <script>
-  initLayout('users', 'Usuarios del Sistema');
-  document.getElementById('icon-plus-usr').innerHTML = icon('plus');
+  // Guard: devuelve true si la página de usuarios sigue activa en el DOM.
+  function _pageActive() {
+    return !!document.getElementById('users-table');
+  }
 
   async function loadUsers() {
+    if (!_pageActive()) return;
     showTableSkeleton('users-table', 5);
     try {
-      const users = await api.get('/auth/users', true); // force=true para no usar caché con ids viejos
+      const users = await api.get('/auth/users');
+      if (!_pageActive()) return;
       document.getElementById('users-table').innerHTML = users.map(u => `
         <tr>
           <td><div style="display:flex;align-items:center;gap:8px">
@@ -146,7 +152,7 @@
     } catch (err) { toast(err.message, 'error'); }
   }
 
-  document.getElementById('btn-new').onclick = () => {
+  document.getElementById('btn-new') && (document.getElementById('btn-new').onclick = () => {
     document.getElementById('user-id').value = '';
     document.getElementById('u-name').value = '';
     document.getElementById('u-email').value = '';
@@ -157,7 +163,7 @@
     document.getElementById('pass-group').classList.remove('hidden');
     document.getElementById('modal-title').textContent = 'Nuevo Usuario';
     openModal('modal-overlay');
-  };
+  });
 
   async function editUser(id) {
     const users = await api.get('/auth/users');
@@ -193,7 +199,7 @@
     }
 
     try {
-      if (id) await api.put(`/auth/users/${id}`, body, { patch: { ns: 'auth', id } });
+      if (id) await api.put(`/auth/users/${id}`, body, { invalidate: ['auth'] });
       else await api.post('/auth/users', body, false, { invalidate: ['auth'] });
       toast(id ? 'Usuario actualizado' : 'Usuario creado');
       closeModal('modal-overlay');
@@ -222,7 +228,7 @@
     if (newPassword !== confirmPassword) return toast('Las contraseñas no coinciden', 'warning');
 
     try {
-      await api.put(`/auth/users/${id}/password`, { currentPassword, newPassword });
+      await api.put(`/auth/users/${id}/password`, { currentPassword, newPassword }, { invalidate: ['auth'] });
       toast('Contraseña actualizada correctamente');
       closeModal('modal-password');
     } catch (err) { toast(err.message, 'error'); }
@@ -273,16 +279,28 @@
     const checks = document.querySelectorAll('#permisos-checks input[type=checkbox]');
     const permisos = Array.from(checks).filter(c => c.checked).map(c => c.value);
     try {
-      await api.put(`/auth/users/${id}/permisos`, { permisos }, {
-        patch: { ns: 'auth', id },
-      });
+      await api.put(`/auth/users/${id}/permisos`, { permisos }, { invalidate: ['auth'] });
       toast('Permisos actualizados');
       closeModal('modal-permisos');
       loadUsers();
     } catch (err) { toast(err.message, 'error'); }
   }
 
+  // ── Exponer funciones al scope global para que los onclick del HTML funcionen
+  //    cuando la página se carga dentro del SPA (el router envuelve el script en IIFE)
+  window.editUser      = editUser;
+  window.openPassword  = openPassword;
+  window.savePassword  = savePassword;
+  window.openPermisos  = openPermisos;
+  window.savePermisos  = savePermisos;
+  window.deleteUser    = deleteUser;
+  window.saveUser      = saveUser;
+
   loadUsers();
-</script>
-</body>
-</html>
+
+  // ── Inicialización ──────────────────────────────────────────────────────────
+  (function _initPage() {
+    initLayout('users', 'Usuarios del Sistema');
+    const el = document.getElementById('icon-plus-usr');
+    if (el) el.innerHTML = icon('plus');
+  })();

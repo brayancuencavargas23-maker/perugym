@@ -8,6 +8,8 @@
   <meta http-equiv="Expires" content="0">
   <title>Caja - GymPro</title>
   <link rel="stylesheet" href="/css/main.css">
+  <!-- SPA redirect: si se accede directamente, redirigir al shell -->
+  <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
   <style>
     .caja-status-bar {
       border-radius: var(--radius);
@@ -280,17 +282,13 @@
 <script src="/js/icons.js"></script>
 <script src="/js/layout.js"></script>
 <script>
-  initLayout('caja', 'Caja');
-  document.getElementById('icon-unlock-caja').innerHTML  = icon('unlock');
-  document.getElementById('icon-tab-venta').innerHTML    = icon('cart');
-  document.getElementById('icon-tab-ventas').innerHTML   = icon('planes');
-  document.getElementById('icon-tab-movimientos').innerHTML = icon('pagos');
-  document.getElementById('icon-tab-export').innerHTML   = icon('excel');
-  document.getElementById('icon-confirm-venta').innerHTML = icon('check');
-  document.getElementById('icon-confirm-mov').innerHTML  = icon('check');
-  document.getElementById('h-historial').innerHTML       = icon('calendar') + ' Historial de Cajas';
   let cajaActual = null;
   let currentTabCaja = 'venta';
+
+  // Guard: devuelve true si la página de caja sigue activa en el DOM.
+  function _pageActive() {
+    return !!document.getElementById('caja-status-bar');
+  }
 
   function switchTab(tab) {
     currentTabCaja = tab;
@@ -332,9 +330,13 @@
 
   async function loadEstado() {
     try {
+      if (!_pageActive()) return;
+      const bar = document.getElementById('caja-status-bar');
+      if (!bar) return;
+      
       const caja = await api.get('/caja/estado');
+      if (!_pageActive()) return; // navegaron mientras esperábamos la respuesta
       cajaActual = caja;
-      const bar  = document.getElementById('caja-status-bar');
       const dot  = document.getElementById('caja-dot');
       const text = document.getElementById('caja-status-text');
       const sub  = document.getElementById('caja-status-sub');
@@ -366,7 +368,8 @@
         document.getElementById('info-apertura').textContent          = fmtDateTime(caja.apertura);
 
         await loadVentaSelects();
-      } else {        bar.className = 'caja-status-bar caja-cerrada';
+      } else {
+        bar.className = 'caja-status-bar caja-cerrada';
         dot.className = 'caja-dot dot-red';
         text.textContent = 'Caja Cerrada';
         sub.textContent  = 'No hay caja abierta';
@@ -381,10 +384,14 @@
       api.get('/productos?activo=true&limit=500'),
       api.get('/clientes?activo=true&limit=500')
     ]);
-    document.getElementById('v-product').innerHTML =
+    if (!_pageActive()) return;
+    const vProduct = document.getElementById('v-product');
+    const vMember  = document.getElementById('v-member');
+    if (!vProduct || !vMember) return;
+    vProduct.innerHTML =
       '<option value="">Seleccionar producto...</option>' +
       prods.data.map(p => `<option value="${p._id || p.id}" data-price="${p.precio_venta}" data-stock="${p.stock}">${p.nombre} — S/${parseFloat(p.precio_venta).toFixed(2)} (stock: ${p.stock})</option>`).join('');
-    document.getElementById('v-member').innerHTML =
+    vMember.innerHTML =
       '<option value="">Sin cliente asociado</option>' +
       clientes.data.map(c => `<option value="${c._id || c.id}">${c.nombre}</option>`).join('');
   }
@@ -502,8 +509,15 @@
 
   async function loadHistorial(page = 1) {
     try {
+      // Validar que estamos en la página de caja
+      const tabla = document.getElementById('historial-table');
+      if (!tabla) {
+        console.log('[Caja] No estamos en la página de caja, saltando loadHistorial');
+        return;
+      }
+      
       const data = await api.get(`/caja?page=${page}&limit=15`);
-      document.getElementById('historial-table').innerHTML = data.data.map(c => `
+      tabla.innerHTML = data.data.map(c => `
         <tr>
           <td style="font-size:12px">${fmtDateTime(c.apertura)}</td>
           <td style="font-size:12px">${c.cierre ? fmtDateTime(c.cierre) : '-'}</td>
@@ -515,7 +529,11 @@
           <td><button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center" onclick="verDetalle('${c.id}')">${icon('eye')}</button></td>
         </tr>
       `).join('') || '<tr><td colspan="8" class="text-center" style="padding:20px;color:var(--text-light)">Sin historial</td></tr>';
-      renderPagination(document.getElementById('pagination-hist'), data.page, data.pages, loadHistorial);
+      
+      const paginacion = document.getElementById('pagination-hist');
+      if (paginacion) {
+        renderPagination(paginacion, data.page, data.pages, loadHistorial);
+      }
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -532,8 +550,6 @@
       openModal('modal-detalle');
     } catch (err) { toast(err.message, 'error'); }
   }
-
-  document.getElementById('btn-abrir').onclick = () => openModal('modal-abrir');
 
   function setTipoMovimiento(tipo) {
     document.getElementById('mov-tipo').value = tipo;
@@ -620,8 +636,29 @@
       .catch(err => toast(err.message, 'error'));
   }
 
-  loadEstado();
-  loadHistorial();
+  // ── Inicialización ──────────────────────────────────────────────────────────
+  (function _initPage() {
+    initLayout('caja', 'Caja');
+
+    const icons = {
+      'icon-unlock-caja':       icon('unlock'),
+      'icon-tab-venta':         icon('cart'),
+      'icon-tab-ventas':        icon('planes'),
+      'icon-tab-movimientos':   icon('pagos'),
+      'icon-tab-export':        icon('excel'),
+      'icon-confirm-venta':     icon('check'),
+      'icon-confirm-mov':       icon('check'),
+    };
+    Object.entries(icons).forEach(([id, html]) => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = html;
+    });
+    const hHistorial = document.getElementById('h-historial');
+    if (hHistorial) hHistorial.innerHTML = icon('calendar') + ' Historial de Cajas';
+
+    loadEstado();
+    loadHistorial();
+  })();
 </script>
 </body>
 </html>

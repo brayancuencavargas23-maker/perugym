@@ -23,6 +23,21 @@ const solicitudLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// ── Helper: consultar RENIEC ──────────────────────────────────────────────────
+async function consultarReniec(dni) {
+  const apiUrl = process.env.RENIEC_API_URL;
+  const token  = process.env.RENIEC_API_TOKEN;
+  if (!apiUrl || !token || !/^\d{8}$/.test(dni)) return null;
+  try {
+    const res = await fetch(`${apiUrl}?numero=${encodeURIComponent(dni)}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
+}
+
 // ── POST /public — recibir solicitud desde la landing (sin auth) ──────────────
 router.post(
   '/public',
@@ -35,15 +50,21 @@ router.post(
       .isLength({ min: 3, max: 80 }).withMessage('El nombre debe tener entre 3 y 80 caracteres.')
       .matches(/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/).withMessage('El nombre solo puede contener letras y espacios.'),
 
+    // DNI: opcional, 8 dígitos
+    body('dni')
+      .optional({ checkFalsy: true })
+      .trim()
+      .matches(/^\d{8}$/).withMessage('El DNI debe tener exactamente 8 dígitos.'),
+
     // Teléfono: exactamente 9 dígitos, debe empezar con 9 (celular peruano)
     body('telefono')
       .trim()
       .notEmpty().withMessage('El teléfono es requerido.')
-      .customSanitizer(val => val.replace(/\D/g, '')) // quitar no-dígitos antes de validar
+      .customSanitizer(val => val.replace(/\D/g, ''))
       .isLength({ min: 9, max: 9 }).withMessage('El teléfono debe tener exactamente 9 dígitos.')
       .matches(/^9\d{8}$/).withMessage('El número debe empezar con 9 (celular peruano).'),
 
-    // Email: opcional, pero si se envía debe ser válido y normalizado
+    // Email: opcional
     body('email')
       .optional({ checkFalsy: true })
       .trim()
@@ -55,40 +76,30 @@ router.post(
     body('plan_id')
       .isMongoId().withMessage('Plan inválido.'),
 
-    // Honeypot: campo oculto que los bots suelen rellenar
-    // Si viene con valor, es un bot — rechazar silenciosamente
+    // Honeypot
     body('website')
       .isEmpty().withMessage('Bot detectado.'),
   ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      // Si el honeypot fue activado, responder 200 para no revelar la detección
       const isHoneypot = errors.array().some(e => e.msg === 'Bot detectado.');
       if (isHoneypot) return res.status(200).json({ ok: true });
       return res.status(400).json({ error: errors.array()[0].msg });
     }
 
-    const { nombre, telefono, email, plan_id } = req.body;
+    const { nombre, dni, telefono, email, plan_id } = req.body;
     try {
       const plan = await Plan.findOne({ _id: plan_id, activo: true, mostrar_landing: true });
       if (!plan) return res.status(404).json({ error: 'Plan no disponible.' });
 
-      // Verificar duplicado reciente: misma IP + mismo teléfono en los últimos 10 min
-      // Evita que alguien envíe la misma solicitud múltiples veces
       const hace10min = new Date(Date.now() - 10 * 60 * 1000);
-      const duplicado = await Solicitud.findOne({
-        telefono,
-        plan_id,
-        created_at: { $gte: hace10min },
-      });
-      if (duplicado) {
-        // Responder OK para no revelar que ya existe — el staff verá solo una
-        return res.status(200).json({ ok: true });
-      }
+      const duplicado = await Solicitud.findOne({ telefono, plan_id, created_at: { $gte: hace10min } });
+      if (duplicado) return res.status(200).json({ ok: true });
 
       const solicitud = await Solicitud.create({
         nombre,
+        dni: dni || null,
         telefono,
         email: email || null,
         plan_id,
@@ -121,7 +132,7 @@ router.get('/', async (req, res) => {
 
     const data = solicitudes.map(s => ({
       ...s.toObject(),
-      id: s._id,
+      id: String(s._id),
       plan_nombre: s.plan_id?.nombre,
       plan_precio: s.plan_id?.precio,
       atendido_por_nombre: s.atendido_por?.nombre || null,
@@ -184,6 +195,9 @@ router.post(
   [
     param('id').isMongoId().withMessage('ID inválido.'),
     body('dni').optional({ checkFalsy: true }).trim(),
+    body('nombre').optional({ checkFalsy: true }).trim(),
+    body('apellido_paterno').optional({ checkFalsy: true }).trim(),
+    body('apellido_materno').optional({ checkFalsy: true }).trim(),
     body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']),
     body('estado_pago').optional().isIn(['pagado', 'pendiente']),
     body('fecha_inicio').optional().isISO8601().withMessage('Fecha de inicio inválida.'),
@@ -192,7 +206,8 @@ router.post(
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
 
-    const { dni, metodo_pago = 'efectivo', estado_pago = 'pagado', fecha_inicio, notas_membresia } = req.body;
+    const { dni, nombre: nombreOverride, apellido_paterno: apOverride, apellido_materno: amOverride,
+            metodo_pago = 'efectivo', estado_pago = 'pagado', fecha_inicio, notas_membresia } = req.body;
     const caja_id = req.cajaActual._id;
 
     const session = await mongoose.startSession();
@@ -206,9 +221,31 @@ router.post(
       const plan = sol.plan_id;
       if (!plan || !plan.activo) { await session.abortTransaction(); return res.status(400).json({ error: 'El plan de esta solicitud ya no está disponible.' }); }
 
-      // Crear cliente
+      // Crear cliente — prioridad: campos editados en el formulario > RENIEC > datos de la solicitud
+      let nombreCliente   = nombreOverride || sol.nombre;
+      let apellidoPaterno = apOverride     || sol.apellido_paterno || null;
+      let apellidoMaterno = amOverride     || sol.apellido_materno || null;
+
+      // Si hay DNI y no se editaron los campos manualmente, consultar RENIEC
+      const sinOverride = !nombreOverride && !apOverride && !amOverride;
+      if (dni && sinOverride) {
+        const reniec = await consultarReniec(dni);
+        if (reniec) {
+          nombreCliente   = reniec.first_name       || nombreCliente;
+          apellidoPaterno = reniec.first_last_name  || apellidoPaterno;
+          apellidoMaterno = reniec.second_last_name || apellidoMaterno;
+        }
+      }
+
       const [cliente] = await Cliente.create(
-        [{ nombre: sol.nombre, telefono: sol.telefono, email: sol.email || null, dni: dni || null }],
+        [{
+          nombre:           nombreCliente,
+          apellido_paterno: apellidoPaterno,
+          apellido_materno: apellidoMaterno,
+          telefono:         sol.telefono,
+          email:            sol.email || null,
+          dni:              dni || sol.dni || null,
+        }],
         { session }
       );
 

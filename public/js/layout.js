@@ -2,6 +2,25 @@ function initLayout(activePage, pageTitle) {
   const user = requireAuth();
   if (!user) return;
 
+  // ── Modo SPA: si el sidebar ya está renderizado, solo actualizar el activo ──
+  // Cuando se navega dentro del shell app.html, el sidebar ya existe y no
+  // debe reconstruirse. Solo actualizamos el ítem activo y el título.
+  const _isSPAShell = !!document.getElementById('spa-content');
+  const _sidebarAlreadyBuilt = _isSPAShell && document.querySelector('#sidebar .nav-item');
+
+  if (_sidebarAlreadyBuilt) {
+    // Solo actualizar ítem activo — el sidebar no se toca
+    document.querySelectorAll('#sidebar .nav-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.page === activePage);
+    });
+    // Actualizar título del topbar si se proporcionó
+    if (pageTitle) {
+      const titleEl = document.querySelector('.topbar h1');
+      if (titleEl) titleEl.textContent = pageTitle;
+    }
+    return;
+  }
+
   // ── Restaurar sidebar desde caché para eliminar el flash entre páginas ─────
   // Si ya existe el HTML del sidebar guardado en sessionStorage, lo inyectamos
   // de inmediato (antes de reconstruirlo) para que el usuario no vea el sidebar
@@ -179,5 +198,5 @@ function logout() {
 
   // 4. Reemplazar la entrada actual en el historial para que el botón
   //    "atrás" no regrese al panel. replace() no agrega nueva entrada.
-  window.location.replace('/login.html');
+  window.location.replace('/index.html');
 }

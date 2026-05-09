@@ -5,9 +5,30 @@ require('dotenv').config();
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/gym_db';
 
 const connectDB = async () => {
-  await mongoose.connect(MONGO_URI);
-  console.log('✅ MongoDB conectado:', mongoose.connection.host);
+  try {
+    await mongoose.connect(MONGO_URI, {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
+    console.log('✅ MongoDB conectado:', mongoose.connection.host);
+  } catch (err) {
+    console.error('❌ Error conectando a MongoDB:', err.message);
+    process.exit(1);
+  }
 };
+
+// Manejar eventos de conexión
+mongoose.connection.on('disconnected', () => {
+  console.warn('⚠️ MongoDB desconectado. Intentando reconectar...');
+});
+
+mongoose.connection.on('reconnected', () => {
+  console.log('✅ MongoDB reconectado');
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('❌ Error de MongoDB:', err.message);
+});
 
 const initDB = async () => {
   await connectDB();

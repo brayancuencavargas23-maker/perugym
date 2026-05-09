@@ -7,6 +7,55 @@ const { saveImage, deleteImage } = require('../config/storage');
 
 router.use(verifyToken);
 
+// ── Consulta DNI via API RENIEC ───────────────────────────────────────────────
+router.get('/reniec/:dni', async (req, res) => {
+  const { dni } = req.params;
+
+  // Validar formato DNI peruano (8 dígitos)
+  if (!/^\d{8}$/.test(dni)) {
+    return res.status(400).json({ error: 'El DNI debe tener exactamente 8 dígitos numéricos' });
+  }
+
+  const apiUrl = process.env.RENIEC_API_URL;
+  const token  = process.env.RENIEC_API_TOKEN;
+
+  if (!apiUrl || !token) {
+    return res.status(503).json({ error: 'Servicio RENIEC no configurado en el servidor' });
+  }
+
+  try {
+    const url = `${apiUrl}?numero=${encodeURIComponent(dni)}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errBody = await response.json().catch(() => ({}));
+      if (response.status === 404) {
+        return res.status(404).json({ error: 'DNI no encontrado en RENIEC' });
+      }
+      return res.status(response.status).json({ error: errBody.message || 'Error al consultar RENIEC' });
+    }
+
+    const data = await response.json();
+    // Devolver solo los campos necesarios
+    res.json({
+      first_name:       data.first_name       || '',
+      first_last_name:  data.first_last_name  || '',
+      second_last_name: data.second_last_name || '',
+      full_name:        data.full_name        || '',
+      document_number:  data.document_number  || dni,
+    });
+  } catch (err) {
+    console.error('[RENIEC] Error al consultar API:', err.message);
+    res.status(500).json({ error: 'No se pudo conectar con el servicio RENIEC' });
+  }
+});
+
 router.get('/', async (req, res) => {
   const { search, activo, page = 1, limit = 20 } = req.query;
   const filter = {};
@@ -16,6 +65,8 @@ router.get('/', async (req, res) => {
     const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     filter.$or = [
       { nombre: { $regex: safeSearch, $options: 'i' } },
+      { apellido_paterno: { $regex: safeSearch, $options: 'i' } },
+      { apellido_materno: { $regex: safeSearch, $options: 'i' } },
       { dni: { $regex: safeSearch, $options: 'i' } },
       { email: { $regex: safeSearch, $options: 'i' } },
     ];
@@ -46,7 +97,7 @@ router.get('/', async (req, res) => {
 
       return {
         ...c.toObject(),
-        id: c._id,
+        id: String(c._id),
         membresia_estado: best?.estado || null,
         fecha_fin: best?.fecha_fin || null,
         plan_nombre: best?.plan_id?.nombre || null,
@@ -81,17 +132,26 @@ router.get('/:id', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { nombre, dni, email, telefono, notas } = req.body;
+  const { nombre, apellido_paterno, apellido_materno, dni, email, telefono, notas } = req.body;
   try {
     let foto_url = null;
     if (req.files?.foto) foto_url = await saveImage(req.files.foto.data, 'clientes', req.files.foto.name);
-    const cliente = await Cliente.create({ nombre, dni: dni || null, email: email || null, telefono: telefono || null, foto_url, notas: notas || null });
+    const cliente = await Cliente.create({
+      nombre,
+      apellido_paterno: apellido_paterno || null,
+      apellido_materno: apellido_materno || null,
+      dni:      dni      || null,
+      email:    email    || null,
+      telefono: telefono || null,
+      foto_url,
+      notas:    notas    || null,
+    });
     res.status(201).json(cliente);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.put('/:id', async (req, res) => {
-  const { nombre, dni, email, telefono, notas, activo } = req.body;
+  const { nombre, apellido_paterno, apellido_materno, dni, email, telefono, notas, activo } = req.body;
   try {
     const current = await Cliente.findById(req.params.id);
     let foto_url = current?.foto_url;
@@ -101,7 +161,17 @@ router.put('/:id', async (req, res) => {
     }
     const cliente = await Cliente.findByIdAndUpdate(
       req.params.id,
-      { nombre, dni: dni || null, email: email || null, telefono: telefono || null, foto_url, notas: notas || null, activo: activo !== undefined ? activo : true },
+      {
+        nombre,
+        apellido_paterno: apellido_paterno || null,
+        apellido_materno: apellido_materno || null,
+        dni:      dni      || null,
+        email:    email    || null,
+        telefono: telefono || null,
+        foto_url,
+        notas:    notas    || null,
+        activo:   activo !== undefined ? activo : true,
+      },
       { new: true }
     );
     res.json(cliente);

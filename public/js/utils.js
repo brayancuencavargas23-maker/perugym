@@ -1,5 +1,11 @@
 // Toast notifications
 function toast(msg, type = 'success', duration = 3500) {
+  // Si es un error, también loggearlo en consola
+  if (type === 'error') {
+    console.error('[Toast Error]', msg);
+    console.trace('Stack trace del error:');
+  }
+  
   let container = document.getElementById('toast-container');
   if (!container) {
     container = document.createElement('div');
@@ -425,3 +431,57 @@ async function withLoading(btn, fn, loadingText = 'Guardando...') {
     btn.innerHTML = originalHTML;
   }
 }
+
+
+/**
+ * safeSetHTML — Set innerHTML con validación para evitar errores de null
+ * 
+ * @param {string} elementId - ID del elemento
+ * @param {string} html - HTML a insertar
+ * @param {string} [fallback=''] - HTML alternativo si el elemento no existe
+ * @returns {boolean} - true si tuvo éxito, false si el elemento no existe
+ * 
+ * Uso:
+ *   safeSetHTML('clientes-table', htmlContent);
+ *   // En lugar de: document.getElementById('clientes-table').innerHTML = htmlContent;
+ */
+function safeSetHTML(elementId, html, fallback = '') {
+  const el = document.getElementById(elementId);
+  if (!el) {
+    console.warn(`[safeSetHTML] ⚠️ Elemento no encontrado: #${elementId}`);
+    return false;
+  }
+  el.innerHTML = html || fallback;
+  return true;
+}
+
+// ── Interceptor global de errores ───────────────────────────────────────────
+window.addEventListener('error', (event) => {
+  const msg = event.message || '';
+  
+  // Capturar errores de propiedades null
+  if (msg.includes('Cannot set properties of null') || 
+      msg.includes('Cannot read properties of null') ||
+      msg.includes('null is not an object')) {
+    
+    console.error('🔴 ERROR CAPTURADO:', {
+      mensaje: event.message,
+      archivo: event.filename,
+      línea: event.lineno,
+      columna: event.colno,
+      error: event.error
+    });
+    
+    if (event.error && event.error.stack) {
+      console.error('Stack trace:', event.error.stack);
+    }
+    
+    // Intentar extraer qué propiedad se intentó acceder
+    const match = msg.match(/setting '(\w+)'/);
+    if (match) {
+      console.error(`❌ Se intentó modificar la propiedad: ${match[1]}`);
+    }
+  }
+}, true);
+
+console.log('✅ Interceptor de errores activado');

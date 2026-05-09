@@ -8,6 +8,8 @@
   <meta http-equiv="Expires" content="0">
   <title>Dashboard - PeruGym</title>
   <link rel="stylesheet" href="/css/main.css">
+  <!-- SPA redirect: si se accede directamente, redirigir al shell -->
+  <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
 </head>
 <body>
 <div class="app-layout">
@@ -73,18 +75,10 @@
 <script src="/js/icons.js"></script>
 <script src="/js/layout.js"></script>
 <script>
-  initLayout('dashboard', 'Dashboard');
-
-  // Stat icons
-  document.getElementById('si-members').innerHTML    = icon('clientes', 'font-size:24px');
-  document.getElementById('si-income').innerHTML     = icon('caja', 'font-size:24px');
-  document.getElementById('si-attendance').innerHTML = icon('asistencia', 'font-size:24px');
-  document.getElementById('si-pending').innerHTML    = icon('pagos', 'font-size:24px');
-  document.getElementById('si-engym').innerHTML      = icon('checkin', 'font-size:24px');
-  document.getElementById('h-vencer').innerHTML      = icon('warning') + ' Membresías por Vencer';
-  document.getElementById('h-planes').innerHTML      = icon('planes') + ' Clientes por Plan';
-  document.getElementById('h-pagos').innerHTML       = icon('pagos') + ' Pagos Recientes';
-  document.getElementById('h-solicitudes').innerHTML = icon('solicitudes') + ' Solicitudes Pendientes';
+  // Guard: devuelve true si la página de dashboard sigue activa en el DOM.
+  function _pageActive() {
+    return !!document.getElementById('recent-payments');
+  }
 
   async function loadDashboard() {
     // Mostrar datos cacheados inmediatamente si existen (sin esperar el await)
@@ -94,20 +88,25 @@
 
     try {
       const data = await api.get('/dashboard');
+      if (!_pageActive()) return;
       renderDashboard(data);
     } catch (err) { toast(err.message, 'error'); }
 
     // Cargar solicitudes pendientes (independiente del dashboard)
     try {
       const stats = await api.get('/solicitudes/stats', true);
+      if (!_pageActive()) return;
       if (stats.pendiente > 0 || stats.contactado > 0) {
-        document.getElementById('card-solicitudes').style.display = 'block';
+        const cardSol = document.getElementById('card-solicitudes');
+        if (cardSol) cardSol.style.display = 'block';
         const pending = await api.get('/solicitudes?estado=pendiente&limit=5', true);
         const contacted = stats.pendiente === 0
           ? await api.get('/solicitudes?estado=contactado&limit=5', true)
           : { data: [] };
+        if (!_pageActive()) return;
         const items = [...pending.data, ...contacted.data].slice(0, 5);
-        document.getElementById('solicitudes-list').innerHTML = items.length
+        const solList = document.getElementById('solicitudes-list');
+        if (solList) solList.innerHTML = items.length
           ? items.map(s => `
             <div class="expiring-item">
               <div>
@@ -122,6 +121,7 @@
   }
 
   function renderDashboard(data) {
+    if (!_pageActive()) return;
       document.getElementById('stat-members').textContent    = data.stats.clientesActivos;
       document.getElementById('stat-income').textContent     = fmtMoney(data.stats.ingresosDelMes);
       document.getElementById('stat-attendance').textContent = data.stats.asistenciaHoy;
@@ -168,6 +168,26 @@
   }
 
   loadDashboard();
+
+  // ── Inicialización ──────────────────────────────────────────────────────────
+  (function _initPage() {
+    initLayout('dashboard', 'Dashboard');
+    const iconMap = {
+      'si-members':    icon('clientes',   'font-size:24px'),
+      'si-income':     icon('caja',       'font-size:24px'),
+      'si-attendance': icon('asistencia', 'font-size:24px'),
+      'si-pending':    icon('pagos',      'font-size:24px'),
+      'si-engym':      icon('checkin',    'font-size:24px'),
+      'h-vencer':      icon('warning')    + ' Membresías por Vencer',
+      'h-planes':      icon('planes')     + ' Clientes por Plan',
+      'h-pagos':       icon('pagos')      + ' Pagos Recientes',
+      'h-solicitudes': icon('solicitudes')+ ' Solicitudes Pendientes',
+    };
+    Object.entries(iconMap).forEach(([id, html]) => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = html;
+    });
+  })();
 </script>
 </body>
 </html>

@@ -14,22 +14,40 @@ const api = {
     const opts = { method, headers: this.headers(isFormData) };
     if (body) opts.body = isFormData ? body : JSON.stringify(body);
 
-    const res = await fetch(API_BASE + path, opts);
-    if (res.status === 401) {
-      // Token inválido o expirado → forzar logout
-      gymCache.clear();
-      localStorage.removeItem('gym_token');
-      localStorage.removeItem('gym_user');
-      window.location.href = '/login.html';
-      return;
+    console.log(`[API] ${method} ${API_BASE}${path}`);
+    
+    try {
+      const res = await fetch(API_BASE + path, opts);
+      
+      if (res.status === 401) {
+        // Token inválido o expirado → forzar logout
+        console.error('[API] ❌ 401 Unauthorized - Cerrando sesión');
+        gymCache.clear();
+        localStorage.removeItem('gym_token');
+        localStorage.removeItem('gym_user');
+        window.location.href = '/login.html';
+        return;
+      }
+      
+      if (res.status === 403) {
+        // Autenticado pero sin permiso → lanzar error sin cerrar sesión
+        console.error('[API] ❌ 403 Forbidden');
+        throw new Error('No tienes permiso para realizar esta acción');
+      }
+      
+      const data = await res.json().catch(() => ({}));
+      
+      if (!res.ok) {
+        console.error(`[API] ❌ ${res.status} ${res.statusText}:`, data);
+        throw new Error(data.error || 'Error en la solicitud');
+      }
+      
+      console.log(`[API] ✅ ${method} ${path} - OK`, data);
+      return data;
+    } catch (err) {
+      console.error(`[API] ❌ Error en ${method} ${path}:`, err);
+      throw err;
     }
-    if (res.status === 403) {
-      // Autenticado pero sin permiso → lanzar error sin cerrar sesión
-      throw new Error('No tienes permiso para realizar esta acción');
-    }
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'Error en la solicitud');
-    return data;
   },
 
   // ── GET con caché ────────────────────────────────────────────────────────────
@@ -43,10 +61,19 @@ const api = {
   async get(path, force = false) {
     if (!force) {
       const cached = gymCache.get(path);
-      if (cached !== null) return cached;
+      if (cached !== null) {
+        console.log(`[API] 💾 CACHÉ HIT: ${path}`);
+        return cached;
+      }
+      console.log(`[API] 🔍 CACHÉ MISS: ${path} - Fetching...`);
+    } else {
+      console.log(`[API] 🔄 FORCE FETCH: ${path}`);
     }
     const data = await this.request('GET', path);
-    if (data !== undefined) gymCache.set(path, data);
+    if (data !== undefined) {
+      gymCache.set(path, data);
+      console.log(`[API] 💾 Guardado en caché: ${path}`);
+    }
     return data;
   },
 

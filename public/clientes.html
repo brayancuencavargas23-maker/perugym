@@ -8,6 +8,8 @@
   <meta http-equiv="Expires" content="0">
   <title>Clientes - PeruGym</title>
   <link rel="stylesheet" href="/css/main.css">
+  <!-- SPA redirect: si se accede directamente, redirigir al shell -->
+  <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
 </head>
 <body>
 <div class="app-layout">
@@ -26,7 +28,7 @@
           <option value="false">Inactivos</option>
         </select>
         <button class="btn btn-primary" id="btn-new" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-new-cliente"></span> Nuevo Cliente</button>
-        <button class="btn btn-success" onclick="exportarClientes()" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-excel-cl"></span> Exportar Excel</button>
+        <button class="btn btn-success" id="btn-exportar-cl" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-excel-cl"></span> Exportar Excel</button>
       </div>
       <div class="card">
         <div class="table-wrapper">
@@ -45,7 +47,7 @@
   <div class="modal">
     <div class="modal-header">
       <h3 id="modal-title">Nuevo Cliente</h3>
-      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-overlay')" style="display:inline-flex;align-items:center"><span id="icon-close-cl"></span></button>
+      <button class="btn btn-icon btn-outline" id="btn-close-modal-cl" style="display:inline-flex;align-items:center"><span id="icon-close-cl"></span></button>
     </div>
     <div class="modal-body">
       <form id="cliente-form">
@@ -59,13 +61,27 @@
             </label>
           </div>
         </div>
+        <!-- DNI + botón RENIEC -->
+        <div class="form-group">
+          <label>DNI</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="c-dni" class="form-control" maxlength="8" placeholder="Ej: 46027897" style="flex:1">
+            <button type="button" class="btn btn-outline btn-sm" id="btn-buscar-dni" style="white-space:nowrap;display:inline-flex;align-items:center;gap:4px">
+              <span id="icon-reniec"></span> Buscar DNI
+            </button>
+          </div>
+          <small id="reniec-status" style="color:var(--text-light);font-size:11px;margin-top:4px;display:block"></small>
+        </div>
         <div class="form-row">
-          <div class="form-group"><label>Nombre *</label><input type="text" id="c-nombre" class="form-control" required></div>
-          <div class="form-group"><label>DNI</label><input type="text" id="c-dni" class="form-control"></div>
+          <div class="form-group"><label>Nombres *</label><input type="text" id="c-nombre" class="form-control" required placeholder="Nombres"></div>
+          <div class="form-group"><label>Apellido Paterno</label><input type="text" id="c-apellido-paterno" class="form-control" placeholder="Apellido paterno"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Apellido Materno</label><input type="text" id="c-apellido-materno" class="form-control" placeholder="Apellido materno"></div>
+          <div class="form-group"><label>Teléfono</label><input type="text" id="c-telefono" class="form-control"></div>
         </div>
         <div class="form-row">
           <div class="form-group"><label>Email</label><input type="email" id="c-email" class="form-control"></div>
-          <div class="form-group"><label>Teléfono</label><input type="text" id="c-telefono" class="form-control"></div>
         </div>
         <div class="form-group"><label>Notas</label><textarea id="c-notas" class="form-control" rows="2"></textarea></div>
         <div class="form-group hidden" id="activo-group">
@@ -74,8 +90,8 @@
       </form>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-overlay')">Cancelar</button>
-      <button class="btn btn-primary" id="btn-save-cliente" onclick="withLoading(this, saveCliente)">Guardar</button>
+      <button class="btn btn-outline" id="btn-cancel-modal-cl">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save-cliente">Guardar</button>
     </div>
   </div>
 </div>
@@ -86,27 +102,26 @@
 <script src="/js/icons.js"></script>
 <script src="/js/layout.js"></script>
 <script>
-  initLayout('clientes', 'Clientes');
-  // Render icons after layout
-  document.getElementById('search-icon-el').innerHTML   = icon('search');
-  document.getElementById('icon-new-cliente').innerHTML = icon('plus');
-  document.getElementById('icon-camera-cl').innerHTML   = icon('camera');
-  document.getElementById('icon-close-cl').innerHTML    = icon('close');
-  document.getElementById('foto-placeholder').innerHTML = icon('user');
-  document.getElementById('icon-excel-cl').innerHTML    = icon('excel');
   let currentPage = 1;
 
   async function loadClientes(page = 1) {
     currentPage = page;
-    const search = document.getElementById('search').value;
-    const activo = document.getElementById('filter-activo').value;
+    const searchEl = document.getElementById('search');
+    const activoEl = document.getElementById('filter-activo');
+    if (!searchEl || !activoEl) return; // página ya no activa
+    const search = searchEl.value;
+    const activo = activoEl.value;
     let qs = `?page=${page}&limit=15`;
     if (search) qs += `&search=${encodeURIComponent(search)}`;
     if (activo) qs += `&activo=${activo}`;
     if (page === 1 && !search && !activo) showTableSkeleton('clientes-table', 6);
     try {
       const data = await api.get(`/clientes${qs}`);
-      document.getElementById('clientes-table').innerHTML = data.data.map(c => {
+      
+      const tbody = document.getElementById('clientes-table');
+      if (!tbody) return;
+      
+      tbody.innerHTML = data.data.map(c => {
         const days = daysUntil(c.fecha_fin);
         const expClass = days !== null && days <= 7 ? 'badge-warning' : days !== null && days < 0 ? 'badge-danger' : 'badge-info';
         const estadoMem = c.membresia_estado
@@ -119,7 +134,7 @@
                 ? `<img src="${c.foto_url}" class="member-avatar" alt="${c.nombre}">`
                 : `<div class="member-avatar" style="display:flex;align-items:center;justify-content:center">${avatarInitials(c.nombre)}</div>`}
               <div>
-                <div style="font-weight:600">${c.nombre}</div>
+                <div style="font-weight:600">${[c.apellido_paterno, c.apellido_materno, c.nombre].filter(Boolean).join(' ') || c.nombre}</div>
                 <div style="font-size:12px;color:var(--text-light)">${c.email || c.telefono || ''}</div>
               </div>
             </div>
@@ -135,8 +150,13 @@
           </td>
         </tr>`;
       }).join('') || '<tr><td colspan="6" class="text-center" style="padding:30px;color:var(--text-light)">Sin clientes</td></tr>';
+      
+      console.log(`[Clientes] ✅ Tabla renderizada con ${data.data.length} filas`);
       renderPagination(document.getElementById('pagination'), data.page, data.pages, loadClientes);
-    } catch (err) { toast(err.message, 'error'); }
+    } catch (err) { 
+      console.error('[Clientes] ❌ Error en loadClientes:', err);
+      toast(err.message, 'error'); 
+    }
   }
 
   async function editCliente(id) {
@@ -144,6 +164,8 @@
       const c = await api.get(`/clientes/${id}`);
       document.getElementById('cliente-id').value = c.id;
       document.getElementById('c-nombre').value = c.nombre;
+      document.getElementById('c-apellido-paterno').value = c.apellido_paterno || '';
+      document.getElementById('c-apellido-materno').value = c.apellido_materno || '';
       document.getElementById('c-dni').value = c.dni || '';
       document.getElementById('c-email').value = c.email || '';
       document.getElementById('c-telefono').value = c.telefono || '';
@@ -151,6 +173,7 @@
       document.getElementById('c-activo').checked = c.activo;
       document.getElementById('activo-group').classList.remove('hidden');
       document.getElementById('modal-title').textContent = 'Editar Cliente';
+      document.getElementById('reniec-status').textContent = '';
       if (c.foto_url) {
         document.getElementById('foto-preview').src = c.foto_url;
         document.getElementById('foto-preview').classList.remove('hidden');
@@ -160,37 +183,16 @@
     } catch (err) { toast(err.message, 'error'); }
   }
 
-  document.getElementById('btn-new').onclick = () => {
-    document.getElementById('cliente-form').reset();
-    document.getElementById('cliente-id').value = '';
-    document.getElementById('modal-title').textContent = 'Nuevo Cliente';
-    document.getElementById('activo-group').classList.add('hidden');
-    document.getElementById('foto-preview').classList.add('hidden');
-    document.getElementById('foto-placeholder').style.display = '';
-    openModal('modal-overlay');
-  };
-
-  document.getElementById('foto').onchange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = ev => {
-        document.getElementById('foto-preview').src = ev.target.result;
-        document.getElementById('foto-preview').classList.remove('hidden');
-        document.getElementById('foto-placeholder').style.display = 'none';
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   async function saveCliente() {
     const id = document.getElementById('cliente-id').value;
     const formData = new FormData();
-    formData.append('nombre', document.getElementById('c-nombre').value);
-    formData.append('dni', document.getElementById('c-dni').value);
-    formData.append('email', document.getElementById('c-email').value);
-    formData.append('telefono', document.getElementById('c-telefono').value);
-    formData.append('notas', document.getElementById('c-notas').value);
+    formData.append('nombre',           document.getElementById('c-nombre').value.trim());
+    formData.append('apellido_paterno', document.getElementById('c-apellido-paterno').value.trim());
+    formData.append('apellido_materno', document.getElementById('c-apellido-materno').value.trim());
+    formData.append('dni',              document.getElementById('c-dni').value.trim());
+    formData.append('email',            document.getElementById('c-email').value.trim());
+    formData.append('telefono',         document.getElementById('c-telefono').value.trim());
+    formData.append('notas',            document.getElementById('c-notas').value.trim());
     if (id) formData.append('activo', document.getElementById('c-activo').checked);
     const fotoFile = document.getElementById('foto').files[0];
     if (fotoFile) formData.append('foto', fotoFile);
@@ -218,9 +220,48 @@
     } catch (err) { toast(err.message, 'error'); }
   }
 
+  // ── Consulta RENIEC ──────────────────────────────────────────────────────────
+  async function buscarDNI() {
+    const dni = document.getElementById('c-dni').value.trim();
+    const statusEl = document.getElementById('reniec-status');
+    const btnBuscar = document.getElementById('btn-buscar-dni');
+
+    if (!/^\d{8}$/.test(dni)) {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = 'Ingresa un DNI válido de 8 dígitos.';
+      return;
+    }
+
+    // Estado de carga
+    btnBuscar.disabled = true;
+    statusEl.style.color = 'var(--text-light)';
+    statusEl.textContent = 'Consultando RENIEC...';
+
+    try {
+      const data = await api.get(`/clientes/reniec/${dni}`, true); // force=true, sin caché
+      // Rellenar campos automáticamente
+      document.getElementById('c-nombre').value           = data.first_name       || '';
+      document.getElementById('c-apellido-paterno').value = data.first_last_name  || '';
+      document.getElementById('c-apellido-materno').value = data.second_last_name || '';
+      statusEl.style.color = 'var(--success, #22c55e)';
+      statusEl.textContent = `✓ Datos obtenidos: ${data.full_name}`;
+    } catch (err) {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = err.message || 'No se encontró el DNI en RENIEC.';
+    } finally {
+      btnBuscar.disabled = false;
+    }
+  }
+
   function irAMembresia(clienteId) {
-    // Redirige a membresías con el cliente preseleccionado via query param
-    window.location.href = `/membresias.html?cliente_id=${clienteId}`;
+    // En modo SPA: navegar al router con parámetro en sessionStorage
+    // En modo standalone: redirigir directamente
+    if (window.__SPA_SHELL__ && typeof GymRouter !== 'undefined') {
+      sessionStorage.setItem('_spa_param_cliente_id', clienteId);
+      GymRouter.navigate('membresias');
+    } else {
+      window.location.href = `/membresias.html?cliente_id=${clienteId}`;
+    }
   }
 
   async function deleteCliente(id, nombre) {
@@ -240,15 +281,102 @@
     } catch (err) { toast(err.message, 'error'); }
   }
 
-  let searchTimer;
-  document.getElementById('search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => loadClientes(1), 400); };
-  document.getElementById('filter-activo').onchange = () => loadClientes(1);
-
   function exportarClientes() {
     api.download('/reports/clientes/excel', 'clientes.xlsx').then(() => toast('Descarga iniciada')).catch(err => toast(err.message, 'error'));
   }
 
-  loadClientes();
-</script>
-</body>
+  // Exponer al scope global para los onclick inline generados en template strings
+  window.editCliente   = editCliente;
+  window.irAMembresia  = irAMembresia;
+  window.deleteCliente = deleteCliente;
+
+  // ── Inicialización: asignaciones al DOM y arranque ──────────────────────────
+  (function _initPage() {
+    console.log('[Clientes] 🚀 Iniciando página...');
+    
+    // Verificar que los elementos críticos existan
+    const tabla = document.getElementById('clientes-table');
+    if (!tabla) {
+      console.error('[Clientes] ❌ ERROR: No se encontró #clientes-table');
+      return;
+    }
+    console.log('[Clientes] ✅ Tabla encontrada');
+
+    initLayout('clientes', 'Clientes');
+
+    const elSearch   = document.getElementById('search-icon-el');
+    const elNew      = document.getElementById('icon-new-cliente');
+    const elExcel    = document.getElementById('icon-excel-cl');
+    const elReniec   = document.getElementById('icon-reniec');
+    if (elSearch) elSearch.innerHTML   = icon('search');
+    if (elNew)    elNew.innerHTML      = icon('plus');
+    if (elExcel)  elExcel.innerHTML    = icon('excel');
+    if (elReniec) elReniec.innerHTML   = icon('search');
+
+    const elBtnBuscarDni = document.getElementById('btn-buscar-dni');
+    if (elBtnBuscarDni) elBtnBuscarDni.onclick = buscarDNI;
+
+    const elBtnSave = document.getElementById('btn-save-cliente');
+    if (elBtnSave) elBtnSave.onclick = function() { withLoading(this, saveCliente); };
+
+    const elBtnExportar = document.getElementById('btn-exportar-cl');
+    if (elBtnExportar) elBtnExportar.onclick = exportarClientes;
+
+    const elBtnCloseModal = document.getElementById('btn-close-modal-cl');
+    if (elBtnCloseModal) elBtnCloseModal.onclick = () => closeModal('modal-overlay');
+
+    const elBtnCancelModal = document.getElementById('btn-cancel-modal-cl');
+    if (elBtnCancelModal) elBtnCancelModal.onclick = () => closeModal('modal-overlay');
+
+    const elBtnNew = document.getElementById('btn-new');
+    if (elBtnNew) {
+      elBtnNew.onclick = () => {
+        document.getElementById('cliente-form').reset();
+        document.getElementById('cliente-id').value = '';
+        document.getElementById('modal-title').textContent = 'Nuevo Cliente';
+        document.getElementById('activo-group').classList.add('hidden');
+        document.getElementById('foto-preview').classList.add('hidden');
+        document.getElementById('foto-placeholder').style.display = '';
+        document.getElementById('reniec-status').textContent = '';
+        const icoCam = document.getElementById('icon-camera-cl');
+        const icoClose = document.getElementById('icon-close-cl');
+        const icoReniec = document.getElementById('icon-reniec');
+        const fotoPlaceholder = document.getElementById('foto-placeholder');
+        if (icoCam && !icoCam.innerHTML) icoCam.innerHTML = icon('camera');
+        if (icoClose && !icoClose.innerHTML) icoClose.innerHTML = icon('close');
+        if (icoReniec) icoReniec.innerHTML = icon('search');
+        if (fotoPlaceholder && !fotoPlaceholder.innerHTML) fotoPlaceholder.innerHTML = icon('user');
+        openModal('modal-overlay');
+      };
+    }
+
+    const elFoto = document.getElementById('foto');
+    if (elFoto) {
+      elFoto.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = ev => {
+            document.getElementById('foto-preview').src = ev.target.result;
+            document.getElementById('foto-preview').classList.remove('hidden');
+            document.getElementById('foto-placeholder').style.display = 'none';
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+    }
+
+    let searchTimer;
+    const elSearchInput = document.getElementById('search');
+    if (elSearchInput) elSearchInput.oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => loadClientes(1), 400); };
+    const elFilterActivo = document.getElementById('filter-activo');
+    if (elFilterActivo) elFilterActivo.onchange = () => loadClientes(1);
+
+    console.log('[Clientes] 🔄 Cargando datos...');
+    loadClientes().catch(err => {
+      console.error('[Clientes] ❌ Error en carga inicial:', err);
+      toast('Error al cargar clientes: ' + err.message, 'error');
+    });
+  })();
+</script></body>
 </html>

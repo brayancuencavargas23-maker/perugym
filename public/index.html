@@ -538,6 +538,21 @@
           style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none"
           aria-hidden="true">
 
+      <!-- DNI (solo captura, sin consulta RENIEC en la landing) -->
+        <div class="sol-field">
+          <label>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            DNI <span class="opt">(opcional)</span>
+          </label>
+          <div class="sol-input-wrap">
+            <span class="sol-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            </span>
+            <input type="text" id="sol-dni" placeholder="Ej: 46027897" maxlength="8" inputmode="numeric"
+              autocomplete="off" oninput="this.value=this.value.replace(/\D/g,'')">
+          </div>
+        </div>
+
         <!-- Nombre -->
         <div class="sol-field">
           <label>
@@ -798,6 +813,9 @@
         if (el) el.value = '';
         setFieldState(c, 'idle');
       });
+      // Reset DNI
+      const dniEl = document.getElementById('sol-dni');
+      if (dniEl) { dniEl.value = ''; dniEl.style.borderColor = ''; }
 
       // Reset botón
       const btn = document.getElementById('sol-btn-enviar');
@@ -859,6 +877,7 @@
       const telefono = document.getElementById('sol-telefono').value.trim();
       const email    = document.getElementById('sol-email').value.trim();
       const planId   = document.getElementById('sol-plan-id').value;
+      const dni      = document.getElementById('sol-dni')?.value.trim() || '';
       // Honeypot: campo oculto — si tiene valor, es un bot, no enviamos
       const website  = document.getElementById('sol-website').value;
 
@@ -874,10 +893,11 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             nombre,
-            telefono: telefono.replace(/\D/g, ''), // enviar solo dígitos
-            email: email || undefined,
-            plan_id: planId,
-            website,  // honeypot — el servidor lo rechaza si tiene valor
+            dni:      dni || undefined,
+            telefono: telefono.replace(/\D/g, ''),
+            email:    email || undefined,
+            plan_id:  planId,
+            website,
           }),
         });
         const data = await res.json();

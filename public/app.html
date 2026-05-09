@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>PeruGym — Sistema de Gestión</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <div class="topbar" id="topbar"></div>
+    <!-- Contenedor SPA: solo este div se reemplaza al navegar -->
+    <div class="page-content" id="spa-content">
+      <!-- El contenido de cada gestión se inyecta aquí -->
+    </div>
+  </div>
+</div>
+
+<!-- Scripts base — se cargan UNA SOLA VEZ -->
+<script>window.__SPA_SHELL__ = true;</script>
+<script src="/js/cache.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/icons.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/router.js"></script>
+<script>
+  // ── Determinar qué página cargar según la URL actual ──────────────────────
+  (function () {
+    const PATH_MAP = {
+      '/app.html':          'dashboard',
+      '/dashboard.html':    'dashboard',
+      '/clientes.html':     'clientes',
+      '/membresias.html':   'membresias',
+      '/planes.html':       'planes',
+      '/pagos.html':        'pagos',
+      '/asistencia.html':   'asistencia',
+      '/productos.html':    'productos',
+      '/caja.html':         'caja',
+      '/reports.html':      'reports',
+      '/users.html':        'users',
+      '/landing-admin.html':'landing-admin',
+      '/solicitudes.html':  'solicitudes',
+    };
+
+    const currentPath = window.location.pathname;
+    const initialPage = PATH_MAP[currentPath] || 'dashboard';
+
+    // Inicializar layout (sidebar + topbar) — solo ocurre UNA VEZ
+    initLayout(initialPage, '');
+
+    // Inicializar router (intercepta clicks del sidebar)
+    GymRouter.init(initialPage);
+
+    // Cargar la página inicial
+    GymRouter.navigate(initialPage, false);
+  })();
+</script>
+</body>
+</html>

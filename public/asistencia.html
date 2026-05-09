@@ -8,6 +8,8 @@
   <meta http-equiv="Expires" content="0">
   <title>Asistencia - PeruGym</title>
   <link rel="stylesheet" href="/css/main.css">
+  <!-- SPA redirect: si se accede directamente, redirigir al shell -->
+  <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
   <style>
     .checkin-opt:hover { background: var(--bg); }
     .checkin-opt:last-child { border-bottom: none !important; }
@@ -133,15 +135,12 @@
 <script src="/js/icons.js"></script>
 <script src="/js/layout.js"></script>
 <script>
-  initLayout('asistencia', 'Asistencia');
-  document.getElementById('h-checkin').innerHTML      = icon('checkin') + ' Check-in Rápido';
-  document.getElementById('btn-checkin-el').innerHTML = icon('checkin') + ' Check-in';
-  document.getElementById('btn-checkout-el').innerHTML= icon('checkout') + ' Check-out';
-  document.getElementById('btn-filter-asis').innerHTML= icon('search') + ' Filtrar';
-  document.getElementById('btn-clear-asis').innerHTML = icon('close') + ' Limpiar';
-  document.getElementById('btn-export-asis').innerHTML= icon('download') + ' Exportar Excel';
-
   let currentPage = 1;
+
+  // Guard: devuelve true si la página de asistencia sigue activa en el DOM.
+  function _pageActive() {
+    return !!document.getElementById('asistencia-table');
+  }
 
   // Al cambiar fecha exacta, limpiar rango y viceversa
   document.getElementById('filter-date').addEventListener('change', function() {
@@ -182,13 +181,15 @@
 
   async function loadClientes() {
     const data = await api.get('/clientes?activo=true&limit=500');
+    if (!_pageActive()) return;
     // Guardar lista para el buscador de check-in
     window._clientesCheckin = data.data;
 
     // Poblar el select del filtro de tabla
     const opts = '<option value="">Todos</option>' +
       data.data.map(c => '<option value="' + (c._id || c.id) + '">' + c.nombre + '</option>').join('');
-    document.getElementById('filter-cliente').innerHTML = opts;
+    const filterCliente = document.getElementById('filter-cliente');
+    if (filterCliente) filterCliente.innerHTML = opts;
 
     // Inicializar buscador de check-in
     initCheckinSearch(data.data);
@@ -235,7 +236,7 @@
       if (!e.target.closest('#checkin-search') && !e.target.closest('#checkin-dropdown')) {
         dropdown.style.display = 'none';
       }
-    });
+    }, { signal: window.__spaPageAbort?.signal });
   }
 
   window.selectCheckinCliente = function(id, name) {
@@ -246,23 +247,33 @@
 
   async function loadAsistencia(page) {
     page = page || 1;
+    if (!_pageActive()) return;
     currentPage = page;
     if (page === 1) showTableSkeleton('asistencia-table', 6);
     try {
       const data = await api.get('/asistencia' + buildQS(page, 20));
+      if (!_pageActive()) return;
 
       // Actualizar stats
       if (data.stats) {
-        document.getElementById('stat-total').textContent    = data.stats.total_hoy || 0;
-        document.getElementById('stat-encurso').textContent  = data.stats.en_curso || 0;
-        document.getElementById('stat-promedio').textContent = data.stats.promedio_min ? data.stats.promedio_min + ' min' : '-';
+        const statTotal = document.getElementById('stat-total');
+        const statEnCurso = document.getElementById('stat-encurso');
+        const statPromedio = document.getElementById('stat-promedio');
+        
+        if (statTotal) statTotal.textContent = data.stats.total_hoy || 0;
+        if (statEnCurso) statEnCurso.textContent = data.stats.en_curso || 0;
+        if (statPromedio) statPromedio.textContent = data.stats.promedio_min ? data.stats.promedio_min + ' min' : '-';
       }
 
       // Info de resultados
-      document.getElementById('result-info').textContent =
-        data.total + ' registro' + (data.total !== 1 ? 's' : '') + ' encontrado' + (data.total !== 1 ? 's' : '');
+      const resultInfo = document.getElementById('result-info');
+      if (resultInfo) {
+        resultInfo.textContent = data.total + ' registro' + (data.total !== 1 ? 's' : '') + ' encontrado' + (data.total !== 1 ? 's' : '');
+      }
 
-      document.getElementById('asistencia-table').innerHTML = data.data.map(function(a) {
+      const tabla = document.getElementById('asistencia-table');
+      if (!tabla) return;
+      tabla.innerHTML = data.data.map(function(a) {
         const durMin = a.salida
           ? Math.round((new Date(a.salida) - new Date(a.entrada)) / 60000)
           : null;
@@ -358,6 +369,23 @@
 
   loadClientes();
   loadAsistencia(1);
+
+  // ── Inicialización de iconos ────────────────────────────────────────────────
+  (function _initPage() {
+    initLayout('asistencia', 'Asistencia');
+    const iconMap = {
+      'h-checkin':        icon('checkin') + ' Check-in Rápido',
+      'btn-checkin-el':   icon('checkin') + ' Check-in',
+      'btn-checkout-el':  icon('checkout') + ' Check-out',
+      'btn-filter-asis':  icon('search') + ' Filtrar',
+      'btn-clear-asis':   icon('close') + ' Limpiar',
+      'btn-export-asis':  icon('download') + ' Exportar Excel',
+    };
+    Object.entries(iconMap).forEach(([id, html]) => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = html;
+    });
+  })();
 </script>
 </body>
 </html>

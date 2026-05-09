@@ -8,6 +8,8 @@
   <meta http-equiv="Expires" content="0">
   <title>Solicitudes - PeruGym</title>
   <link rel="stylesheet" href="/css/main.css">
+  <!-- SPA redirect: si se accede directamente, redirigir al shell -->
+  <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
   <style>
     .estado-badge-pendiente  { background:rgba(255,193,7,0.15);  color:#856404;  border:1px solid #ffc107; }
     .estado-badge-contactado { background:rgba(13,110,253,0.12); color:#084298;  border:1px solid #0d6efd; }
@@ -125,16 +127,40 @@
       <!-- Resumen del lead -->
       <div style="background:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px" id="conv-info"></div>
 
+      <!-- DNI + botón RENIEC -->
+      <div class="form-group">
+        <label>DNI</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="conv-dni" class="form-control" maxlength="8" placeholder="Ej: 46027897" style="flex:1">
+          <button type="button" class="btn btn-outline btn-sm" id="btn-conv-buscar-dni" style="white-space:nowrap">
+            Buscar DNI
+          </button>
+        </div>
+        <small id="conv-reniec-status" style="color:var(--text-light);font-size:11px;margin-top:4px;display:block"></small>
+      </div>
+
+      <!-- Nombres y apellidos (autocompletados por RENIEC) -->
       <div class="form-row">
         <div class="form-group">
-          <label>DNI <span style="color:var(--text-light);font-size:11px">(opcional)</span></label>
-          <input type="text" id="conv-dni" class="form-control" placeholder="12345678">
+          <label>Nombres</label>
+          <input type="text" id="conv-nombre" class="form-control" placeholder="Nombres">
+        </div>
+        <div class="form-group">
+          <label>Apellido Paterno</label>
+          <input type="text" id="conv-apellido-paterno" class="form-control" placeholder="Apellido paterno">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Apellido Materno</label>
+          <input type="text" id="conv-apellido-materno" class="form-control" placeholder="Apellido materno">
         </div>
         <div class="form-group">
           <label>Fecha inicio membresía</label>
           <input type="date" id="conv-inicio" class="form-control">
         </div>
       </div>
+
       <div class="form-row">
         <div class="form-group">
           <label>Método de pago</label>
@@ -176,25 +202,31 @@
 <script src="/js/icons.js"></script>
 <script src="/js/layout.js"></script>
 <script>
-  initLayout('solicitudes', 'Solicitudes');
-  document.getElementById('icon-refresh-sol').innerHTML = icon('refresh');
-
   let currentPage = 1;
   let cajaActual = null;
+
+  // Guard: devuelve true si la página de solicitudes sigue activa en el DOM.
+  function _pageActive() {
+    return !!document.getElementById('solicitudes-table');
+  }
 
   // ── Verificar caja ──────────────────────────────────────────────────────────
   async function checkCaja() {
     try { cajaActual = await api.get('/caja/estado'); } catch { cajaActual = null; }
   }
-
   // ── Cargar resumen de estados ───────────────────────────────────────────────
   async function loadStats(force = false) {
     try {
       const stats = await api.get('/solicitudes/stats', force);
-      document.getElementById('cnt-pendiente').textContent  = stats.pendiente;
-      document.getElementById('cnt-contactado').textContent = stats.contactado;
-      document.getElementById('cnt-convertido').textContent = stats.convertido;
-      document.getElementById('cnt-descartado').textContent = stats.descartado;
+      if (!_pageActive()) return;
+      const cntPendiente  = document.getElementById('cnt-pendiente');
+      const cntContactado = document.getElementById('cnt-contactado');
+      const cntConvertido = document.getElementById('cnt-convertido');
+      const cntDescartado = document.getElementById('cnt-descartado');
+      if (cntPendiente)  cntPendiente.textContent  = stats.pendiente;
+      if (cntContactado) cntContactado.textContent = stats.contactado;
+      if (cntConvertido) cntConvertido.textContent = stats.convertido;
+      if (cntDescartado) cntDescartado.textContent = stats.descartado;
       // Actualizar badge del sidebar
       const badge = document.getElementById('nav-badge-solicitudes');
       if (badge) {
@@ -206,14 +238,19 @@
 
   // ── Cargar tabla ────────────────────────────────────────────────────────────
   async function loadSolicitudes(page = 1, force = false) {
+    if (!_pageActive()) return;
     currentPage = page;
-    const estado = document.getElementById('filter-estado').value;
+    const estadoEl = document.getElementById('filter-estado');
+    const estado = estadoEl ? estadoEl.value : '';
     let qs = `?page=${page}&limit=15`;
     if (estado) qs += `&estado=${estado}`;
     if (page === 1 && !estado && !force) showTableSkeleton('solicitudes-table', 7);
     try {
       const data = await api.get(`/solicitudes${qs}`, force);
-      document.getElementById('solicitudes-table').innerHTML = data.data.map(s => {
+      if (!_pageActive()) return;
+      const tbody = document.getElementById('solicitudes-table');
+      if (!tbody) return;
+      tbody.innerHTML = data.data.map(s => {
         const estadoClass = {
           pendiente:  'estado-badge-pendiente',
           contactado: 'estado-badge-contactado',
@@ -228,7 +265,8 @@
              <a class="btn btn-sm btn-outline" href="${whatsappUrl}" target="_blank" title="WhatsApp" style="display:inline-flex;align-items:center">
                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
              </a>
-             <button class="btn btn-sm btn-success" title="Convertir a cliente" onclick="abrirConvertir('${s.id}','${s.nombre.replace(/'/g,"\\'")}','${s.plan_nombre || ''}',${s.plan_precio || 0},'${s.telefono}','${s.email || ''}')">${icon('check')}</button>`
+             <button class="btn btn-sm btn-success" title="Convertir a cliente" onclick="abrirConvertir('${s.id}','${s.nombre.replace(/'/g,"\\'")}','${s.plan_nombre || ''}',${s.plan_precio || 0},'${s.telefono}','${s.email || ''}','${s.dni || ''}','${(s.apellido_paterno||'').replace(/'/g,"\\'")}','${(s.apellido_materno||'').replace(/'/g,"\\'")}')">
+               ${icon('check')}</button>`
           : s.estado === 'convertido'
             ? `<a href="/clientes.html" class="btn btn-sm btn-outline" title="Ver clientes" style="display:inline-flex;align-items:center">${icon('clientes')}</a>`
             : `<button class="btn btn-sm btn-outline" title="Ver detalle" onclick="abrirDetalle('${s.id}')">${icon('eye')}</button>`;
@@ -248,7 +286,10 @@
       }).join('') || '<tr><td colspan="7" class="text-center" style="padding:30px;color:var(--text-light)">Sin solicitudes</td></tr>';
 
       renderPagination(document.getElementById('pagination'), data.page, data.pages, loadSolicitudes);
-    } catch (err) { toast(err.message, 'error'); }
+    } catch (err) { 
+      console.error('[Solicitudes] ❌ Error en loadSolicitudes:', err);
+      toast(err.message, 'error'); 
+    }
   }
 
   // ── Modal detalle / cambio de estado ───────────────────────────────────────
@@ -291,16 +332,21 @@
   }
 
   // ── Modal convertir ─────────────────────────────────────────────────────────
-  function abrirConvertir(id, nombre, planNombre, planPrecio, telefono, email) {
+  function abrirConvertir(id, nombre, planNombre, planPrecio, telefono, email, dni, apellidoPaterno, apellidoMaterno) {
     document.getElementById('conv-id').value = id;
-    document.getElementById('conv-dni').value = '';
-    document.getElementById('conv-inicio').value = new Date().toISOString().split('T')[0];
-    document.getElementById('conv-metodo').value = 'efectivo';
-    document.getElementById('conv-estado-pago').value = 'pagado';
-    document.getElementById('conv-notas').value = '';
+    // Precargar datos de la solicitud (pueden venir de RENIEC si el cliente ingresó DNI en la landing)
+    document.getElementById('conv-dni').value              = dni || '';
+    document.getElementById('conv-nombre').value           = nombre || '';
+    document.getElementById('conv-apellido-paterno').value = apellidoPaterno || '';
+    document.getElementById('conv-apellido-materno').value = apellidoMaterno || '';
+    document.getElementById('conv-inicio').value           = new Date().toISOString().split('T')[0];
+    document.getElementById('conv-metodo').value           = 'efectivo';
+    document.getElementById('conv-estado-pago').value      = 'pagado';
+    document.getElementById('conv-notas').value            = '';
+    document.getElementById('conv-reniec-status').textContent = dni ? '✓ DNI precargado desde la solicitud' : '';
+    document.getElementById('conv-reniec-status').style.color = 'var(--success, #22c55e)';
     document.getElementById('conv-info').innerHTML = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div><span style="color:var(--text-light)">Cliente</span><br><strong>${nombre}</strong></div>
         <div><span style="color:var(--text-light)">Teléfono</span><br>${telefono}</div>
         <div><span style="color:var(--text-light)">Email</span><br>${email || '-'}</div>
         <div><span style="color:var(--text-light)">Plan</span><br><strong>${planNombre}</strong> — ${fmtMoney(planPrecio)}</div>
@@ -316,7 +362,43 @@
       banner.classList.add('hidden');
       btnConv.disabled = false;
     }
+
+    // Asignar evento al botón buscar DNI
+    const btnBuscarDni = document.getElementById('btn-conv-buscar-dni');
+    if (btnBuscarDni) btnBuscarDni.onclick = buscarDniConvertir;
+
     openModal('modal-convertir');
+  }
+
+  // ── Buscar DNI en el modal de conversión ────────────────────────────────────
+  async function buscarDniConvertir() {
+    const dni       = document.getElementById('conv-dni').value.trim();
+    const statusEl  = document.getElementById('conv-reniec-status');
+    const btnBuscar = document.getElementById('btn-conv-buscar-dni');
+
+    if (!/^\d{8}$/.test(dni)) {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = 'Ingresa un DNI válido de 8 dígitos.';
+      return;
+    }
+
+    btnBuscar.disabled   = true;
+    statusEl.style.color = 'var(--text-light)';
+    statusEl.textContent = 'Consultando RENIEC...';
+
+    try {
+      const data = await api.get(`/clientes/reniec/${dni}`, true);
+      document.getElementById('conv-nombre').value           = data.first_name       || '';
+      document.getElementById('conv-apellido-paterno').value = data.first_last_name  || '';
+      document.getElementById('conv-apellido-materno').value = data.second_last_name || '';
+      statusEl.style.color = 'var(--success, #22c55e)';
+      statusEl.textContent = `✓ ${data.full_name}`;
+    } catch (err) {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = err.message || 'DNI no encontrado en RENIEC.';
+    } finally {
+      btnBuscar.disabled = false;
+    }
   }
 
   async function confirmarConversion() {
@@ -324,12 +406,15 @@
     const id = document.getElementById('conv-id').value;
     try {
       await api.post(`/solicitudes/${id}/convertir`, {
-        dni:             document.getElementById('conv-dni').value || null,
-        fecha_inicio:    document.getElementById('conv-inicio').value,
-        metodo_pago:     document.getElementById('conv-metodo').value,
-        estado_pago:     document.getElementById('conv-estado-pago').value,
-        notas_membresia: document.getElementById('conv-notas').value || null,
-        caja_id:         cajaActual.id,
+        dni:              document.getElementById('conv-dni').value.trim() || null,
+        nombre:           document.getElementById('conv-nombre').value.trim() || null,
+        apellido_paterno: document.getElementById('conv-apellido-paterno').value.trim() || null,
+        apellido_materno: document.getElementById('conv-apellido-materno').value.trim() || null,
+        fecha_inicio:     document.getElementById('conv-inicio').value,
+        metodo_pago:      document.getElementById('conv-metodo').value,
+        estado_pago:      document.getElementById('conv-estado-pago').value,
+        notas_membresia:  document.getElementById('conv-notas').value || null,
+        caja_id:          cajaActual.id,
       }, false, { invalidate: ['solicitudes', 'clientes', 'membresias', 'pagos'] });
       toast('¡Cliente creado con membresía y pago registrados!', 'success');
       closeModal('modal-convertir');
@@ -337,6 +422,13 @@
       loadStats(true);
     } catch (err) { toast(err.message, 'error'); }
   }
+
+  // Exponer al scope global para los onclick inline generados en template strings
+  window.abrirDetalle       = abrirDetalle;
+  window.abrirConvertir     = abrirConvertir;
+  window.guardarEstado      = guardarEstado;
+  window.confirmarConversion = confirmarConversion;
+  window.buscarDniConvertir = buscarDniConvertir;
 
   // ── Polling: detectar nuevas solicitudes en segundo plano ──────────────────
   let _lastPendingCount = null;
@@ -375,27 +467,42 @@
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) stopPolling();
     else startPolling();
-  });
+  }, { signal: window.__spaPageAbort?.signal });
 
   // ── Eventos ─────────────────────────────────────────────────────────────────
-  document.getElementById('filter-estado').onchange = () => loadSolicitudes(1);
-  document.getElementById('btn-refresh').onclick = () => {
+  const _elFilterEstado = document.getElementById('filter-estado');
+  if (_elFilterEstado) _elFilterEstado.onchange = () => loadSolicitudes(1);
+  const _elBtnRefresh = document.getElementById('btn-refresh');
+  if (_elBtnRefresh) _elBtnRefresh.onclick = () => {
     gymCache.invalidate('solicitudes');
     loadStats(true);
     loadSolicitudes(currentPage, true);
   };
 
   // ── Init ────────────────────────────────────────────────────────────────────
-  checkCaja().then(async () => {
-    await loadStats();
-    await loadSolicitudes();
-    // Guardar conteo inicial y arrancar polling
+  (async function _initSolicitudes() {
+    initLayout('solicitudes', 'Solicitudes');
+    const elRefresh = document.getElementById('icon-refresh-sol');
+    if (elRefresh) elRefresh.innerHTML = icon('refresh');
+
+    if (!_pageActive()) return;
+    
     try {
-      const stats = await api.get('/solicitudes/stats', true);
-      _lastPendingCount = stats.pendiente;
-    } catch {}
-    startPolling();
-  });
+      await checkCaja();
+      await loadStats();
+      await loadSolicitudes();
+      
+      // Guardar conteo inicial y arrancar polling
+      try {
+        const stats = await api.get('/solicitudes/stats', true);
+        _lastPendingCount = stats.pendiente;
+      } catch (err) { /* ignorar */ }
+      
+      startPolling();
+    } catch (err) {
+      toast('Error al cargar solicitudes: ' + err.message, 'error');
+    }
+  })();
 </script>
 </body>
 </html>

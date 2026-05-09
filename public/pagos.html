@@ -8,6 +8,8 @@
   <meta http-equiv="Expires" content="0">
   <title>Pagos - PeruGym</title>
   <link rel="stylesheet" href="/css/main.css">
+  <!-- SPA redirect: si se accede directamente, redirigir al shell -->
+  <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
 </head>
 <body>
 <div class="app-layout">
@@ -87,24 +89,32 @@
 <script src="/js/icons.js"></script>
 <script src="/js/layout.js"></script>
 <script>
-  initLayout('pagos', 'Pagos');
-  document.getElementById('icon-filter-pag').innerHTML = icon('search');
-  document.getElementById('icon-excel-pag').innerHTML  = icon('excel');
   let currentPage = 1;
   let cajaActual = null;
 
+  // Guard: devuelve true si la página de pagos sigue activa en el DOM.
+  function _pageActive() {
+    return !!document.getElementById('pagos-table');
+  }
+
   async function checkCaja() {
     try { cajaActual = await api.get('/caja/estado'); } catch (e) { cajaActual = null; }
+    if (!_pageActive()) return;
     const banner = document.getElementById('banner-caja-cerrada');
-    banner.classList.toggle('hidden', !!cajaActual);
+    if (banner) banner.classList.toggle('hidden', !!cajaActual);
   }
 
   async function loadPagos(page = 1) {
     currentPage = page;
-    const estado = document.getElementById('filter-estado').value;
-    const metodo = document.getElementById('filter-metodo').value;
-    const from = document.getElementById('filter-from').value;
-    const to = document.getElementById('filter-to').value;
+    const estadoEl = document.getElementById('filter-estado');
+    const metodoEl = document.getElementById('filter-metodo');
+    const fromEl   = document.getElementById('filter-from');
+    const toEl     = document.getElementById('filter-to');
+    if (!estadoEl || !metodoEl) return; // página ya no activa
+    const estado = estadoEl.value;
+    const metodo = metodoEl.value;
+    const from = fromEl ? fromEl.value : '';
+    const to   = toEl   ? toEl.value   : '';
     let qs = `?page=${page}&limit=15`;
     if (estado) qs += `&estado=${estado}`;
     if (metodo) qs += `&metodo_pago=${metodo}`;
@@ -113,6 +123,7 @@
     if (page === 1 && !estado && !metodo && !from && !to) showTableSkeleton('pagos-table', 7);
     try {
       const data = await api.get(`/pagos${qs}`);
+      if (!_pageActive()) return;
       document.getElementById('pagos-table').innerHTML = data.data.map(p => `
         <tr>
           <td>${p.cliente_nombre || '-'}</td>
@@ -156,11 +167,8 @@
         caja_id: cajaActual.id,
       }, {
         patch: { ns: 'pagos', id },
-        // membresias: estado cambió → invalidar
         invalidate: ['membresias'],
       });
-      // Patch quirúrgico en clientes: solo actualizar el estado de membresía
-      // del cliente afectado sin borrar toda la lista
       if (pagoActualizado?.cliente_id) {
         const clienteId = pagoActualizado.cliente_id?._id
           || pagoActualizado.cliente_id?.id
@@ -193,9 +201,6 @@
     } catch (err) { toast(err.message, 'error'); }
   }
 
-  document.getElementById('filter-estado').onchange = () => loadPagos(1);
-  document.getElementById('filter-metodo').onchange = () => loadPagos(1);
-
   function exportarPagos() {
     const estado = document.getElementById('filter-estado').value;
     const metodo = document.getElementById('filter-metodo').value;
@@ -209,8 +214,23 @@
     api.download(`/reports/pagos/excel${qs}`, 'pagos.xlsx').then(() => toast('Descarga iniciada')).catch(err => toast(err.message, 'error'));
   }
 
-  loadPagos();
-  checkCaja();
+  // ── Inicialización ──────────────────────────────────────────────────────────
+  (function _initPage() {
+    initLayout('pagos', 'Pagos');
+
+    const elFilter = document.getElementById('icon-filter-pag');
+    const elExcel  = document.getElementById('icon-excel-pag');
+    if (elFilter) elFilter.innerHTML = icon('search');
+    if (elExcel)  elExcel.innerHTML  = icon('excel');
+
+    const elEstado = document.getElementById('filter-estado');
+    const elMetodo = document.getElementById('filter-metodo');
+    if (elEstado) elEstado.onchange = () => loadPagos(1);
+    if (elMetodo) elMetodo.onchange = () => loadPagos(1);
+
+    loadPagos();
+    checkCaja();
+  })();
 </script>
 </body>
 </html>

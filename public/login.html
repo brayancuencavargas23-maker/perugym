@@ -17,18 +17,21 @@
         <p>Sistema de Gestión de Gimnasio</p>
       </div>
       <div id="login-error" class="alert alert-danger hidden"></div>
-      <form id="login-form">
+      <form id="login-form" autocomplete="off">
         <div class="form-group">
           <label>Usuario</label>
-          <input type="text" id="username" class="form-control" placeholder="admin" required autocomplete="username">
+          <input type="text" id="username" class="form-control" placeholder="admin" required autocomplete="off">
         </div>
         <div class="form-group">
           <label>Contraseña</label>
-          <input type="password" id="password" class="form-control" placeholder="••••••••" required>
+          <input type="password" id="password" class="form-control" placeholder="••••••••" required autocomplete="new-password">
         </div>
         <button type="submit" class="btn btn-primary w-full mt-2" id="login-btn">
           Iniciar Sesión
         </button>
+        <a href="/index.html" class="btn btn-outline w-full mt-2" style="display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;margin-top:10px">
+          ← Volver al inicio
+        </a>
       </form>
     </div>
   </div>
@@ -51,7 +54,7 @@
         const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
         if (payload.exp && payload.exp * 1000 > Date.now()) {
           // Token válido → redirigir al panel (ya está logueado)
-          window.location.replace('/dashboard.html');
+          window.location.replace('/app.html');
         } else {
           // Token expirado → limpiar y mostrar login
           localStorage.removeItem('gym_token');
@@ -65,9 +68,19 @@
 
     _loginPageGuard();
 
+    // Limpiar campos al cargar para evitar que el navegador rellene credenciales guardadas
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('username').value = '';
+      document.getElementById('password').value = '';
+    });
+
     // También se dispara cuando el navegador restaura esta página desde bfcache
     window.addEventListener('pageshow', (e) => {
-      if (e.persisted) _loginPageGuard();
+      if (e.persisted) {
+        _loginPageGuard();
+        document.getElementById('username').value = '';
+        document.getElementById('password').value = '';
+      }
     });
 
     document.getElementById('login-form').addEventListener('submit', async (e) => {
@@ -85,7 +98,7 @@
         });
         localStorage.setItem('gym_token', data.token);
         localStorage.setItem('gym_user', JSON.stringify(data.user));
-        window.location.replace('/dashboard.html');
+        window.location.replace('/app.html');
       } catch (err) {
         errEl.textContent = err.message;
         errEl.classList.remove('hidden');
