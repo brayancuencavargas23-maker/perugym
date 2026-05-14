@@ -4,6 +4,7 @@
  */
 const path = require('path');
 const fs   = require('fs');
+const logger = require('../utils/logger');
 require('dotenv').config();
 
 const isCloudinary =
@@ -31,13 +32,46 @@ if (isCloudinary) {
 const saveImage = async (buffer, folder = 'misc', filename = 'img') => {
   if (isCloudinary) {
     const cloudinary = require('cloudinary').v2;
-    return new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        { folder: `gym/${folder}`, resource_type: 'image' },
-        (err, result) => err ? reject(err) : resolve(result.secure_url)
-      );
-      stream.end(buffer);
-    });
+    try {
+      return await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: `gym/${folder}`, resource_type: 'image' },
+          (err, result) => {
+            if (err) {
+              logger.error('Cloudinary upload error', {
+                folder,
+                filename,
+                error: err.message,
+                http_code: err.http_code,
+                service: 'Cloudinary'
+              });
+              reject(err);
+            } else {
+              resolve(result.secure_url);
+            }
+          }
+        );
+        stream.end(buffer);
+      });
+    } catch (err) {
+      logger.error('Cloudinary upload error', {
+        folder,
+        filename,
+        error: err.message,
+        service: 'Cloudinary'
+      });
+      logger.warn('Using local storage as fallback', { folder, filename });
+      
+      // Fallback a almacenamiento local
+      const ext      = path.extname(filename) || '.jpg';
+      const safeName = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+      const dir      = path.join(__dirname, '..', 'public', 'imagenes', folder);
+
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+      fs.writeFileSync(path.join(dir, safeName), buffer);
+      return `/imagenes/${folder}/${safeName}`;
+    }
   }
 
   // Almacenamiento local
@@ -63,7 +97,13 @@ const deleteImage = async (url) => {
     try {
       const filePath = path.join(__dirname, '..', 'public', url);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    } catch (_) {}
+    } catch (err) {
+      logger.error('Local storage delete error', {
+        url,
+        error: err.message,
+        service: 'LocalStorage'
+      });
+    }
     return;
   }
 
@@ -78,7 +118,14 @@ const deleteImage = async (url) => {
         const publicId = match[1]; // ej: "gym/productos/zpqe4s4jhhzilwreho2r"
         await cloudinary.uploader.destroy(publicId);
       }
-    } catch (_) {}
+    } catch (err) {
+      logger.error('Cloudinary delete error', {
+        url,
+        error: err.message,
+        service: 'Cloudinary'
+      });
+      // No lanzar error - la eliminación de imagen es una operación secundaria
+    }
   }
 };
 

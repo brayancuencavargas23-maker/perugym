@@ -6,16 +6,12 @@ const Plan = require('../models/Plan');
 const Pago = require('../models/Pago');
 const { verifyToken } = require('../middleware/auth');
 const { requireCajaAbierta } = require('../middleware/cajaAbierta');
+const { asyncHandler } = require('../middleware/errorHandler');
+const { validators, handleValidationErrors } = require('../middleware/validation');
+const MembresiaService = require('../services/MembresiaService');
+const TransactionManager = require('../utils/TransactionManager');
 
 router.use(verifyToken);
-
-// ── Helper: vencer membresías expiradas ──────────────────────────────────────
-async function autoVencer() {
-  await Membresia.updateMany(
-    { fecha_fin: { $lt: new Date() }, estado: 'activo' },
-    { $set: { estado: 'vencido' } }
-  );
-}
 
 // ── GET / — listar membresías ─────────────────────────────────────────────────
 router.get('/', async (req, res) => {
@@ -23,7 +19,7 @@ router.get('/', async (req, res) => {
   const filter = {};
 
   try {
-    await autoVencer();
+    await MembresiaService.autoVencer();
 
     if (cliente_id) filter.cliente_id = cliente_id;
     if (estado) filter.estado = estado;
@@ -37,8 +33,16 @@ router.get('/', async (req, res) => {
     // Filtro por nombre de cliente: buscar primero los clientes que coincidan
     if (nombre) {
       const Cliente = require('../models/Cliente');
+      const safeNombre = nombre.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regexNombre = { $regex: safeNombre, $options: 'i' };
       const clientes = await Cliente.find(
-        { nombre: { $regex: nombre, $options: 'i' } },
+        {
+          $or: [
+            { nombre: regexNombre },
+            { apellido_paterno: regexNombre },
+            { apellido_materno: regexNombre },
+          ]
+        },
         '_id'
       );
       filter.cliente_id = { $in: clientes.map(c => c._id) };
@@ -46,7 +50,7 @@ router.get('/', async (req, res) => {
 
     const total = await Membresia.countDocuments(filter);
     const mems = await Membresia.find(filter)
-      .populate('cliente_id', 'nombre foto_url')
+      .populate('cliente_id', 'nombre apellido_paterno apellido_materno foto_url')
       .populate('plan_id', 'nombre precio')
       .sort({ fecha_fin: -1 })
       .skip((page - 1) * limit)
@@ -55,7 +59,7 @@ router.get('/', async (req, res) => {
     const data = mems.map(m => ({
       ...m.toObject(),
       id: m._id,
-      cliente_nombre: m.cliente_id?.nombre,
+      cliente_nombre: [m.cliente_id?.nombre, m.cliente_id?.apellido_paterno, m.cliente_id?.apellido_materno].filter(Boolean).join(' ') || null,
       foto_url: m.cliente_id?.foto_url,
       plan_nombre: m.plan_id?.nombre,
       precio: m.plan_id?.precio,
@@ -74,56 +78,44 @@ router.post(
     body('plan_id').isMongoId().withMessage('plan_id inválido.'),
     body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']).withMessage('Método de pago inválido.'),
     body('estado_pago').optional().isIn(['pagado', 'pendiente']).withMessage('Estado de pago inválido.'),
-    body('fecha_inicio').optional().isISO8601().withMessage('Fecha de inicio inválida.'),
+    validators.fecha('fecha_inicio'),
+    handleValidationErrors
   ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
-
+  asyncHandler(async (req, res) => {
     const { cliente_id, plan_id, fecha_inicio, metodo_pago, estado_pago = 'pagado', notas } = req.body;
     const caja_id = req.cajaActual._id;
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    try {
-      await autoVencer();
+    await MembresiaService.autoVencer();
 
-      const activa = await Membresia.findOne({ cliente_id, estado: 'activo' }).session(session);
-      if (activa) {
-        await session.abortTransaction();
-        return res.status(409).json({ error: 'El cliente ya tiene una membresía activa. Cancélala o espera que venza antes de asignar una nueva.' });
-      }
-
-      const plan = await Plan.findOne({ _id: plan_id, activo: true }).session(session);
-      if (!plan) {
-        await session.abortTransaction();
-        return res.status(404).json({ error: 'Plan no encontrado o inactivo.' });
-      }
-
-      const inicio = fecha_inicio ? new Date(fecha_inicio) : new Date();
-      const fin = new Date(inicio);
-      fin.setDate(fin.getDate() + plan.duracion_dias);
-
-      const estadoMembresia = estado_pago === 'pendiente' ? 'pendiente' : 'activo';
-
-      const [membresia] = await Membresia.create(
-        [{ cliente_id, plan_id, fecha_inicio: inicio, fecha_fin: fin, estado: estadoMembresia }],
-        { session }
+    const result = await TransactionManager.execute(async (session) => {
+      // Create membership using service
+      const membresia = await MembresiaService.crear(
+        { cliente_id, plan_id, fecha_inicio, estado_pago },
+        session
       );
+
+      // Get plan for payment amount
+      const plan = await Plan.findById(plan_id).session(session);
+
+      // Create payment
       const [pago] = await Pago.create(
-        [{ cliente_id, membresia_id: membresia._id, caja_id, monto: plan.precio, metodo_pago: metodo_pago || 'efectivo', estado: estado_pago, notas: notas || null }],
+        [{
+          cliente_id,
+          membresia_id: membresia._id,
+          caja_id,
+          monto: plan.precio,
+          metodo_pago: metodo_pago || 'efectivo',
+          estado: estado_pago,
+          notas: notas || null
+        }],
         { session }
       );
 
-      await session.commitTransaction();
-      res.status(201).json({ membresia, pago });
-    } catch (err) {
-      await session.abortTransaction();
-      res.status(500).json({ error: err.message });
-    } finally {
-      session.endSession();
-    }
-  }
+      return { membresia, pago };
+    });
+
+    res.status(201).json(result);
+  })
 );
 
 // ── POST /:id/cambiar-plan (requiere caja abierta) ────────────────────────────
@@ -131,56 +123,50 @@ router.post(
   '/:id/cambiar-plan',
   requireCajaAbierta,
   [
-    param('id').isMongoId().withMessage('ID de membresía inválido.'),
+    validators.mongoId('id'),
     body('plan_id').isMongoId().withMessage('plan_id inválido.'),
-    body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']),
-    body('estado_pago').optional().isIn(['pagado', 'pendiente']),
+    body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']).withMessage('Método de pago inválido.'),
+    body('estado_pago').optional().isIn(['pagado', 'pendiente']).withMessage('Estado de pago inválido.'),
+    validators.fecha('fecha_inicio'),
+    handleValidationErrors
   ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
-
+  asyncHandler(async (req, res) => {
     const { plan_id, fecha_inicio, metodo_pago, estado_pago = 'pagado', notas } = req.body;
     const caja_id = req.cajaActual._id;
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    try {
-      const mem = await Membresia.findById(req.params.id).session(session);
-      if (!mem) { await session.abortTransaction(); return res.status(404).json({ error: 'Membresía no encontrada.' }); }
-      if (mem.estado !== 'activo' && mem.estado !== 'pendiente') {
-        await session.abortTransaction();
-        return res.status(400).json({ error: 'Solo se puede cambiar el plan de una membresía activa o pendiente.' });
-      }
-
-      const plan = await Plan.findOne({ _id: plan_id, activo: true }).session(session);
-      if (!plan) { await session.abortTransaction(); return res.status(404).json({ error: 'Plan no encontrado o inactivo.' }); }
-
-      await Membresia.findByIdAndUpdate(req.params.id, { estado: 'cancelado' }, { session });
-
-      const inicio = fecha_inicio ? new Date(fecha_inicio) : new Date();
-      const fin = new Date(inicio);
-      fin.setDate(fin.getDate() + plan.duracion_dias);
-      const estadoMembresia = estado_pago === 'pendiente' ? 'pendiente' : 'activo';
-
-      const [nueva] = await Membresia.create(
-        [{ cliente_id: mem.cliente_id, plan_id, fecha_inicio: inicio, fecha_fin: fin, estado: estadoMembresia }],
-        { session }
+    const result = await TransactionManager.execute(async (session) => {
+      // Change plan using service
+      const nueva = await MembresiaService.cambiarPlan(
+        req.params.id,
+        { plan_id, fecha_inicio, estado_pago },
+        session
       );
+
+      // Get plan for payment amount
+      const plan = await Plan.findById(plan_id).session(session);
+
+      // Get client ID from new membership
+      const mem = await Membresia.findById(nueva._id).session(session);
+
+      // Create payment
       const [pago] = await Pago.create(
-        [{ cliente_id: mem.cliente_id, membresia_id: nueva._id, caja_id, monto: plan.precio, metodo_pago: metodo_pago || 'efectivo', estado: estado_pago, notas: notas || null }],
+        [{
+          cliente_id: mem.cliente_id,
+          membresia_id: nueva._id,
+          caja_id,
+          monto: plan.precio,
+          metodo_pago: metodo_pago || 'efectivo',
+          estado: estado_pago,
+          notas: notas || null
+        }],
         { session }
       );
 
-      await session.commitTransaction();
-      res.status(201).json({ membresia: nueva, pago });
-    } catch (err) {
-      await session.abortTransaction();
-      res.status(500).json({ error: err.message });
-    } finally {
-      session.endSession();
-    }
-  }
+      return { membresia: nueva, pago };
+    });
+
+    res.status(201).json(result);
+  })
 );
 
 // ── POST /:id/renovar (requiere caja abierta) ─────────────────────────────────
@@ -188,77 +174,72 @@ router.post(
   '/:id/renovar',
   requireCajaAbierta,
   [
-    param('id').isMongoId().withMessage('ID de membresía inválido.'),
-    body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']),
-    body('estado_pago').optional().isIn(['pagado', 'pendiente']),
+    validators.mongoId('id'),
+    body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']).withMessage('Método de pago inválido.'),
+    body('estado_pago').optional().isIn(['pagado', 'pendiente']).withMessage('Estado de pago inválido.'),
+    handleValidationErrors
   ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
-
+  asyncHandler(async (req, res) => {
     const { metodo_pago, estado_pago = 'pagado', notas } = req.body;
     const caja_id = req.cajaActual._id;
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    try {
-      await autoVencer();
+    await MembresiaService.autoVencer();
 
-      const mem = await Membresia.findById(req.params.id).populate('plan_id').session(session);
-      if (!mem) { await session.abortTransaction(); return res.status(404).json({ error: 'Membresía no encontrada.' }); }
-      if (mem.estado === 'activo') { await session.abortTransaction(); return res.status(400).json({ error: 'La membresía aún está activa. No es necesario renovar.' }); }
-
-      const otraActiva = await Membresia.findOne({ cliente_id: mem.cliente_id, estado: 'activo' }).session(session);
-      if (otraActiva) { await session.abortTransaction(); return res.status(409).json({ error: 'El cliente ya tiene una membresía activa.' }); }
-
-      const inicio = new Date();
-      const fin = new Date(inicio);
-      fin.setDate(fin.getDate() + mem.plan_id.duracion_dias);
-      const estadoMembresia = estado_pago === 'pendiente' ? 'pendiente' : 'activo';
-
-      const [nueva] = await Membresia.create(
-        [{ cliente_id: mem.cliente_id, plan_id: mem.plan_id._id, fecha_inicio: inicio, fecha_fin: fin, estado: estadoMembresia }],
-        { session }
+    const result = await TransactionManager.execute(async (session) => {
+      // Renew membership using service
+      const nueva = await MembresiaService.renovar(
+        req.params.id,
+        estado_pago,
+        session
       );
+
+      // Get plan for payment amount
+      const mem = await Membresia.findById(nueva._id)
+        .populate('plan_id')
+        .session(session);
+
+      // Create payment
       const [pago] = await Pago.create(
-        [{ cliente_id: mem.cliente_id, membresia_id: nueva._id, caja_id, monto: mem.plan_id.precio, metodo_pago: metodo_pago || 'efectivo', estado: estado_pago, notas: notas || null }],
+        [{
+          cliente_id: mem.cliente_id,
+          membresia_id: nueva._id,
+          caja_id,
+          monto: mem.plan_id.precio,
+          metodo_pago: metodo_pago || 'efectivo',
+          estado: estado_pago,
+          notas: notas || null
+        }],
         { session }
       );
 
-      await session.commitTransaction();
-      res.status(201).json({ membresia: nueva, pago });
-    } catch (err) {
-      await session.abortTransaction();
-      res.status(500).json({ error: err.message });
-    } finally {
-      session.endSession();
-    }
-  }
+      return { membresia: nueva, pago };
+    });
+
+    res.status(201).json(result);
+  })
 );
 
 // ── PUT /:id — actualizar estado manualmente ──────────────────────────────────
 router.put('/:id', [
-  param('id').isMongoId().withMessage('ID de membresía inválido.'),
+  validators.mongoId('id'),
   body('estado').optional().isIn(['activo', 'vencido', 'cancelado', 'pendiente']).withMessage('Estado inválido.'),
-  body('fecha_fin').optional().isISO8601().withMessage('Fecha fin inválida.'),
+  validators.fecha('fecha_fin'),
+  handleValidationErrors
 ], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
-
   const { estado, fecha_fin } = req.body;
   try {
     const update = {};
     if (estado) update.estado = estado;
     if (fecha_fin) update.fecha_fin = fecha_fin;
     const mem = await Membresia.findByIdAndUpdate(req.params.id, update, { new: true })
-      .populate('cliente_id', 'nombre foto_url')
+      .populate('cliente_id', 'nombre apellido_paterno apellido_materno foto_url')
       .populate('plan_id', 'nombre precio');
     if (!mem) return res.status(404).json({ error: 'Membresía no encontrada.' });
     // Devolver con el mismo shape que GET /membresias para que el patch del caché funcione
     res.json({
       ...mem.toObject(),
       id: mem._id,
-      cliente_nombre: mem.cliente_id?.nombre,
+      cliente_nombre: [mem.cliente_id?.nombre, mem.cliente_id?.apellido_paterno, mem.cliente_id?.apellido_materno].filter(Boolean).join(' ') || null,
       foto_url: mem.cliente_id?.foto_url,
       plan_nombre: mem.plan_id?.nombre,
       precio: mem.plan_id?.precio,
@@ -268,10 +249,9 @@ router.put('/:id', [
 
 // ── DELETE /:id — cancelar membresía ─────────────────────────────────────────
 router.delete('/:id', [
-  param('id').isMongoId().withMessage('ID de membresía inválido.'),
+  validators.mongoId('id'),
+  handleValidationErrors
 ], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
   try {
     const mem = await Membresia.findById(req.params.id);
     if (!mem) return res.status(404).json({ error: 'Membresía no encontrada.' });
@@ -284,18 +264,17 @@ router.delete('/:id', [
 
 // ── GET /:id/pagos — historial de pagos de una membresía ─────────────────────
 router.get('/:id/pagos', [
-  param('id').isMongoId().withMessage('ID de membresía inválido.'),
+  validators.mongoId('id'),
+  handleValidationErrors
 ], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
   try {
     const pagos = await Pago.find({ membresia_id: req.params.id })
-      .populate('cliente_id', 'nombre')
+      .populate('cliente_id', 'nombre apellido_paterno apellido_materno')
       .sort({ fecha_pago: -1 });
     const data = pagos.map(p => ({
       ...p.toObject(),
       id: p._id,
-      cliente_nombre: p.cliente_id?.nombre,
+      cliente_nombre: [p.cliente_id?.nombre, p.cliente_id?.apellido_paterno, p.cliente_id?.apellido_materno].filter(Boolean).join(' ') || null,
     }));
     res.json(data);
   } catch (err) { res.status(500).json({ error: err.message }); }

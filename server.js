@@ -81,6 +81,7 @@ app.get('/app.html', noCache, (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Rutas API
+app.use('/api/health',       require('./routes/health'));
 app.use('/api/auth',         require('./routes/auth'));
 app.use('/api/clientes',     require('./routes/clientes'));
 app.use('/api/membresias',   require('./routes/membresias'));
@@ -102,13 +103,8 @@ app.get('*', (req, res) => {
 
 // ── Manejador de errores centralizado ────────────────────────────────────────
 // Captura errores lanzados con next(err) o errores no controlados
-app.use((err, req, res, _next) => {
-  console.error('[ERROR]', req.method, req.path, err);
-  const isDev = process.env.NODE_ENV !== 'production';
-  res.status(err.status || 500).json({
-    error: isDev ? err.message : 'Error interno del servidor.',
-  });
-});
+const { errorHandler } = require('./middleware/errorHandler');
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
 

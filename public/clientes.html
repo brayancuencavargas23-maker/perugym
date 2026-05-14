@@ -8,6 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>Clientes - PeruGym</title>
   <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/styles-responsive.css">
   <!-- SPA redirect: si se accede directamente, redirigir al shell -->
   <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
 </head>
@@ -128,7 +129,7 @@
           ? `<span class="badge ${c.membresia_estado === 'activo' ? 'badge-success' : 'badge-danger'}">${c.membresia_estado}</span>`
           : '<span style="color:var(--text-light)">Sin membresía</span>';
         return `<tr>
-          <td>
+          <td data-label="Cliente">
             <div class="member-cell">
               ${c.foto_url
                 ? `<img src="${c.foto_url}" class="member-avatar" alt="${c.nombre}">`
@@ -139,11 +140,11 @@
               </div>
             </div>
           </td>
-          <td>${c.dni || '-'}</td>
-          <td>${estadoMem}<div style="font-size:11px;color:var(--text-light)">${c.plan_nombre || ''}</div></td>
-          <td>${c.fecha_fin ? `<span class="badge ${expClass}">${fmtDate(c.fecha_fin)}</span>` : '-'}</td>
-          <td><span class="badge ${c.activo ? 'badge-success' : 'badge-danger'}">${c.activo ? 'Activo' : 'Inactivo'}</span></td>
-          <td>
+          <td data-label="DNI">${c.dni || '-'}</td>
+          <td data-label="Membresía">${estadoMem}<div style="font-size:11px;color:var(--text-light)">${c.plan_nombre || ''}</div></td>
+          <td data-label="Vencimiento">${c.fecha_fin ? `<span class="badge ${expClass}">${fmtDate(c.fecha_fin)}</span>` : '-'}</td>
+          <td data-label="Estado"><span class="badge ${c.activo ? 'badge-success' : 'badge-danger'}">${c.activo ? 'Activo' : 'Inactivo'}</span></td>
+          <td data-label="Acciones">
             <button class="btn btn-sm btn-outline" title="Editar" onclick="editCliente('${c.id}')">${icon('edit')}</button>
             <button class="btn btn-sm btn-outline" title="Asignar membresía" onclick="irAMembresia('${c.id}')">${icon('membresias')}</button>
             <button class="btn btn-sm btn-danger" title="Eliminar" onclick="withLoading(this, () => deleteCliente('${c.id}', '${c.nombre.replace(/'/g, "\\'")}'), 'Eliminando...')">${icon('trash')}</button>
@@ -378,5 +379,13 @@
       toast('Error al cargar clientes: ' + err.message, 'error');
     });
   })();
+
+  // Exponer funciones al scope global para que los onclick funcionen en el SPA
+  window.editCliente    = editCliente;
+  window.deleteCliente  = deleteCliente;
+  window.irAMembresia   = irAMembresia;
+  window.saveCliente    = saveCliente;
+  window.buscarDNI      = buscarDNI;
+  window.exportarClientes = exportarClientes;
 </script></body>
 </html>

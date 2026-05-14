@@ -8,6 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>Solicitudes - PeruGym</title>
   <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/styles-responsive.css">
   <!-- SPA redirect: si se accede directamente, redirigir al shell -->
   <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
   <style>
@@ -272,16 +273,16 @@
             : `<button class="btn btn-sm btn-outline" title="Ver detalle" onclick="abrirDetalle('${s.id}')">${icon('eye')}</button>`;
 
         return `<tr>
-          <td style="font-size:12px;white-space:nowrap">${fmtDateTime(s.created_at)}</td>
-          <td><strong>${s.nombre}</strong></td>
-          <td>${s.telefono}</td>
-          <td>
+          <td data-label="Fecha" style="font-size:12px;white-space:nowrap">${fmtDateTime(s.created_at)}</td>
+          <td data-label="Nombre"><strong>${s.nombre}</strong></td>
+          <td data-label="Teléfono">${s.telefono}</td>
+          <td data-label="Plan">
             <strong>${s.plan_nombre || '-'}</strong>
             ${s.plan_precio ? `<div style="font-size:11px;color:var(--text-light)">${fmtMoney(s.plan_precio)}/mes</div>` : ''}
           </td>
-          <td><span class="estado-badge ${estadoClass}">${s.estado}</span></td>
-          <td style="font-size:12px;color:var(--text-light);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.notas || ''}">${s.notas || '-'}</td>
-          <td style="display:flex;gap:4px;flex-wrap:wrap">${acciones}</td>
+          <td data-label="Estado"><span class="estado-badge ${estadoClass}">${s.estado}</span></td>
+          <td data-label="Notas" style="font-size:12px;color:var(--text-light);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.notas || ''}">${s.notas || '-'}</td>
+          <td data-label="Acciones" style="display:flex;gap:4px;flex-wrap:wrap">${acciones}</td>
         </tr>`;
       }).join('') || '<tr><td colspan="7" class="text-center" style="padding:30px;color:var(--text-light)">Sin solicitudes</td></tr>';
 
@@ -503,6 +504,14 @@
       toast('Error al cargar solicitudes: ' + err.message, 'error');
     }
   })();
+
+  // Exponer funciones al scope global para que los onclick funcionen en el SPA
+  window.abrirDetalle        = abrirDetalle;
+  window.guardarEstado       = guardarEstado;
+  window.abrirConvertir      = abrirConvertir;
+  window.confirmarConversion = confirmarConversion;
+  window.buscarDniConvertir  = buscarDniConvertir;
+  window.loadSolicitudes     = loadSolicitudes;
 </script>
 </body>
 </html>

@@ -8,6 +8,11 @@ const Pago = require('../models/Pago');
 const Plan = require('../models/Plan');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const { requireCajaAbierta } = require('../middleware/cajaAbierta');
+const TransactionManager = require('../utils/TransactionManager');
+const MembresiaService = require('../services/MembresiaService');
+const { asyncHandler } = require('../middleware/errorHandler');
+const { validators, handleValidationErrors } = require('../middleware/validation');
+const logger = require('../utils/logger');
 
 // ── Rate limiting específico para el endpoint público ─────────────────────────
 const rateLimit = require('express-rate-limit');
@@ -29,13 +34,26 @@ async function consultarReniec(dni) {
   const token  = process.env.RENIEC_API_TOKEN;
   if (!apiUrl || !token || !/^\d{8}$/.test(dni)) return null;
   try {
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
     const res = await fetch(`${apiUrl}?numero=${encodeURIComponent(dni)}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
+    
     if (!res.ok) return null;
     return await res.json();
-  } catch { return null; }
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      logger.error('RENIEC timeout', { dni, service: 'RENIEC' });
+    }
+    return null;
+  }
 }
 
 // ── POST /public — recibir solicitud desde la landing (sin auth) ──────────────
@@ -200,9 +218,9 @@ router.post(
     body('apellido_materno').optional({ checkFalsy: true }).trim(),
     body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']),
     body('estado_pago').optional().isIn(['pagado', 'pendiente']),
-    body('fecha_inicio').optional().isISO8601().withMessage('Fecha de inicio inválida.'),
+    validators.fecha('fecha_inicio'),
   ],
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
 
@@ -210,23 +228,38 @@ router.post(
             metodo_pago = 'efectivo', estado_pago = 'pagado', fecha_inicio, notas_membresia } = req.body;
     const caja_id = req.cajaActual._id;
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    try {
+    const result = await TransactionManager.execute(async (session) => {
+      // Get solicitud with plan details
       const sol = await Solicitud.findById(req.params.id).populate('plan_id').session(session);
-      if (!sol) { await session.abortTransaction(); return res.status(404).json({ error: 'Solicitud no encontrada.' }); }
-      if (sol.estado === 'convertido') { await session.abortTransaction(); return res.status(400).json({ error: 'Esta solicitud ya fue convertida.' }); }
-      if (sol.estado === 'descartado') { await session.abortTransaction(); return res.status(400).json({ error: 'No se puede convertir una solicitud descartada.' }); }
+      if (!sol) {
+        const error = new Error('Solicitud no encontrada.');
+        error.statusCode = 404;
+        throw error;
+      }
+      if (sol.estado === 'convertido') {
+        const error = new Error('Esta solicitud ya fue convertida.');
+        error.statusCode = 400;
+        throw error;
+      }
+      if (sol.estado === 'descartado') {
+        const error = new Error('No se puede convertir una solicitud descartada.');
+        error.statusCode = 400;
+        throw error;
+      }
 
       const plan = sol.plan_id;
-      if (!plan || !plan.activo) { await session.abortTransaction(); return res.status(400).json({ error: 'El plan de esta solicitud ya no está disponible.' }); }
+      if (!plan || !plan.activo) {
+        const error = new Error('El plan de esta solicitud ya no está disponible.');
+        error.statusCode = 400;
+        throw error;
+      }
 
-      // Crear cliente — prioridad: campos editados en el formulario > RENIEC > datos de la solicitud
+      // Prepare client data — priority: form overrides > RENIEC > solicitud data
       let nombreCliente   = nombreOverride || sol.nombre;
       let apellidoPaterno = apOverride     || sol.apellido_paterno || null;
       let apellidoMaterno = amOverride     || sol.apellido_materno || null;
 
-      // Si hay DNI y no se editaron los campos manualmente, consultar RENIEC
+      // If DNI provided and no manual overrides, consult RENIEC
       const sinOverride = !nombreOverride && !apOverride && !amOverride;
       if (dni && sinOverride) {
         const reniec = await consultarReniec(dni);
@@ -237,6 +270,7 @@ router.post(
         }
       }
 
+      // Create client
       const [cliente] = await Cliente.create(
         [{
           nombre:           nombreCliente,
@@ -249,39 +283,40 @@ router.post(
         { session }
       );
 
-      // Crear membresía
-      const inicio = fecha_inicio ? new Date(fecha_inicio) : new Date();
-      const fin = new Date(inicio);
-      fin.setDate(fin.getDate() + plan.duracion_dias);
-      const estadoMembresia = estado_pago === 'pendiente' ? 'pendiente' : 'activo';
+      // Create membership using MembresiaService
+      const membresia = await MembresiaService.crear({
+        cliente_id: cliente._id,
+        plan_id: plan._id,
+        fecha_inicio,
+        estado_pago
+      }, session);
 
-      const [membresia] = await Membresia.create(
-        [{ cliente_id: cliente._id, plan_id: plan._id, fecha_inicio: inicio, fecha_fin: fin, estado: estadoMembresia }],
-        { session }
-      );
-
-      // Crear pago
+      // Create payment
       const [pago] = await Pago.create(
-        [{ cliente_id: cliente._id, membresia_id: membresia._id, caja_id, monto: plan.precio, metodo_pago, estado: estado_pago, notas: notas_membresia || null }],
+        [{
+          cliente_id: cliente._id,
+          membresia_id: membresia._id,
+          caja_id,
+          monto: plan.precio,
+          metodo_pago,
+          estado: estado_pago,
+          notas: notas_membresia || null
+        }],
         { session }
       );
 
-      // Marcar solicitud como convertida
+      // Mark solicitud as converted
       await Solicitud.findByIdAndUpdate(
         req.params.id,
         { estado: 'convertido', cliente_id: cliente._id, atendido_por: req.user.id },
         { session }
       );
 
-      await session.commitTransaction();
-      res.status(201).json({ cliente, membresia, pago });
-    } catch (err) {
-      await session.abortTransaction();
-      res.status(500).json({ error: err.message });
-    } finally {
-      session.endSession();
-    }
-  }
+      return { cliente, membresia, pago };
+    });
+
+    res.status(201).json(result);
+  })
 );
 
 // ── DELETE /:id — eliminar solicitud (solo admin) ─────────────────────────────

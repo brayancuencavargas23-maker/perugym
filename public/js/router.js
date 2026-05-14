@@ -54,6 +54,7 @@ const GymRouter = (() => {
     const SHELL_SCRIPTS = [
       '/js/cache.js', '/js/api.js', '/js/utils.js',
       '/js/icons.js', '/js/layout.js', '/js/router.js',
+      '/js/app-responsive.js',
     ];
     
     const allBodyScripts = Array.from(doc.querySelectorAll('body script'));
@@ -326,8 +327,8 @@ const GymRouter = (() => {
       if (!page || !ROUTES[page]) return;
       e.preventDefault();
       navigate(page);
-      // Cerrar en móvil
-      if (window.innerWidth <= 768) {
+      // Cerrar en móvil y tablet (drawer mode < 1024px)
+      if (window.innerWidth < 1024) {
         sidebar.classList.remove('open');
         document.body.classList.remove('sidebar-open');
         const ov = document.getElementById('sidebar-overlay');

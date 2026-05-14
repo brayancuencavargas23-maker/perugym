@@ -168,6 +168,9 @@
         if (el) el.innerHTML = icon('excel');
       });
   })();
+
+  // Exponer funciones al scope global para que los onclick funcionen en el SPA
+  window.downloadReport = downloadReport;
 </script>
 </body>
 </html>

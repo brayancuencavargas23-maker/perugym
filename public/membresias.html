@@ -8,6 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>Membresías - PeruGym</title>
   <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/styles-responsive.css">
   <!-- SPA redirect: si se accede directamente, redirigir al shell -->
   <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
 </head>
@@ -345,7 +346,10 @@
     const cSel = document.getElementById('mem-cliente');
     if (cSel) {
       cSel.innerHTML = '<option value="">Seleccionar cliente</option>' +
-        clientes.data.map(c => `<option value="${c._id || c.id}">${c.nombre}${c.dni ? ' - ' + c.dni : ''}</option>`).join('');
+        clientes.data.map(c => {
+          const fullName = [c.nombre, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' ');
+          return `<option value="${c._id || c.id}">${fullName}${c.dni ? ' - ' + c.dni : ''}</option>`;
+        }).join('');
     }
 
     const planOpts = '<option value="">Seleccionar plan</option>' +
@@ -453,7 +457,7 @@
         }
 
         return `<tr>
-          <td>
+          <td data-label="Cliente">
             <div class="member-cell">
               ${m.foto_url
                 ? `<img src="${m.foto_url}" class="member-avatar">`
@@ -461,12 +465,12 @@
               <div><div style="font-weight:600">${m.cliente_nombre}</div></div>
             </div>
           </td>
-          <td>${m.plan_nombre}<div style="font-size:11px;color:var(--text-light)">${fmtMoney(m.precio)}</div></td>
-          <td>${fmtDate(m.fecha_inicio)}</td>
-          <td><span class="badge ${expClass}">${fmtDate(m.fecha_fin)}</span></td>
-          <td><span class="badge ${estadoClass}">${m.estado}</span></td>
-          <td>${pagoBadge}</td>
-          <td style="display:flex;gap:4px;flex-wrap:wrap">
+          <td data-label="Plan">${m.plan_nombre}<div style="font-size:11px;color:var(--text-light)">${fmtMoney(m.precio)}</div></td>
+          <td data-label="Inicio">${fmtDate(m.fecha_inicio)}</td>
+          <td data-label="Vencimiento"><span class="badge ${expClass}">${fmtDate(m.fecha_fin)}</span></td>
+          <td data-label="Estado"><span class="badge ${estadoClass}">${m.estado}</span></td>
+          <td data-label="Pago">${pagoBadge}</td>
+          <td data-label="Acciones" style="display:flex;gap:4px;flex-wrap:wrap">
             <button class="btn btn-sm btn-outline" title="Ver pagos" onclick="abrirHistorialPagos('${m.id}')">${icon('money')}</button>
             ${esActivo ? `<button class="btn btn-sm btn-outline" title="Cambiar plan" ${disabledAttr} onclick="abrirCambioPlan('${m.id}','${m.plan_nombre}','${m.cliente_nombre}')">${icon('refresh')}</button>` : ''}
             ${esPendiente ? `<button class="btn btn-sm btn-success" title="Marcar como pagado" ${disabledAttr} onclick="abrirConfirmarPago('${m.id}','${m.cliente_nombre}',${m.precio})">${icon('check')}</button>` : ''}
@@ -582,7 +586,10 @@
       toast('Pago confirmado correctamente');
       closeModal('modal-confirmar-pago');
       closeModal('modal-pagos');
-      loadMembresias(currentPage);
+      // Limpiar filtro de estado para que la membresía recién activada sea visible
+      const filterEstado = document.getElementById('filter-estado');
+      if (filterEstado) filterEstado.value = '';
+      loadMembresias(1);
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -870,6 +877,27 @@
 
     checkCaja().then(() => loadMembresias());
   })();
+
+  // Exponer funciones al scope global para que los onclick funcionen en el SPA
+  window.abrirHistorialPagos           = abrirHistorialPagos;
+  window.abrirCambioPlan               = abrirCambioPlan;
+  window.abrirConfirmarPago            = abrirConfirmarPago;
+  window.abrirRenovar                  = abrirRenovar;
+  window.abrirEditar                   = abrirEditar;
+  window.abrirCancelar                 = abrirCancelar;
+  window.abrirConfirmarPagoDesdeHistorial = abrirConfirmarPagoDesdeHistorial;
+  window.ejecutarConfirmarPago         = ejecutarConfirmarPago;
+  window.confirmarCancelar             = confirmarCancelar;
+  window.cambiarPlan                   = cambiarPlan;
+  window.renovar                       = renovar;
+  window.guardarEdicion                = guardarEdicion;
+  window.suscribir                     = suscribir;
+  window.exportarMembresias            = exportarMembresias;
+  window.loadMembresias                = loadMembresias;
+  window.onSearchInput                 = onSearchInput;
+  window.onClienteChange               = onClienteChange;
+  window.onPlanChange                  = onPlanChange;
+  window.onCambioPlanChange            = onCambioPlanChange;
 </script>
 </body>
 </html>

@@ -8,6 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>PeruGym — Sistema de Gestión</title>
   <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/styles-responsive.css">
 </head>
 <body>
 <div class="app-layout">
@@ -28,6 +29,7 @@
 <script src="/js/utils.js"></script>
 <script src="/js/icons.js"></script>
 <script src="/js/layout.js"></script>
+<script src="/js/app-responsive.js"></script>
 <script src="/js/router.js"></script>
 <script>
   // ── Determinar qué página cargar según la URL actual ──────────────────────
@@ -61,5 +63,6 @@
     GymRouter.navigate(initialPage, false);
   })();
 </script>
+<div id="sidebar-overlay" class="sidebar-overlay"></div>
 </body>
 </html>

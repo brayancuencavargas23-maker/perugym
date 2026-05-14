@@ -224,6 +224,11 @@
       openModal('modal-overlay');
     };
   })();
+
+  // Exponer funciones al scope global para que los onclick funcionen en el SPA
+  window.savePlan   = savePlan;
+  window.editPlan   = editPlan;
+  window.deletePlan = deletePlan;
 </script>
 </body>
 </html>

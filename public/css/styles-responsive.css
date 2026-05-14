@@ -1,0 +1,385 @@
+/* ============================================================
+   styles-responsive.css
+   Capa mobile-first sobre main.css — cargado DESPUÉS de main.css
+   ============================================================ */
+
+/* ── 1. VARIABLES RESPONSIVE ── */
+:root {
+  --topbar-height: 60px;
+  --touch-target: 48px;
+  /* --sidebar-width ya existe en main.css (260px) — no se redefine globalmente */
+}
+
+/* Ajuste de --sidebar-width solo en tablet */
+@media (min-width: 768px) and (max-width: 1023px) {
+  :root {
+    --sidebar-width: 220px;
+  }
+}
+
+
+/* ── 2. BASE / MÓVIL (<480px) ── */
+
+/* Sidebar: oculto fuera de pantalla por defecto (mobile-first) */
+#sidebar,
+.sidebar {
+  transform: translateX(-100%);
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 1000;
+  transition: transform 0.3s ease;
+}
+
+/* Sidebar abierto: desliza hacia adentro */
+#sidebar.open,
+.sidebar.open {
+  transform: translateX(0);
+}
+
+/* Contenido principal: sin margen izquierdo, espacio para topbar fija */
+.main-content {
+  margin-left: 0;
+  padding-top: var(--topbar-height);
+}
+
+/* Hamburguesa: visible en móvil */
+#hamburger,
+.hamburger {
+  display: flex;
+}
+
+/* Padding del contenido de página en móvil */
+.page-content {
+  padding: 16px;
+}
+
+/* Topbar: fija en la parte superior */
+#topbar,
+.topbar {
+  padding: 12px 16px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 999;
+  height: var(--topbar-height);
+}
+
+/* Overlay oscuro detrás del sidebar */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease;
+}
+
+/* Overlay visible (display activado) */
+.sidebar-overlay.visible {
+  visibility: visible;
+}
+
+/* Overlay activo (opaco) */
+.sidebar-overlay.active {
+  opacity: 1;
+}
+
+/* Bloquear scroll del body cuando el sidebar está abierto */
+body.sidebar-open {
+  overflow: hidden;
+}
+
+
+/* ── 3. TABLET (≥768px) ── */
+
+@media (min-width: 768px) {
+  /* Sidebar con ancho de tablet (220px via variable) */
+  #sidebar,
+  .sidebar {
+    width: var(--sidebar-width);
+  }
+
+  /* Stats en 2 columnas */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Formularios en 2 columnas */
+  .form-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Grid central en 1 columna */
+  #mid-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Padding de página en tablet */
+  .page-content {
+    padding: 18px;
+  }
+
+  /* Topbar con más padding en tablet */
+  #topbar,
+  .topbar {
+    padding: 14px 20px;
+  }
+}
+
+
+/* ── 4. DESKTOP (≥1024px) ── */
+
+@media (min-width: 1024px) {
+  /* Restaurar variable de ancho del sidebar a 260px */
+  :root {
+    --sidebar-width: 260px;
+  }
+
+  /* Sidebar: siempre visible, ancho completo */
+  #sidebar,
+  .sidebar {
+    transform: translateX(0);
+    width: 260px;
+  }
+
+  /* Contenido principal: margen izquierdo igual al ancho del sidebar */
+  .main-content {
+    margin-left: 260px;
+  }
+
+  /* Hamburguesa: oculta en desktop */
+  #hamburger,
+  .hamburger {
+    display: none;
+  }
+
+  /* Overlay: no necesario en desktop */
+  .sidebar-overlay {
+    display: none;
+  }
+
+  /* Padding de página en desktop */
+  .page-content {
+    padding: 24px;
+  }
+
+  /* Topbar: no cubre el sidebar */
+  #topbar,
+  .topbar {
+    left: 260px;
+  }
+}
+
+
+/* ── 5. COMPONENTES: TABLAS → CARDS ── */
+
+@media (max-width: 767px) {
+  .table-wrapper thead { display: none; }
+
+  .table-wrapper table {
+    display: block;
+    width: 100%;
+  }
+
+  .table-wrapper tbody { display: block; }
+
+  .table-wrapper tr {
+    display: block;
+    padding: 12px;
+    border-bottom: 1px solid var(--border, #e0e0e0);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: var(--card-bg, #fff);
+  }
+
+  .table-wrapper td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: var(--touch-target);
+    padding: 6px 0;
+    border: none;
+    font-size: 14px;
+  }
+
+  .table-wrapper td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--text-light, #888);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    flex-shrink: 0;
+    margin-right: 8px;
+    min-width: 90px;
+  }
+
+  /* Si no hay data-label, apilar verticalmente */
+  .table-wrapper td:not([data-label])::before {
+    display: none;
+  }
+}
+
+
+/* ── 6. COMPONENTES: BOTONES TÁCTILES ── */
+
+@media (max-width: 767px) {
+  .btn {
+    min-height: var(--touch-target);
+    min-width: var(--touch-target);
+    padding: 10px 16px;
+    font-size: 15px;
+  }
+
+  .page-btn {
+    min-height: var(--touch-target);
+    min-width: var(--touch-target);
+  }
+
+  #hamburger,
+  .hamburger {
+    min-height: var(--touch-target);
+    min-width: var(--touch-target);
+  }
+
+  .form-control,
+  select {
+    min-height: var(--touch-target);
+    font-size: 16px; /* evita zoom en iOS */
+  }
+
+  .search-bar {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .search-bar .btn,
+  .search-bar button {
+    width: 100%;
+  }
+}
+
+
+/* ── 7. COMPONENTES: MODALES MÓVIL ── */
+
+@media (max-width: 767px) {
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal {
+    border-radius: 16px 16px 0 0;
+    max-width: 100%;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    margin: 0;
+  }
+
+  .modal .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-body {
+    padding: 16px;
+  }
+
+  .modal-header {
+    padding: 16px 16px 12px;
+    position: sticky;
+    top: 0;
+    background: inherit;
+    z-index: 1;
+  }
+
+  .modal-footer {
+    padding: 12px 16px;
+    position: sticky;
+    bottom: 0;
+    background: inherit;
+  }
+}
+
+
+/* ── 8. COMPONENTES: HAMBURGUESA ── */
+
+/* Animación de las líneas del hamburguesa */
+.hamburger,
+#hamburger {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 8px;
+  border-radius: 6px;
+}
+
+.hamburger span,
+#hamburger span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 2px;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* Estado abierto: forma X */
+.hamburger.is-open span:nth-child(1),
+#hamburger.is-open span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.hamburger.is-open span:nth-child(2),
+#hamburger.is-open span:nth-child(2) {
+  opacity: 0;
+  transform: scaleX(0);
+}
+
+.hamburger.is-open span:nth-child(3),
+#hamburger.is-open span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+
+/* ── 9. ACCESIBILIDAD ── */
+
+/* ── Foco visible para navegación por teclado ── */
+/* Contraste mínimo 3:1 respecto al fondo (WCAG 2.1 SC 1.4.11) */
+.btn:focus-visible,
+.form-control:focus-visible,
+select:focus-visible,
+.nav-item:focus-visible,
+#hamburger:focus-visible,
+.hamburger:focus-visible,
+.page-btn:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--primary, #6c63ff);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Eliminar outline por defecto solo cuando hay :focus-visible */
+.btn:focus:not(:focus-visible),
+.form-control:focus:not(:focus-visible),
+select:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/*
+ * NOTA DE CONTRASTE (WCAG 2.1 SC 1.4.3):
+ * Todos los textos deben mantener relación de contraste mínima de 4.5:1
+ * respecto al fondo. Verificar con herramientas como:
+ * - Colour Contrast Analyser (https://www.tpgi.com/color-contrast-checker/)
+ * - axe DevTools
+ * Los colores base (--primary, --text, --bg) están definidos en main.css.
+ */

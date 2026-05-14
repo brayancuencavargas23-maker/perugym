@@ -40,12 +40,12 @@ router.get('/', async (req, res) => {
       Asistencia.countDocuments({ fecha: { $gte: today, $lt: tomorrow }, salida: null }),
 
       Membresia.find({ estado: 'activo', fecha_fin: { $gte: today, $lte: in7 } })
-        .populate('cliente_id', 'nombre')
+        .populate('cliente_id', 'nombre apellido_paterno apellido_materno')
         .populate('plan_id', 'nombre')
         .sort({ fecha_fin: 1 }),
 
       Pago.find()
-        .populate('cliente_id', 'nombre')
+        .populate('cliente_id', 'nombre apellido_paterno apellido_materno')
         .populate({ path: 'membresia_id', populate: { path: 'plan_id', select: 'nombre' } })
         .sort({ fecha_pago: -1 })
         .limit(5),
@@ -74,14 +74,14 @@ router.get('/', async (req, res) => {
       },
       membresiasVencenPronto: membresiasVencenPronto.map(m => ({
         id: m._id,
-        nombre: m.cliente_id?.nombre,
+        nombre: [m.cliente_id?.nombre, m.cliente_id?.apellido_paterno, m.cliente_id?.apellido_materno].filter(Boolean).join(' ') || null,
         fecha_fin: m.fecha_fin,
         plan_nombre: m.plan_id?.nombre,
       })),
       pagosRecientes: pagosRecientes.map(p => ({
         ...p.toObject(),
         id: p._id,
-        cliente_nombre: p.cliente_id?.nombre,
+        cliente_nombre: [p.cliente_id?.nombre, p.cliente_id?.apellido_paterno, p.cliente_id?.apellido_materno].filter(Boolean).join(' ') || null,
         plan_nombre: p.membresia_id?.plan_id?.nombre,
       })),
       clientesPorPlan,

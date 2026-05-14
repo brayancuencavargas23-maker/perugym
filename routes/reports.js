@@ -174,7 +174,8 @@ router.get('/pagos/excel', async (req, res) => {
     const pagos = await Pago.find(filter)
       .populate('cliente_id', 'nombre')
       .populate({ path: 'membresia_id', populate: { path: 'plan_id', select: 'nombre' } })
-      .sort({ fecha_pago: -1 });
+      .sort({ fecha_pago: -1 })
+      .lean();
 
     const rows = pagos.map(p => ({
       _num:        null,
@@ -216,12 +217,13 @@ router.get('/pagos/excel', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/clientes/excel', async (req, res) => {
   try {
-    const clientes = await Cliente.find().sort({ nombre: 1 });
+    const clientes = await Cliente.find().sort({ nombre: 1 }).lean();
 
     const rows = await Promise.all(clientes.map(async (c) => {
       const mem = await Membresia.findOne({ cliente_id: c._id })
         .populate('plan_id', 'nombre')
-        .sort({ fecha_fin: -1 });
+        .sort({ fecha_fin: -1 })
+        .lean();
       return {
         _num:             null,
         nombre:           c.nombre,
@@ -270,7 +272,8 @@ router.get('/asistencia/excel', async (req, res) => {
 
     const asistencias = await require('../models/Asistencia').find(filter)
       .populate('cliente_id', 'nombre')
-      .sort({ fecha: -1, entrada: -1 });
+      .sort({ fecha: -1, entrada: -1 })
+      .lean();
 
     const rows = asistencias.map(a => {
       const entrada = a.entrada ? a.entrada.toTimeString().slice(0, 5) : '-';
@@ -329,7 +332,8 @@ router.get('/membresias/excel', async (req, res) => {
     const mems = await Membresia.find(filter)
       .populate('cliente_id', 'nombre dni telefono email')
       .populate('plan_id', 'nombre')
-      .sort({ fecha_fin: 1 });
+      .sort({ fecha_fin: 1 })
+      .lean();
 
     const now = new Date();
     const rows = mems.map(m => ({
@@ -374,7 +378,8 @@ router.get('/pagos-pendientes/excel', async (req, res) => {
     const pagos = await Pago.find({ estado: 'pendiente' })
       .populate('cliente_id', 'nombre dni telefono email')
       .populate({ path: 'membresia_id', populate: { path: 'plan_id', select: 'nombre' } })
-      .sort({ fecha_pago: 1 });
+      .sort({ fecha_pago: 1 })
+      .lean();
 
     const rows = pagos.map(p => ({
       _num:      null,
@@ -416,7 +421,7 @@ router.get('/pagos-pendientes/excel', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/stock/excel', async (req, res) => {
   try {
-    const productos = await Producto.find().sort({ categoria: 1, nombre: 1 });
+    const productos = await Producto.find().sort({ categoria: 1, nombre: 1 }).lean();
 
     const rows = productos.map(p => ({
       _num:        null,
@@ -461,7 +466,8 @@ router.get('/caja/excel', async (req, res) => {
 
     const cajas = await Caja.find(filter)
       .populate('usuario_id', 'usuario')
-      .sort({ apertura: -1 });
+      .sort({ apertura: -1 })
+      .lean();
 
     const mongoose = require('mongoose');
     const rows = await Promise.all(cajas.map(async (c) => {
@@ -533,7 +539,8 @@ router.get('/ventas/excel', async (req, res) => {
     const ventas = await Venta.find(filter)
       .populate('cliente_id', 'nombre')
       .populate('items.producto_id', 'nombre')
-      .sort({ fecha_venta: -1 });
+      .sort({ fecha_venta: -1 })
+      .lean();
 
     const rows = [];
     for (const v of ventas) {
@@ -589,7 +596,8 @@ router.get('/pagos/pdf', async (req, res) => {
     const pagos = await Pago.find(filter)
       .populate('cliente_id', 'nombre')
       .populate({ path: 'membresia_id', populate: { path: 'plan_id', select: 'nombre' } })
-      .sort({ fecha_pago: -1 });
+      .sort({ fecha_pago: -1 })
+      .lean();
 
     const doc = new PDFDocument({ margin: 40 });
     res.setHeader('Content-Type', 'application/pdf');

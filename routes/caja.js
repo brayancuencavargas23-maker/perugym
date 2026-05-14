@@ -4,6 +4,9 @@ const Pago = require('../models/Pago');
 const Venta = require('../models/Venta');
 const MovimientoCaja = require('../models/MovimientoCaja');
 const { verifyToken } = require('../middleware/auth');
+const { asyncHandler } = require('../middleware/errorHandler');
+const CajaService = require('../services/CajaService');
+const TransactionManager = require('../utils/TransactionManager');
 
 router.use(verifyToken);
 
@@ -22,12 +25,35 @@ router.get('/estado', async (req, res) => {
     const ingresosManuales = movs.find(m => m._id === 'ingreso')?.total || 0;
     const egresosManuales  = movs.find(m => m._id === 'egreso')?.total  || 0;
 
+    // Sumar pagos de membresías por método de pago (yape / plin)
+    const pagosPorMetodo = await Pago.aggregate([
+      { $match: { caja_id: caja._id, estado: 'pagado', metodo_pago: { $in: ['efectivo', 'yape', 'plin'] } } },
+      { $group: { _id: '$metodo_pago', total: { $sum: '$monto' } } },
+    ]);
+
+    // Sumar ventas de productos por método de pago (yape / plin)
+    const ventasPorMetodo = await Venta.aggregate([
+      { $match: { caja_id: caja._id, anulada: false, metodo_pago: { $in: ['efectivo', 'yape', 'plin'] } } },
+      { $unwind: '$items' },
+      { $group: { _id: '$metodo_pago', total: { $sum: '$items.subtotal' } } },
+    ]);
+
+    const totalEfectivoPagos = pagosPorMetodo.find(m => m._id === 'efectivo')?.total || 0;
+    const totalYapePagos     = pagosPorMetodo.find(m => m._id === 'yape')?.total     || 0;
+    const totalPlinPagos     = pagosPorMetodo.find(m => m._id === 'plin')?.total     || 0;
+    const totalEfectivoVentas = ventasPorMetodo.find(m => m._id === 'efectivo')?.total || 0;
+    const totalYapeVentas     = ventasPorMetodo.find(m => m._id === 'yape')?.total    || 0;
+    const totalPlinVentas     = ventasPorMetodo.find(m => m._id === 'plin')?.total    || 0;
+
     res.json({
       ...caja.toObject(),
       id: caja._id,
       usuario_nombre: caja.usuario_id?.usuario,
       ingresos_manuales: ingresosManuales,
       egresos_manuales: egresosManuales,
+      total_efectivo: totalEfectivoPagos + totalEfectivoVentas,
+      total_yape: totalYapePagos + totalYapeVentas,
+      total_plin: totalPlinPagos + totalPlinVentas,
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -73,60 +99,38 @@ router.get('/', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/abrir', async (req, res) => {
+router.post('/abrir', asyncHandler(async (req, res) => {
   const { monto_inicial, notas } = req.body;
-  try {
-    const abierta = await Caja.findOne({ estado: 'abierta' });
-    if (abierta) return res.status(400).json({ error: 'Ya hay una caja abierta' });
-    const caja = await Caja.create({ usuario_id: req.user.id, monto_inicial: monto_inicial || 0, notas: notas || null });
-    res.status(201).json(caja);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
+  
+  const caja = await CajaService.abrir({
+    usuario_id: req.user.id,
+    monto_inicial,
+    notas
+  });
+  
+  res.status(201).json(caja);
+}));
 
-router.put('/cerrar/:id', async (req, res) => {
+router.put('/cerrar/:id', asyncHandler(async (req, res) => {
   const { monto_final, notas } = req.body;
-  try {
-    const cajaId = req.params.id;
-    const mongoose = require('mongoose');
-    const oid = mongoose.Types.ObjectId.createFromHexString(cajaId);
-
-    const ingresosMem = await Pago.aggregate([
-      { $match: { caja_id: oid, estado: 'pagado' } },
-      { $group: { _id: null, total: { $sum: '$monto' } } },
-    ]);
-    const ingresosVentas = await Venta.aggregate([
-      { $match: { caja_id: oid, anulada: false } },
-      { $unwind: '$items' },
-      { $group: { _id: null, total: { $sum: '$items.subtotal' } } },
-    ]);
-    const movs = await MovimientoCaja.aggregate([
-      { $match: { caja_id: oid } },
-      { $group: { _id: '$tipo', total: { $sum: '$monto' } } },
-    ]);
-    const ingresosManuales = movs.find(m => m._id === 'ingreso')?.total || 0;
-    const egresosManuales  = movs.find(m => m._id === 'egreso')?.total  || 0;
-
-    const total_ingresos = (ingresosMem[0]?.total || 0) + (ingresosVentas[0]?.total || 0) + ingresosManuales - egresosManuales;
-
-    const caja = await Caja.findOneAndUpdate(
-      { _id: cajaId, estado: 'abierta' },
-      { estado: 'cerrada', cierre: new Date(), monto_final: monto_final || 0, total_ingresos, ...(notas ? { notas } : {}) },
-      { new: true }
-    );
-    if (!caja) return res.status(404).json({ error: 'Caja no encontrada o ya cerrada' });
-    res.json(caja);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
+  
+  const caja = await CajaService.cerrar(req.params.id, {
+    monto_final,
+    notas
+  });
+  
+  res.json(caja);
+}));
 
 router.get('/:id/detalle', async (req, res) => {
   try {
     const pagos = await Pago.find({ caja_id: req.params.id })
-      .populate('cliente_id', 'nombre')
+      .populate('cliente_id', 'nombre apellido_paterno apellido_materno')
       .populate({ path: 'membresia_id', populate: { path: 'plan_id', select: 'nombre' } })
       .sort({ fecha_pago: -1 });
 
     const ventas = await Venta.find({ caja_id: req.params.id })
-      .populate('cliente_id', 'nombre')
+      .populate('cliente_id', 'nombre apellido_paterno apellido_materno')
       .populate('items.producto_id', 'nombre')
       .sort({ fecha_venta: -1 });
 
@@ -137,7 +141,7 @@ router.get('/:id/detalle', async (req, res) => {
     const pagosData = pagos.map(p => ({
       ...p.toObject(),
       id: p._id,
-      cliente_nombre: p.cliente_id?.nombre,
+      cliente_nombre: [p.cliente_id?.nombre, p.cliente_id?.apellido_paterno, p.cliente_id?.apellido_materno].filter(Boolean).join(' ') || null,
       plan_nombre: p.membresia_id?.plan_id?.nombre,
     }));
 
@@ -152,7 +156,7 @@ router.get('/:id/detalle', async (req, res) => {
           anulada: v.anulada,
           anulada_at: v.anulada_at,
           metodo_pago: v.metodo_pago || 'efectivo',
-          cliente_nombre: v.cliente_id?.nombre,
+          cliente_nombre: [v.cliente_id?.nombre, v.cliente_id?.apellido_paterno, v.cliente_id?.apellido_materno].filter(Boolean).join(' ') || null,
           producto_nombre: item.producto_id?.nombre,
           cantidad: item.cantidad,
           precio_unit: item.precio_unit,
@@ -174,25 +178,18 @@ router.get('/:id/detalle', async (req, res) => {
 // --- Movimientos manuales (ingresos/egresos) ---
 
 // Registrar un movimiento manual
-router.post('/:id/movimientos', async (req, res) => {
+router.post('/:id/movimientos', asyncHandler(async (req, res) => {
   const { tipo, monto, concepto } = req.body;
-  try {
-    const caja = await Caja.findOne({ _id: req.params.id, estado: 'abierta' });
-    if (!caja) return res.status(400).json({ error: 'La caja no está abierta' });
-    if (!['ingreso', 'egreso'].includes(tipo)) return res.status(400).json({ error: 'Tipo inválido' });
-    if (!monto || isNaN(monto) || parseFloat(monto) <= 0) return res.status(400).json({ error: 'Monto inválido' });
-    if (!concepto || !concepto.trim()) return res.status(400).json({ error: 'El concepto es requerido' });
-
-    const mov = await MovimientoCaja.create({
-      caja_id: caja._id,
-      usuario_id: req.user.id,
-      tipo,
-      monto: parseFloat(monto),
-      concepto: concepto.trim(),
-    });
-    res.status(201).json({ ...mov.toObject(), id: mov._id });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
+  
+  const mov = await CajaService.registrarMovimiento(req.params.id, {
+    usuario_id: req.user.id,
+    tipo,
+    monto,
+    concepto
+  });
+  
+  res.status(201).json({ ...mov.toObject(), id: mov._id });
+}));
 
 // Listar movimientos de una caja
 router.get('/:id/movimientos', async (req, res) => {

@@ -54,7 +54,7 @@
           </div>
         </div>
         <div style="display:flex;gap:10px" id="caja-actions">
-          <button class="btn btn-success" id="btn-abrir" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-unlock-caja"></span> Abrir Caja</button>
+          <button class="btn btn-success" id="btn-abrir" style="display:inline-flex;align-items:center;gap:6px" onclick="openModal('modal-abrir')"><span id="icon-unlock-caja"></span> Abrir Caja</button>
         </div>
       </div>
 
@@ -68,6 +68,18 @@
           <div class="caja-info-item">
             <div class="caja-info-label">Ventas del turno</div>
             <div class="caja-info-value" style="color:var(--success)" id="info-ventas">S/ 0.00</div>
+          </div>
+          <div class="caja-info-item">
+            <div class="caja-info-label">Efectivo</div>
+            <div class="caja-info-value" style="color:#28a745" id="info-efectivo">S/ 0.00</div>
+          </div>
+          <div class="caja-info-item">
+            <div class="caja-info-label">Yape</div>
+            <div class="caja-info-value" style="color:#7b2ff7" id="info-yape">S/ 0.00</div>
+          </div>
+          <div class="caja-info-item">
+            <div class="caja-info-label">Plin</div>
+            <div class="caja-info-value" style="color:#00b4d8" id="info-plin">S/ 0.00</div>
           </div>
           <div class="caja-info-item">
             <div class="caja-info-label">Ingresos manuales</div>
@@ -362,6 +374,9 @@
 
         document.getElementById('info-inicial').textContent           = `S/ ${inicial.toFixed(2)}`;
         document.getElementById('info-ventas').textContent            = `S/ ${totalVentasAll.toFixed(2)}`;
+        document.getElementById('info-efectivo').textContent          = `S/ ${parseFloat(caja.total_efectivo || 0).toFixed(2)}`;
+        document.getElementById('info-yape').textContent              = `S/ ${parseFloat(caja.total_yape || 0).toFixed(2)}`;
+        document.getElementById('info-plin').textContent              = `S/ ${parseFloat(caja.total_plin || 0).toFixed(2)}`;
         document.getElementById('info-ingresos-manuales').textContent = `S/ ${ingresosManuales.toFixed(2)}`;
         document.getElementById('info-egresos-manuales').textContent  = `S/ ${egresosManuales.toFixed(2)}`;
         document.getElementById('info-total').textContent             = `S/ ${(inicial + totalVentasAll + ingresosManuales - egresosManuales).toFixed(2)}`;
@@ -659,6 +674,21 @@
     loadEstado();
     loadHistorial();
   })();
+  
+  // Exponer funciones al scope global para que los onclick del HTML funcionen
+  // cuando la página se carga dentro del SPA (el router envuelve el script en un IIFE)
+  window.abrirCaja           = abrirCaja;
+  window.cerrarCaja          = cerrarCaja;
+  window.switchTab           = switchTab;
+  window.exportarVentasTurno = exportarVentasTurno;
+  window.registrarVenta      = registrarVenta;
+  window.setTipoMovimiento   = setTipoMovimiento;
+  window.registrarMovimiento = registrarMovimiento;
+  window.anularVenta         = anularVenta;
+  window.verDetalle          = verDetalle;
+  window.eliminarMovimiento  = eliminarMovimiento;
+  window.onVProductChange    = onVProductChange;
+  window.updateVTotal        = updateVTotal;
 </script>
 </body>
 </html>

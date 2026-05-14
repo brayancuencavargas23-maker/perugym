@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const logger = require('../utils/logger');
 require('dotenv').config();
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/gym_db';
@@ -10,24 +11,39 @@ const connectDB = async () => {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
     });
-    console.log('✅ MongoDB conectado:', mongoose.connection.host);
+    logger.info('MongoDB connected', {
+      host: mongoose.connection.host,
+      database: mongoose.connection.name,
+      service: 'MongoDB'
+    });
   } catch (err) {
-    console.error('❌ Error conectando a MongoDB:', err.message);
+    logger.error('MongoDB connection error', {
+      error: err.message,
+      service: 'MongoDB'
+    });
     process.exit(1);
   }
 };
 
 // Manejar eventos de conexión
 mongoose.connection.on('disconnected', () => {
-  console.warn('⚠️ MongoDB desconectado. Intentando reconectar...');
+  logger.warn('MongoDB disconnected - attempting to reconnect', {
+    service: 'MongoDB'
+  });
 });
 
 mongoose.connection.on('reconnected', () => {
-  console.log('✅ MongoDB reconectado');
+  logger.info('MongoDB reconnected', {
+    host: mongoose.connection.host,
+    service: 'MongoDB'
+  });
 });
 
 mongoose.connection.on('error', (err) => {
-  console.error('❌ Error de MongoDB:', err.message);
+  logger.error('MongoDB error', {
+    error: err.message,
+    service: 'MongoDB'
+  });
 });
 
 const initDB = async () => {

@@ -8,6 +8,7 @@
   <meta http-equiv="Expires" content="0">
   <title>Asistencia - PeruGym</title>
   <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/styles-responsive.css">
   <!-- SPA redirect: si se accede directamente, redirigir al shell -->
   <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
   <style>
@@ -185,9 +186,14 @@
     // Guardar lista para el buscador de check-in
     window._clientesCheckin = data.data;
 
+    // Construir nombre completo: "Nombre Apellido Paterno Apellido Materno"
+    function nombreCompleto(c) {
+      return [c.nombre, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' ');
+    }
+
     // Poblar el select del filtro de tabla
     const opts = '<option value="">Todos</option>' +
-      data.data.map(c => '<option value="' + (c._id || c.id) + '">' + c.nombre + '</option>').join('');
+      data.data.map(c => '<option value="' + (c._id || c.id) + '">' + nombreCompleto(c) + '</option>').join('');
     const filterCliente = document.getElementById('filter-cliente');
     if (filterCliente) filterCliente.innerHTML = opts;
 
@@ -200,19 +206,24 @@
     const hidden   = document.getElementById('checkin-cliente');
     const dropdown = document.getElementById('checkin-dropdown');
 
+    function nombreCompleto(c) {
+      return [c.nombre, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' ');
+    }
+
     function renderDropdown(lista) {
       if (!lista.length) {
         dropdown.innerHTML = '<div style="padding:10px 14px;color:var(--text-light);font-size:13px">Sin resultados</div>';
         dropdown.style.display = 'block';
         return;
       }
-      dropdown.innerHTML = lista.slice(0, 10).map(c =>
-        `<div class="checkin-opt" data-id="${c._id || c.id}" data-name="${c.nombre}"
+      dropdown.innerHTML = lista.slice(0, 10).map(c => {
+        const fullName = nombreCompleto(c);
+        return `<div class="checkin-opt" data-id="${c._id || c.id}" data-name="${fullName}"
           style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
-          onmousedown="selectCheckinCliente('${c._id || c.id}','${c.nombre.replace(/'/g,"\\'")}')">
-          ${c.nombre}
-        </div>`
-      ).join('');
+          onmousedown="selectCheckinCliente('${c._id || c.id}','${fullName.replace(/'/g,"\\'")}')">
+          ${fullName}
+        </div>`;
+      }).join('');
       dropdown.style.display = 'block';
     }
 
@@ -220,14 +231,20 @@
       hidden.value = '';
       const q = this.value.trim().toLowerCase();
       if (!q) { dropdown.style.display = 'none'; return; }
-      const filtered = clientes.filter(c => c.nombre.toLowerCase().includes(q));
+      const filtered = clientes.filter(c =>
+        nombreCompleto(c).toLowerCase().includes(q) ||
+        (c.dni && c.dni.includes(q))
+      );
       renderDropdown(filtered);
     });
 
     input.addEventListener('focus', function() {
       if (this.value.trim() && !hidden.value) {
         const q = this.value.trim().toLowerCase();
-        const filtered = clientes.filter(c => c.nombre.toLowerCase().includes(q));
+        const filtered = clientes.filter(c =>
+          nombreCompleto(c).toLowerCase().includes(q) ||
+          (c.dni && c.dni.includes(q))
+        );
         renderDropdown(filtered);
       }
     });
@@ -284,12 +301,12 @@
           ? '<img src="' + a.foto_url + '" class="member-avatar" alt="">'
           : '<div class="member-avatar" style="display:flex;align-items:center;justify-content:center">' + avatarInitials(a.cliente_nombre) + '</div>';
         return '<tr>' +
-          '<td><div class="member-cell">' + avatar + '<span>' + (a.cliente_nombre || '-') + '</span></div></td>' +
-          '<td>' + fmtDate(a.fecha) + '</td>' +
-          '<td>' + fmtDateTime(a.entrada) + '</td>' +
-          '<td>' + (a.salida ? fmtDateTime(a.salida) : '-') + '</td>' +
-          '<td>' + duration + '</td>' +
-          '<td>' + (!a.salida ? '<button class="btn btn-sm btn-warning" style="display:inline-flex;align-items:center;gap:4px" onclick="withLoading(this, () => checkoutById(\'' + a.id + '\'), \'Registrando...\')">' + icon('checkout') + ' Checkout</button>' : '') + '</td>' +
+          '<td data-label="Cliente"><div class="member-cell">' + avatar + '<span>' + (a.cliente_nombre || '-') + '</span></div></td>' +
+          '<td data-label="Fecha">' + fmtDate(a.fecha) + '</td>' +
+          '<td data-label="Entrada">' + fmtDateTime(a.entrada) + '</td>' +
+          '<td data-label="Salida">' + (a.salida ? fmtDateTime(a.salida) : '-') + '</td>' +
+          '<td data-label="Duración">' + duration + '</td>' +
+          '<td data-label="Acciones">' + (!a.salida ? '<button class="btn btn-sm btn-warning" style="display:inline-flex;align-items:center;gap:4px" onclick="withLoading(this, () => checkoutById(\'' + a.id + '\'), \'Registrando...\')">' + icon('checkout') + ' Checkout</button>' : '') + '</td>' +
           '</tr>';
       }).join('') || '<tr><td colspan="6" class="text-center" style="padding:30px;color:var(--text-light)">Sin registros</td></tr>';
 
@@ -339,6 +356,7 @@
       // Limpiar buscador
       document.getElementById('checkin-search').value = '';
       document.getElementById('checkin-cliente').value = '';
+      gymCache.invalidateMany(['asistencia', 'dashboard']);
       loadAsistencia(currentPage);
     } catch (err) { toast(err.message, 'error'); }
   }
@@ -353,6 +371,7 @@
       // Limpiar buscador
       document.getElementById('checkin-search').value = '';
       document.getElementById('checkin-cliente').value = '';
+      gymCache.invalidateMany(['asistencia', 'dashboard']);
       loadAsistencia(currentPage);
     } catch (err) { toast(err.message, 'error'); }
   }
@@ -363,6 +382,7 @@
         patch: { ns: 'asistencia', id },
       });
       toast('Check-out registrado');
+      gymCache.invalidateMany(['asistencia', 'dashboard']);
       loadAsistencia(currentPage);
     } catch (err) { toast(err.message, 'error'); }
   }
@@ -386,6 +406,14 @@
       if (el) el.innerHTML = html;
     });
   })();
+
+  // Exponer funciones al scope global para que los onclick funcionen en el SPA
+  window.doCheckin      = doCheckin;
+  window.doCheckout     = doCheckout;
+  window.checkoutById   = checkoutById;
+  window.loadAsistencia = loadAsistencia;
+  window.clearFilters   = clearFilters;
+  window.exportarCSV    = exportarCSV;
 </script>
 </body>
 </html>

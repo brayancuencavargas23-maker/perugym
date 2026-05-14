@@ -38,7 +38,7 @@ router.get('/', async (req, res) => {
 
   try {
     let query = Asistencia.find(filter)
-      .populate('cliente_id', 'nombre foto_url');
+      .populate('cliente_id', 'nombre apellido_paterno apellido_materno foto_url');
 
     if (nombreSearch) {
       // Necesitamos filtrar por nombre del cliente después del populate
@@ -48,7 +48,11 @@ router.get('/', async (req, res) => {
 
     // Filtrar por nombre si aplica
     const filtered = nombreSearch
-      ? all.filter(a => a.cliente_id?.nombre?.toLowerCase().includes(nombreSearch.toLowerCase()))
+      ? all.filter(a => {
+          const full = [a.cliente_id?.nombre, a.cliente_id?.apellido_paterno, a.cliente_id?.apellido_materno]
+            .filter(Boolean).join(' ').toLowerCase();
+          return full.includes(nombreSearch.toLowerCase());
+        })
       : all;
 
     const total = filtered.length;
@@ -72,7 +76,7 @@ router.get('/', async (req, res) => {
     const data = paginated.map(a => ({
       ...a.toObject(),
       id: a._id,
-      cliente_nombre: a.cliente_id?.nombre,
+      cliente_nombre: [a.cliente_id?.nombre, a.cliente_id?.apellido_paterno, a.cliente_id?.apellido_materno].filter(Boolean).join(' ') || null,
       foto_url: a.cliente_id?.foto_url,
     }));
 
@@ -89,11 +93,15 @@ router.get('/export', async (req, res) => {
 
   try {
     const all = await Asistencia.find(filter)
-      .populate('cliente_id', 'nombre')
+      .populate('cliente_id', 'nombre apellido_paterno apellido_materno')
       .sort({ entrada: -1 });
 
     const filtered = nombreSearch
-      ? all.filter(a => a.cliente_id?.nombre?.toLowerCase().includes(nombreSearch.toLowerCase()))
+      ? all.filter(a => {
+          const full = [a.cliente_id?.nombre, a.cliente_id?.apellido_paterno, a.cliente_id?.apellido_materno]
+            .filter(Boolean).join(' ').toLowerCase();
+          return full.includes(nombreSearch.toLowerCase());
+        })
       : all;
 
     const rows = filtered.map(a => {
@@ -105,7 +113,7 @@ router.get('/export', async (req, res) => {
         duracion = secs < 60 ? `${secs} seg` : `${Math.round(secs / 60)} min`;
       }
       return {
-        cliente: a.cliente_id?.nombre || '-',
+        cliente: [a.cliente_id?.nombre, a.cliente_id?.apellido_paterno, a.cliente_id?.apellido_materno].filter(Boolean).join(' ') || '-',
         fecha: a.fecha ? a.fecha.toISOString().split('T')[0] : a.entrada.toISOString().split('T')[0],
         entrada,
         salida: salida || '-',
@@ -231,12 +239,12 @@ router.post('/checkin', async (req, res) => {
     const created = await Asistencia.create({ cliente_id });
     // Populate para devolver el mismo shape que GET /asistencia
     const asistencia = await Asistencia.findById(created._id)
-      .populate('cliente_id', 'nombre foto_url');
+      .populate('cliente_id', 'nombre apellido_paterno apellido_materno foto_url');
 
     res.status(201).json({
       ...asistencia.toObject(),
       id: asistencia._id,
-      cliente_nombre: asistencia.cliente_id?.nombre,
+      cliente_nombre: [asistencia.cliente_id?.nombre, asistencia.cliente_id?.apellido_paterno, asistencia.cliente_id?.apellido_materno].filter(Boolean).join(' ') || null,
       foto_url: asistencia.cliente_id?.foto_url,
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -248,13 +256,13 @@ router.put('/checkout/:id', async (req, res) => {
       req.params.id,
       { salida: new Date() },
       { new: true }
-    ).populate('cliente_id', 'nombre foto_url');
+    ).populate('cliente_id', 'nombre apellido_paterno apellido_materno foto_url');
 
     // Devolver con el mismo shape que GET /asistencia para que el patch del caché funcione
     res.json({
       ...asistencia.toObject(),
       id: asistencia._id,
-      cliente_nombre: asistencia.cliente_id?.nombre,
+      cliente_nombre: [asistencia.cliente_id?.nombre, asistencia.cliente_id?.apellido_paterno, asistencia.cliente_id?.apellido_materno].filter(Boolean).join(' ') || null,
       foto_url: asistencia.cliente_id?.foto_url,
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -270,12 +278,12 @@ router.put('/checkout/cliente/:cliente_id', async (req, res) => {
       active._id,
       { salida: new Date() },
       { new: true }
-    ).populate('cliente_id', 'nombre foto_url');
+    ).populate('cliente_id', 'nombre apellido_paterno apellido_materno foto_url');
 
     res.json({
       ...asistencia.toObject(),
       id: asistencia._id,
-      cliente_nombre: asistencia.cliente_id?.nombre,
+      cliente_nombre: [asistencia.cliente_id?.nombre, asistencia.cliente_id?.apellido_paterno, asistencia.cliente_id?.apellido_materno].filter(Boolean).join(' ') || null,
       foto_url: asistencia.cliente_id?.foto_url,
     });
   } catch (err) { res.status(500).json({ error: err.message }); }

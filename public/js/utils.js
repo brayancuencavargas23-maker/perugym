@@ -1,4 +1,4 @@
-// Toast notifications
+﻿// Toast notifications
 function toast(msg, type = 'success', duration = 3500) {
   // Si es un error, también loggearlo en consola
   if (type === 'error') {
@@ -238,22 +238,29 @@ function setActiveNav(page) {
 }
 
 // Hamburger toggle
+// _hamburgerInitialized evita registrar listeners de document/window
+// mas de una vez en el SPA (el sidebar se reconstruye pero el documento no).
+var _hamburgerInitialized = false;
+var _hamburgerClickHandler = null;
+
 function initHamburger() {
-  const btn     = document.getElementById('hamburger');
-  const sidebar = document.getElementById('sidebar');
+  var btn     = document.getElementById('hamburger');
+  var sidebar = document.getElementById('sidebar');
   if (!btn || !sidebar) return;
 
-  // Reemplazar el contenido del botón con el ícono animado de 3 líneas
-  btn.innerHTML = `
-    <span class="hamburger-icon" aria-hidden="true">
-      <span></span><span></span><span></span>
-    </span>`;
-  btn.setAttribute('aria-label', 'Abrir menú de navegación');
+  // Inyectar el icono de 3 lineas si el boton esta vacio
+  if (!btn.querySelector('.hamburger-icon')) {
+    btn.innerHTML =
+      '<span class="hamburger-icon" aria-hidden="true">' +
+        '<span></span><span></span><span></span>' +
+      '</span>';
+  }
+  btn.setAttribute('aria-label', 'Abrir menu de navegacion');
   btn.setAttribute('aria-expanded', 'false');
   btn.setAttribute('aria-controls', 'sidebar');
 
   // Crear overlay si no existe
-  let overlay = document.getElementById('sidebar-overlay');
+  var overlay = document.getElementById('sidebar-overlay');
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'sidebar-overlay';
@@ -263,58 +270,96 @@ function initHamburger() {
   }
 
   function openSidebar() {
-    sidebar.classList.add('open');
-    btn.classList.add('is-open');
-    btn.setAttribute('aria-expanded', 'true');
-    btn.setAttribute('aria-label', 'Cerrar menú de navegación');
+    var b = document.getElementById('hamburger');
+    var s = document.getElementById('sidebar');
+    var o = document.getElementById('sidebar-overlay');
+    if (!b || !s || !o) return;
+    s.classList.add('open');
+    b.classList.add('is-open');
+    b.setAttribute('aria-expanded', 'true');
+    b.setAttribute('aria-label', 'Cerrar menu de navegacion');
     document.body.classList.add('sidebar-open');
-    // Activar overlay en dos pasos para que la transición CSS funcione
-    overlay.classList.add('visible');
-    requestAnimationFrame(() => overlay.classList.add('active'));
+    o.classList.add('visible');
+    requestAnimationFrame(function() { o.classList.add('active'); });
+    s.removeAttribute('aria-hidden');
   }
 
   function closeSidebar() {
-    sidebar.classList.remove('open');
-    btn.classList.remove('is-open');
-    btn.setAttribute('aria-expanded', 'false');
-    btn.setAttribute('aria-label', 'Abrir menú de navegación');
+    var b = document.getElementById('hamburger');
+    var s = document.getElementById('sidebar');
+    var o = document.getElementById('sidebar-overlay');
+    if (!s) return;
+    s.classList.remove('open');
+    if (b) {
+      b.classList.remove('is-open');
+      b.setAttribute('aria-expanded', 'false');
+      b.setAttribute('aria-label', 'Abrir menu de navegacion');
+    }
     document.body.classList.remove('sidebar-open');
-    overlay.classList.remove('active');
-    // Esperar a que termine la transición antes de ocultar
-    overlay.addEventListener('transitionend', () => overlay.classList.remove('visible'), { once: true });
+    if (o) {
+      o.classList.remove('active');
+      o.addEventListener('transitionend', function handler() {
+        o.classList.remove('visible');
+        o.removeEventListener('transitionend', handler);
+      });
+      setTimeout(function() { o.classList.remove('visible'); }, 350);
+    }
+    s.setAttribute('aria-hidden', 'true');
   }
 
-  btn.addEventListener('click', (e) => {
+  // Limpiar listener anterior del boton antes de agregar uno nuevo
+  if (_hamburgerClickHandler) {
+    btn.removeEventListener('click', _hamburgerClickHandler);
+  }
+  _hamburgerClickHandler = function(e) {
     e.stopPropagation();
-    sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
-  });
+    var s = document.getElementById('sidebar');
+    if (s && s.classList.contains('open')) {
+      closeSidebar();
+    } else {
+      openSidebar();
+    }
+  };
+  btn.addEventListener('click', _hamburgerClickHandler);
 
   // Cerrar al hacer clic en el overlay
-  overlay.addEventListener('click', closeSidebar);
+  overlay.onclick = closeSidebar;
 
-  // Cerrar al hacer clic en un link del sidebar (navegación en móvil)
-  sidebar.querySelectorAll('.nav-item').forEach(link => {
-    link.addEventListener('click', () => {
-      if (window.innerWidth <= 768) closeSidebar();
+  // Los siguientes listeners van al document/window una sola vez
+  if (!_hamburgerInitialized) {
+    // Event delegation: cerrar al navegar en movil
+    document.addEventListener('click', function(e) {
+      var navItem = e.target.closest('#sidebar .nav-item');
+      if (navItem && window.innerWidth < 1024) {
+        closeSidebar();
+      }
     });
-  });
 
-  // Cerrar con Escape
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && sidebar.classList.contains('open')) {
-      closeSidebar();
-      btn.focus();
-    }
-  });
+    // Cerrar con Escape
+    document.addEventListener('keydown', function(e) {
+      var s = document.getElementById('sidebar');
+      if (e.key === 'Escape' && s && s.classList.contains('open')) {
+        closeSidebar();
+        var b = document.getElementById('hamburger');
+        if (b) b.focus();
+      }
+    });
 
-  // Cerrar si se redimensiona a desktop
-  window.addEventListener('resize', () => {
-    if (window.innerWidth > 768 && sidebar.classList.contains('open')) {
-      closeSidebar();
-    }
-  });
+    // Cerrar si se redimensiona a desktop
+    var _resizeTimer = null;
+    window.addEventListener('resize', function() {
+      clearTimeout(_resizeTimer);
+      _resizeTimer = setTimeout(function() {
+        var s = document.getElementById('sidebar');
+        if (window.innerWidth >= 1024 && s && s.classList.contains('open')) {
+          closeSidebar();
+        }
+      }, 100);
+    });
+
+    _hamburgerInitialized = true;
+  }
 }
-
 // Custom confirm dialog — replaces native confirm()
 // Usage: confirmDialog({ message, title, confirmText, type }).then(ok => { if (ok) ... })
 function confirmDialog({ message, title = '¿Confirmar acción?', confirmText = 'Confirmar', type = 'danger' } = {}) {

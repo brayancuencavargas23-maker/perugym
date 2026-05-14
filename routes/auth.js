@@ -3,6 +3,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Usuario = require('../models/Usuario');
 const { verifyToken, requireRole } = require('../middleware/auth');
+const { validators, handleValidationErrors } = require('../middleware/validation');
+const { param } = require('express-validator');
 
 /**
  * Logout: aunque JWT es stateless, este endpoint permite al cliente
@@ -69,7 +71,9 @@ router.get('/users', verifyToken, requireRole('admin'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/users', verifyToken, requireRole('admin'), async (req, res) => {
+router.post('/users', verifyToken, requireRole('admin'), [
+  validators.email()
+], handleValidationErrors, async (req, res) => {
   const { name, email, password, role } = req.body;
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'Nombre, email y contraseña son requeridos' });
@@ -87,7 +91,10 @@ router.post('/users', verifyToken, requireRole('admin'), async (req, res) => {
   }
 });
 
-router.put('/users/:id', verifyToken, requireRole('admin'), async (req, res) => {
+router.put('/users/:id', verifyToken, requireRole('admin'), [
+  validators.mongoId('id', 'param'),
+  validators.email()
+], handleValidationErrors, async (req, res) => {
   const { name, email, role, active } = req.body;
   try {
     const target = await Usuario.findById(req.params.id).select('usuario').lean();

@@ -4,17 +4,20 @@ const Membresia = require('../models/Membresia');
 const Plan = require('../models/Plan');
 const { verifyToken } = require('../middleware/auth');
 const { saveImage, deleteImage } = require('../config/storage');
+const { validators, handleValidationErrors } = require('../middleware/validation');
+const { param } = require('express-validator');
+const logger = require('../utils/logger');
 
 router.use(verifyToken);
 
 // ── Consulta DNI via API RENIEC ───────────────────────────────────────────────
-router.get('/reniec/:dni', async (req, res) => {
+router.get('/reniec/:dni', [
+  param('dni')
+    .trim()
+    .matches(/^\d{8}$/)
+    .withMessage('El DNI debe tener exactamente 8 dígitos.')
+], handleValidationErrors, async (req, res) => {
   const { dni } = req.params;
-
-  // Validar formato DNI peruano (8 dígitos)
-  if (!/^\d{8}$/.test(dni)) {
-    return res.status(400).json({ error: 'El DNI debe tener exactamente 8 dígitos numéricos' });
-  }
 
   const apiUrl = process.env.RENIEC_API_URL;
   const token  = process.env.RENIEC_API_TOKEN;
@@ -25,13 +28,21 @@ router.get('/reniec/:dni', async (req, res) => {
 
   try {
     const url = `${apiUrl}?numero=${encodeURIComponent(dni)}`;
+    
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
     const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errBody = await response.json().catch(() => ({}));
@@ -51,7 +62,11 @@ router.get('/reniec/:dni', async (req, res) => {
       document_number:  data.document_number  || dni,
     });
   } catch (err) {
-    console.error('[RENIEC] Error al consultar API:', err.message);
+    if (err.name === 'AbortError') {
+      logger.error('RENIEC timeout', { dni, service: 'RENIEC' });
+      return res.status(504).json({ error: 'El servicio RENIEC no respondió a tiempo. Intenta de nuevo.' });
+    }
+    logger.error('RENIEC error', { dni, error: err.message, service: 'RENIEC' });
     res.status(500).json({ error: 'No se pudo conectar con el servicio RENIEC' });
   }
 });
@@ -61,7 +76,7 @@ router.get('/', async (req, res) => {
   const filter = {};
 
   if (search) {
-    // Escapar caracteres especiales de regex para evitar ReDoS
+    // Escape regex special characters to prevent ReDoS
     const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     filter.$or = [
       { nombre: { $regex: safeSearch, $options: 'i' } },
@@ -108,7 +123,9 @@ router.get('/', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', [
+  validators.mongoId('id', 'param')
+], handleValidationErrors, async (req, res) => {
   try {
     const cliente = await Cliente.findById(req.params.id);
     if (!cliente) return res.status(404).json({ error: 'Cliente no encontrado' });
@@ -131,7 +148,11 @@ router.get('/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', [
+  validators.telefono(false),
+  validators.dni(),
+  validators.email()
+], handleValidationErrors, async (req, res) => {
   const { nombre, apellido_paterno, apellido_materno, dni, email, telefono, notas } = req.body;
   try {
     let foto_url = null;
@@ -150,7 +171,12 @@ router.post('/', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', [
+  validators.mongoId('id', 'param'),
+  validators.telefono(false),
+  validators.dni(),
+  validators.email()
+], handleValidationErrors, async (req, res) => {
   const { nombre, apellido_paterno, apellido_materno, dni, email, telefono, notas, activo } = req.body;
   try {
     const current = await Cliente.findById(req.params.id);
@@ -178,7 +204,9 @@ router.put('/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', [
+  validators.mongoId('id', 'param')
+], handleValidationErrors, async (req, res) => {
   try {
     const c = await Cliente.findById(req.params.id);
     await deleteImage(c?.foto_url);

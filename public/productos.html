@@ -304,6 +304,12 @@
     const placeholder = document.getElementById('prod-photo-placeholder');
     if (placeholder) placeholder.innerHTML = icon('productos', 'font-size:28px');
   })();
+
+  // Exponer funciones al scope global para que los onclick funcionen en el SPA
+  window.saveProduct    = saveProduct;
+  window.editProduct    = editProduct;
+  window.deleteProduct  = deleteProduct;
+  window.exportarStock  = exportarStock;
 </script>
 </body>
 </html>
