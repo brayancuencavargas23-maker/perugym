@@ -229,8 +229,17 @@
 
     try {
       await api.put(`/auth/users/${id}/password`, { currentPassword, newPassword }, { invalidate: ['auth'] });
-      toast('Contraseña actualizada correctamente');
       closeModal('modal-password');
+
+      // Si el admin cambió su propia contraseña, el token actual ya no corresponde
+      // a las credenciales vigentes. Forzar logout para que vuelva a ingresar.
+      const currentUser = JSON.parse(localStorage.getItem('gym_user') || '{}');
+      if (currentUser.id && currentUser.id.toString() === id.toString()) {
+        toast('Contraseña actualizada. Vuelve a iniciar sesión con tu nueva contraseña.', 'info', 4000);
+        setTimeout(() => logout(), 2000);
+      } else {
+        toast('Contraseña actualizada correctamente');
+      }
     } catch (err) { toast(err.message, 'error'); }
   }
 
