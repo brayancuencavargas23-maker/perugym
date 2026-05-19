@@ -85,7 +85,7 @@ CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
 
 # RENIEC API (opcional)
-RENIEC_API_URL=https://api.decolecta.com/v1/reniec/dni
+RENIEC_API_URL=https://your-reniec-api-provider.com/v1/reniec/dni
 RENIEC_API_TOKEN=your_token
 
 # Usuario Desarrollador
