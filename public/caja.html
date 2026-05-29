@@ -82,6 +82,10 @@
             <div class="caja-info-value" style="color:#00b4d8" id="info-plin">S/ 0.00</div>
           </div>
           <div class="caja-info-item">
+            <div class="caja-info-label">Transferencia</div>
+            <div class="caja-info-value" style="color:#fd7e14" id="info-transferencia">S/ 0.00</div>
+          </div>
+          <div class="caja-info-item">
             <div class="caja-info-label">Ingresos manuales</div>
             <div class="caja-info-value" style="color:var(--success)" id="info-ingresos-manuales">S/ 0.00</div>
           </div>
@@ -168,7 +172,7 @@
         <!-- Ingresos / Egresos manuales -->
         <div id="section-movimientos" class="hidden">
           <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">
-            <!-- Formulario -->
+            <!-- Formulario movimiento manual -->
             <div class="card" style="flex:0 0 320px;min-width:280px">
               <h3 style="font-size:15px;margin-bottom:16px">Registrar movimiento</h3>
               <div class="form-group">
@@ -187,14 +191,45 @@
                 <label>Concepto *</label>
                 <input type="text" id="mov-concepto" class="form-control" placeholder="Ej: Compra de insumos, Fondo inicial...">
               </div>
+              <div class="form-group">
+                <label>Método de pago</label>
+                <select id="mov-metodo" class="form-control">
+                  <option value="efectivo">💵 Efectivo</option>
+                  <option value="yape">💜 Yape</option>
+                  <option value="plin">🔵 Plin</option>
+                  <option value="transferencia">🏦 Transferencia</option>
+                </select>
+              </div>
               <button class="btn btn-primary w-full" style="margin-top:4px;display:inline-flex;align-items:center;justify-content:center;gap:6px" onclick="withLoading(this, registrarMovimiento, 'Registrando...')"><span id="icon-confirm-mov"></span> Registrar</button>
+
+              <!-- Ingreso rápido de rutina -->
+              <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+                <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text-light)">⚡ Ingreso rápido — Rutina</div>
+                <div style="font-size:12px;color:var(--text-light);margin-bottom:10px">Para clientes ocasionales que solo vienen a entrenar. Sin registro de cliente.</div>
+                <div style="display:flex;gap:8px;margin-bottom:8px">
+                  <div class="form-group" style="flex:1;margin-bottom:0">
+                    <label style="font-size:11px">Monto (S/)</label>
+                    <input type="number" id="rutina-monto" class="form-control" value="8" step="0.50" min="0.50" style="font-weight:700">
+                  </div>
+                  <div class="form-group" style="flex:1;margin-bottom:0">
+                    <label style="font-size:11px">Método</label>
+                    <select id="rutina-metodo" class="form-control">
+                      <option value="efectivo">💵 Efectivo</option>
+                      <option value="yape">💜 Yape</option>
+                      <option value="plin">🔵 Plin</option>
+                      <option value="transferencia">🏦 Transferencia</option>
+                    </select>
+                  </div>
+                </div>
+                <button class="btn btn-success w-full" style="display:inline-flex;align-items:center;justify-content:center;gap:6px" onclick="withLoading(this, registrarRutina, 'Registrando...')">⚡ Registrar Rutina</button>
+              </div>
             </div>
             <!-- Tabla de movimientos -->
             <div class="card" style="flex:1;min-width:300px">
               <h3 style="font-size:15px;margin-bottom:16px">Movimientos del turno</h3>
               <div class="table-wrapper">
                 <table>
-                  <thead><tr><th>Tipo</th><th>Concepto</th><th>Monto</th><th>Hora</th><th>Usuario</th><th></th></tr></thead>
+                  <thead><tr><th>Tipo</th><th>Concepto</th><th>Método</th><th>Monto</th><th>Hora</th><th>Usuario</th><th></th></tr></thead>
                   <tbody id="movimientos-table"></tbody>
                 </table>
               </div>
@@ -377,6 +412,7 @@
         document.getElementById('info-efectivo').textContent          = `S/ ${parseFloat(caja.total_efectivo || 0).toFixed(2)}`;
         document.getElementById('info-yape').textContent              = `S/ ${parseFloat(caja.total_yape || 0).toFixed(2)}`;
         document.getElementById('info-plin').textContent              = `S/ ${parseFloat(caja.total_plin || 0).toFixed(2)}`;
+        document.getElementById('info-transferencia').textContent     = `S/ ${parseFloat(caja.total_transferencia || 0).toFixed(2)}`;
         document.getElementById('info-ingresos-manuales').textContent = `S/ ${ingresosManuales.toFixed(2)}`;
         document.getElementById('info-egresos-manuales').textContent  = `S/ ${egresosManuales.toFixed(2)}`;
         document.getElementById('info-total').textContent             = `S/ ${(inicial + totalVentasAll + ingresosManuales - egresosManuales).toFixed(2)}`;
@@ -585,17 +621,39 @@
 
   async function registrarMovimiento() {
     if (!cajaActual) return toast('Debes abrir la caja primero', 'warning');
-    const tipo     = document.getElementById('mov-tipo').value;
-    const monto    = document.getElementById('mov-monto').value;
-    const concepto = document.getElementById('mov-concepto').value.trim();
+    const tipo       = document.getElementById('mov-tipo').value;
+    const monto      = document.getElementById('mov-monto').value;
+    const concepto   = document.getElementById('mov-concepto').value.trim();
+    const metodo_pago = document.getElementById('mov-metodo').value;
     if (!monto || parseFloat(monto) <= 0) return toast('Ingresa un monto válido', 'warning');
     if (!concepto) return toast('El concepto es requerido', 'warning');
     try {
-      await api.post(`/caja/${cajaActual.id}/movimientos`, { tipo, monto, concepto });
+      await api.post(`/caja/${cajaActual.id}/movimientos`, { tipo, monto, concepto, metodo_pago });
       gymCache.invalidate('caja');
       toast(`${tipo === 'ingreso' ? 'Ingreso' : 'Egreso'} registrado ✅`);
-      document.getElementById('mov-monto').value   = '';
+      document.getElementById('mov-monto').value    = '';
       document.getElementById('mov-concepto').value = '';
+      document.getElementById('mov-metodo').value   = 'efectivo';
+      loadEstado();
+      loadMovimientos();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function registrarRutina() {
+    if (!cajaActual) return toast('Debes abrir la caja primero', 'warning');
+    const monto       = document.getElementById('rutina-monto').value;
+    const metodo_pago = document.getElementById('rutina-metodo').value;
+    if (!monto || parseFloat(monto) <= 0) return toast('Ingresa un monto válido', 'warning');
+    try {
+      await api.post(`/caja/${cajaActual.id}/movimientos`, {
+        tipo: 'ingreso',
+        monto,
+        concepto: 'Rutina (cliente ocasional)',
+        metodo_pago,
+        es_rutina: true,
+      });
+      gymCache.invalidate('caja');
+      toast(`Rutina registrada — S/ ${parseFloat(monto).toFixed(2)} por ${metodo_pago} ✅`);
       loadEstado();
       loadMovimientos();
     } catch (err) { toast(err.message, 'error'); }
@@ -607,13 +665,23 @@
       const movs = await api.get(`/caja/${cajaActual.id}/movimientos`);
       const tbody = document.getElementById('movimientos-table');
       if (!movs.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="padding:20px;color:var(--text-light)">Sin movimientos registrados</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding:20px;color:var(--text-light)">Sin movimientos registrados</td></tr>';
         return;
       }
+      const metodoBadge = {
+        efectivo:      '<span class="badge" style="background:#28a74522;color:#28a745">💵 Efectivo</span>',
+        yape:          '<span class="badge" style="background:#7b2ff722;color:#7b2ff7">💜 Yape</span>',
+        plin:          '<span class="badge" style="background:#00b4d822;color:#00b4d8">🔵 Plin</span>',
+        transferencia: '<span class="badge" style="background:#fd7e1422;color:#fd7e14">🏦 Transf.</span>',
+      };
       tbody.innerHTML = movs.map(m => `
         <tr>
-          <td><span class="badge ${m.tipo === 'ingreso' ? 'badge-success' : 'badge-danger'}">${m.tipo === 'ingreso' ? '▲ Ingreso' : '▼ Egreso'}</span></td>
+          <td>
+            <span class="badge ${m.tipo === 'ingreso' ? 'badge-success' : 'badge-danger'}">${m.tipo === 'ingreso' ? '▲ Ingreso' : '▼ Egreso'}</span>
+            ${m.es_rutina ? '<span class="badge" style="background:#fff3cd;color:#856404;margin-left:4px;font-size:10px">⚡ Rutina</span>' : ''}
+          </td>
           <td>${m.concepto}</td>
+          <td>${metodoBadge[m.metodo_pago] || m.metodo_pago || '-'}</td>
           <td style="font-weight:700;color:${m.tipo === 'ingreso' ? 'var(--success)' : 'var(--danger)'}">
             ${m.tipo === 'ingreso' ? '+' : '-'}S/ ${parseFloat(m.monto).toFixed(2)}
           </td>
@@ -684,6 +752,7 @@
   window.registrarVenta      = registrarVenta;
   window.setTipoMovimiento   = setTipoMovimiento;
   window.registrarMovimiento = registrarMovimiento;
+  window.registrarRutina     = registrarRutina;
   window.anularVenta         = anularVenta;
   window.verDetalle          = verDetalle;
   window.eliminarMovimiento  = eliminarMovimiento;
