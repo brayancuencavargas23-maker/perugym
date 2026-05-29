@@ -171,7 +171,7 @@ class CajaService {
    * @throws {BusinessError} - If validation fails
    */
   static async registrarMovimiento(cajaId, data, session = null) {
-    const { usuario_id, tipo, monto, concepto } = data;
+    const { usuario_id, tipo, monto, concepto, metodo_pago = 'efectivo', es_rutina = false } = data;
 
     // Validate cash register is open
     const caja = await Caja.findOne({ _id: cajaId, estado: 'abierta' })
@@ -196,13 +196,21 @@ class CajaService {
       throw new BusinessError('El concepto es requerido.');
     }
 
+    // Validate payment method
+    const metodosValidos = ['efectivo', 'yape', 'plin', 'transferencia'];
+    if (!metodosValidos.includes(metodo_pago)) {
+      throw new BusinessError('Método de pago inválido.');
+    }
+
     // Create movement
     const movimientoData = {
       caja_id: cajaId,
       usuario_id,
       tipo,
       monto: parseFloat(monto),
-      concepto: concepto.trim()
+      concepto: concepto.trim(),
+      metodo_pago,
+      es_rutina: !!es_rutina,
     };
 
     let movimiento;

@@ -25,6 +25,16 @@ router.get('/estado', async (req, res) => {
     const ingresosManuales = movs.find(m => m._id === 'ingreso')?.total || 0;
     const egresosManuales  = movs.find(m => m._id === 'egreso')?.total  || 0;
 
+    // Sumar movimientos manuales por método de pago (solo ingresos)
+    const movsMetodo = await MovimientoCaja.aggregate([
+      { $match: { caja_id: caja._id, tipo: 'ingreso' } },
+      { $group: { _id: '$metodo_pago', total: { $sum: '$monto' } } },
+    ]);
+    const ingresosManEfectivo      = movsMetodo.find(m => m._id === 'efectivo')?.total      || 0;
+    const ingresosManYape          = movsMetodo.find(m => m._id === 'yape')?.total          || 0;
+    const ingresosManPlin          = movsMetodo.find(m => m._id === 'plin')?.total          || 0;
+    const ingresosManTransferencia = movsMetodo.find(m => m._id === 'transferencia')?.total || 0;
+
     // Sumar pagos de membresías por método de pago (yape / plin)
     const pagosPorMetodo = await Pago.aggregate([
       { $match: { caja_id: caja._id, estado: 'pagado', metodo_pago: { $in: ['efectivo', 'yape', 'plin'] } } },
@@ -51,9 +61,10 @@ router.get('/estado', async (req, res) => {
       usuario_nombre: caja.usuario_id?.usuario,
       ingresos_manuales: ingresosManuales,
       egresos_manuales: egresosManuales,
-      total_efectivo: totalEfectivoPagos + totalEfectivoVentas,
-      total_yape: totalYapePagos + totalYapeVentas,
-      total_plin: totalPlinPagos + totalPlinVentas,
+      total_efectivo:      totalEfectivoPagos + totalEfectivoVentas + ingresosManEfectivo,
+      total_yape:          totalYapePagos     + totalYapeVentas     + ingresosManYape,
+      total_plin:          totalPlinPagos     + totalPlinVentas     + ingresosManPlin,
+      total_transferencia: ingresosManTransferencia,
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -179,13 +190,15 @@ router.get('/:id/detalle', async (req, res) => {
 
 // Registrar un movimiento manual
 router.post('/:id/movimientos', asyncHandler(async (req, res) => {
-  const { tipo, monto, concepto } = req.body;
+  const { tipo, monto, concepto, metodo_pago, es_rutina } = req.body;
   
   const mov = await CajaService.registrarMovimiento(req.params.id, {
     usuario_id: req.user.id,
     tipo,
     monto,
-    concepto
+    concepto,
+    metodo_pago,
+    es_rutina,
   });
   
   res.status(201).json({ ...mov.toObject(), id: mov._id });
