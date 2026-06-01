@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -9,7 +9,7 @@
   <title>Productos - GymPro</title>
   <link rel="stylesheet" href="/css/main.css">
   <!-- SPA redirect: si se accede directamente, redirigir al shell -->
-  <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
+  <script>if(!window.__SPA_SHELL__){sessionStorage.setItem('_spa_direct_url',window.location.pathname);window.location.replace('/app.html');}</script>
   <style>
     .product-img { width:44px; height:44px; border-radius:8px; object-fit:cover; background:var(--bg); }
     .product-img-placeholder { width:44px; height:44px; border-radius:8px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:20px; }

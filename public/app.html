@@ -50,7 +50,11 @@
       '/solicitudes.html':  'solicitudes',
     };
 
-    const currentPath = window.location.pathname;
+    // Si el usuario llegó desde un acceso directo, usar esa URL; si no, la actual
+    const directUrl = sessionStorage.getItem('_spa_direct_url');
+    if (directUrl) sessionStorage.removeItem('_spa_direct_url');
+
+    const currentPath = directUrl || window.location.pathname;
     const initialPage = PATH_MAP[currentPath] || 'dashboard';
 
     // Inicializar layout (sidebar + topbar) — solo ocurre UNA VEZ
