@@ -78,12 +78,11 @@ router.post(
     body('plan_id').isMongoId().withMessage('plan_id inválido.'),
     body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']).withMessage('Método de pago inválido.'),
     body('estado_pago').optional().isIn(['pagado', 'pendiente']).withMessage('Estado de pago inválido.'),
-    body('descuento').optional().isFloat({ min: 0 }).withMessage('El descuento debe ser un número positivo.'),
     validators.fecha('fecha_inicio'),
     handleValidationErrors
   ],
   asyncHandler(async (req, res) => {
-    const { cliente_id, plan_id, fecha_inicio, metodo_pago, estado_pago = 'pagado', notas, descuento = 0 } = req.body;
+    const { cliente_id, plan_id, fecha_inicio, metodo_pago, estado_pago = 'pagado', notas } = req.body;
     const caja_id = req.cajaActual._id;
 
     await MembresiaService.autoVencer();
@@ -98,25 +97,16 @@ router.post(
       // Get plan for payment amount
       const plan = await Plan.findById(plan_id).session(session);
 
-      // Apply discount: monto cannot go below 0
-      const descuentoAplicado = Math.min(parseFloat(descuento) || 0, plan.precio);
-      const montoFinal = Math.max(plan.precio - descuentoAplicado, 0);
-
-      // Build notes including discount info if applicable
-      const notasConDescuento = descuentoAplicado > 0
-        ? [notas, `Descuento aplicado: S/ ${descuentoAplicado.toFixed(2)} (precio original: S/ ${plan.precio.toFixed(2)})`].filter(Boolean).join(' | ')
-        : notas || null;
-
       // Create payment
       const [pago] = await Pago.create(
         [{
           cliente_id,
           membresia_id: membresia._id,
           caja_id,
-          monto: montoFinal,
+          monto: plan.precio,
           metodo_pago: metodo_pago || 'efectivo',
           estado: estado_pago,
-          notas: notasConDescuento
+          notas: notas || null
         }],
         { session }
       );
@@ -137,12 +127,11 @@ router.post(
     body('plan_id').isMongoId().withMessage('plan_id inválido.'),
     body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']).withMessage('Método de pago inválido.'),
     body('estado_pago').optional().isIn(['pagado', 'pendiente']).withMessage('Estado de pago inválido.'),
-    body('descuento').optional().isFloat({ min: 0 }).withMessage('El descuento debe ser un número positivo.'),
     validators.fecha('fecha_inicio'),
     handleValidationErrors
   ],
   asyncHandler(async (req, res) => {
-    const { plan_id, fecha_inicio, metodo_pago, estado_pago = 'pagado', notas, descuento = 0 } = req.body;
+    const { plan_id, fecha_inicio, metodo_pago, estado_pago = 'pagado', notas } = req.body;
     const caja_id = req.cajaActual._id;
 
     const result = await TransactionManager.execute(async (session) => {
@@ -159,24 +148,16 @@ router.post(
       // Get client ID from new membership
       const mem = await Membresia.findById(nueva._id).session(session);
 
-      // Apply discount
-      const descuentoAplicado = Math.min(parseFloat(descuento) || 0, plan.precio);
-      const montoFinal = Math.max(plan.precio - descuentoAplicado, 0);
-
-      const notasConDescuento = descuentoAplicado > 0
-        ? [notas, `Descuento aplicado: S/ ${descuentoAplicado.toFixed(2)} (precio original: S/ ${plan.precio.toFixed(2)})`].filter(Boolean).join(' | ')
-        : notas || null;
-
       // Create payment
       const [pago] = await Pago.create(
         [{
           cliente_id: mem.cliente_id,
           membresia_id: nueva._id,
           caja_id,
-          monto: montoFinal,
+          monto: plan.precio,
           metodo_pago: metodo_pago || 'efectivo',
           estado: estado_pago,
-          notas: notasConDescuento
+          notas: notas || null
         }],
         { session }
       );
@@ -196,11 +177,10 @@ router.post(
     validators.mongoId('id'),
     body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']).withMessage('Método de pago inválido.'),
     body('estado_pago').optional().isIn(['pagado', 'pendiente']).withMessage('Estado de pago inválido.'),
-    body('descuento').optional().isFloat({ min: 0 }).withMessage('El descuento debe ser un número positivo.'),
     handleValidationErrors
   ],
   asyncHandler(async (req, res) => {
-    const { metodo_pago, estado_pago = 'pagado', notas, descuento = 0 } = req.body;
+    const { metodo_pago, estado_pago = 'pagado', notas } = req.body;
     const caja_id = req.cajaActual._id;
 
     await MembresiaService.autoVencer();
@@ -218,24 +198,16 @@ router.post(
         .populate('plan_id')
         .session(session);
 
-      // Apply discount
-      const descuentoAplicado = Math.min(parseFloat(descuento) || 0, mem.plan_id.precio);
-      const montoFinal = Math.max(mem.plan_id.precio - descuentoAplicado, 0);
-
-      const notasConDescuento = descuentoAplicado > 0
-        ? [notas, `Descuento aplicado: S/ ${descuentoAplicado.toFixed(2)} (precio original: S/ ${mem.plan_id.precio.toFixed(2)})`].filter(Boolean).join(' | ')
-        : notas || null;
-
       // Create payment
       const [pago] = await Pago.create(
         [{
           cliente_id: mem.cliente_id,
           membresia_id: nueva._id,
           caja_id,
-          monto: montoFinal,
+          monto: mem.plan_id.precio,
           metodo_pago: metodo_pago || 'efectivo',
           estado: estado_pago,
-          notas: notasConDescuento
+          notas: notas || null
         }],
         { session }
       );
