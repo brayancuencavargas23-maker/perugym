@@ -100,6 +100,15 @@
         </div>
       </div>
       <div class="form-group"><label>Notas</label><textarea id="mem-notas" class="form-control" rows="2"></textarea></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Descuento (S/)</label>
+          <input type="number" id="mem-descuento" class="form-control" min="0" step="0.01" placeholder="0.00" value="0">
+        </div>
+        <div class="form-group" style="display:flex;align-items:flex-end">
+          <div id="mem-monto-final" style="background:var(--bg);border-radius:8px;padding:10px 14px;font-size:13px;width:100%;text-align:center"></div>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" id="btn-cancel-nueva">Cancelar</button>
@@ -143,6 +152,15 @@
         </div>
       </div>
       <div class="form-group"><label>Notas</label><textarea id="cambio-notas" class="form-control" rows="2"></textarea></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Descuento (S/)</label>
+          <input type="number" id="cambio-descuento" class="form-control" min="0" step="0.01" placeholder="0.00" value="0">
+        </div>
+        <div class="form-group" style="display:flex;align-items:flex-end">
+          <div id="cambio-monto-final" style="background:var(--bg);border-radius:8px;padding:10px 14px;font-size:13px;width:100%;text-align:center"></div>
+        </div>
+      </div>
       <div id="cambio-resumen" class="hidden" style="background:var(--bg);border:1.5px solid var(--primary);border-radius:8px;padding:10px 14px;margin-top:8px;font-size:13px"></div>
       <p style="font-size:12px;color:var(--text-light);margin-top:8px">⚠️ La membresía actual quedará cancelada y se creará una nueva desde hoy.</p>
     </div>
@@ -182,6 +200,15 @@
         </div>
       </div>
       <div class="form-group"><label>Notas</label><textarea id="renovar-notas" class="form-control" rows="2"></textarea></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Descuento (S/)</label>
+          <input type="number" id="renovar-descuento" class="form-control" min="0" step="0.01" placeholder="0.00" value="0">
+        </div>
+        <div class="form-group" style="display:flex;align-items:flex-end">
+          <div id="renovar-monto-final" style="background:var(--bg);border-radius:8px;padding:10px 14px;font-size:13px;width:100%;text-align:center"></div>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" id="btn-cancel-renovar">Cancelar</button>
@@ -384,12 +411,13 @@
     const opt = sel.options[sel.selectedIndex];
     const info = document.getElementById('plan-info');
     const inicio = document.getElementById('mem-inicio').value;
-    if (!opt || !opt.value) { info.classList.add('hidden'); document.getElementById('mem-fin').value = ''; return; }
+    if (!opt || !opt.value) { info.classList.add('hidden'); document.getElementById('mem-fin').value = ''; actualizarMontoFinal('mem', 0); return; }
     const dias = parseInt(opt.dataset.dias);
     const precio = parseFloat(opt.dataset.precio);
     info.innerHTML = `Precio: <strong>${fmtMoney(precio)}</strong> &nbsp;|&nbsp; Duración: <strong>${dias} días</strong>`;
     info.classList.remove('hidden');
     if (inicio) calcularFechaFin(inicio, dias, 'mem-fin');
+    actualizarMontoFinal('mem', precio);
   }
 
   function onCambioPlanChange() {
@@ -397,15 +425,17 @@
     const opt = sel.options[sel.selectedIndex];
     const info = document.getElementById('cambio-plan-info');
     const resumen = document.getElementById('cambio-resumen');
-    if (!opt || !opt.value) { info.classList.add('hidden'); resumen.classList.add('hidden'); return; }
-    info.innerHTML = `Precio: <strong>${fmtMoney(opt.dataset.precio)}</strong> &nbsp;|&nbsp; Duración: <strong>${opt.dataset.dias} días</strong>`;
+    if (!opt || !opt.value) { info.classList.add('hidden'); resumen.classList.add('hidden'); actualizarMontoFinal('cambio', 0); return; }
+    const precio = parseFloat(opt.dataset.precio);
+    info.innerHTML = `Precio: <strong>${fmtMoney(precio)}</strong> &nbsp;|&nbsp; Duración: <strong>${opt.dataset.dias} días</strong>`;
     info.classList.remove('hidden');
     // Calcular nueva fecha de vencimiento desde hoy
     const hoy = new Date();
     const nuevaFin = new Date(hoy);
     nuevaFin.setDate(nuevaFin.getDate() + parseInt(opt.dataset.dias));
-    resumen.innerHTML = `📋 <strong>Resumen del cambio:</strong> Se cobrará <strong>${fmtMoney(opt.dataset.precio)}</strong> y la nueva membresía vencerá el <strong>${fmtDate(nuevaFin.toISOString())}</strong>.`;
+    resumen.innerHTML = `📋 <strong>Resumen del cambio:</strong> Se cobrará <strong>${fmtMoney(precio)}</strong> y la nueva membresía vencerá el <strong>${fmtDate(nuevaFin.toISOString())}</strong>.`;
     resumen.classList.remove('hidden');
+    actualizarMontoFinal('cambio', precio);
   }
 
   function calcularFechaFin(fechaInicio, dias, targetId) {
@@ -593,6 +623,21 @@
     } catch (err) { toast(err.message, 'error'); }
   }
 
+  // --- Calcular y mostrar monto final con descuento ---
+  function actualizarMontoFinal(prefijo, precioBase) {
+    const descEl = document.getElementById(`${prefijo}-descuento`);
+    const montoEl = document.getElementById(`${prefijo}-monto-final`);
+    if (!montoEl) return;
+    if (!precioBase || precioBase <= 0) { montoEl.innerHTML = ''; return; }
+    const descuento = Math.min(parseFloat(descEl?.value) || 0, precioBase);
+    const montoFinal = Math.max(precioBase - descuento, 0);
+    if (descuento > 0) {
+      montoEl.innerHTML = `<span style="text-decoration:line-through;color:var(--text-light)">${fmtMoney(precioBase)}</span> → <strong style="color:var(--success)">${fmtMoney(montoFinal)}</strong>`;
+    } else {
+      montoEl.innerHTML = `Total: <strong>${fmtMoney(montoFinal)}</strong>`;
+    }
+  }
+
   async function suscribir() {
     if (!cajaActual) { toast('No hay caja abierta. Abre la caja antes de registrar membresías.', 'warning'); return; }
     const clienteId = document.getElementById('mem-cliente').value;
@@ -615,6 +660,7 @@
         fecha_inicio: inicio,
         metodo_pago: document.getElementById('mem-metodo').value,
         estado_pago: document.getElementById('mem-estado-pago').value,
+        descuento: parseFloat(document.getElementById('mem-descuento').value) || 0,
         caja_id: cajaActual.id,
         notas: document.getElementById('mem-notas').value || null,
       }, false, {
@@ -646,6 +692,8 @@
     document.getElementById('cambio-metodo').value = 'efectivo';
     document.getElementById('cambio-estado-pago').value = 'pagado';
     document.getElementById('cambio-notas').value = '';
+    document.getElementById('cambio-descuento').value = '0';
+    document.getElementById('cambio-monto-final').innerHTML = '';
     document.getElementById('cambio-plan-error').classList.add('hidden');
     openModal('modal-cambio');
   }
@@ -661,6 +709,7 @@
         plan_id: planId,
         metodo_pago: document.getElementById('cambio-metodo').value,
         estado_pago: document.getElementById('cambio-estado-pago').value,
+        descuento: parseFloat(document.getElementById('cambio-descuento').value) || 0,
         caja_id: cajaActual.id,
         notas: document.getElementById('cambio-notas').value || null,
       }, false, {
@@ -685,10 +734,13 @@
   function abrirRenovar(id, plan, cliente, precio) {
     if (!cajaActual) { toast('Abre la caja antes de renovar membresías', 'warning'); return; }
     document.getElementById('renovar-mem-id').value = id;
-    document.getElementById('renovar-info').innerHTML = `Cliente: <strong>${cliente}</strong> &nbsp;|&nbsp; Plan: <strong>${plan}</strong> &nbsp;|&nbsp; Monto: <strong>${fmtMoney(precio)}</strong>`;
+    document.getElementById('renovar-info').innerHTML = `Cliente: <strong>${cliente}</strong> &nbsp;|&nbsp; Plan: <strong>${plan}</strong> &nbsp;|&nbsp; Precio: <strong>${fmtMoney(precio)}</strong>`;
     document.getElementById('renovar-metodo').value = 'efectivo';
     document.getElementById('renovar-estado-pago').value = 'pagado';
     document.getElementById('renovar-notas').value = '';
+    const descEl = document.getElementById('renovar-descuento');
+    if (descEl) { descEl.value = '0'; descEl.dataset.precioBase = precio; }
+    actualizarMontoFinal('renovar', precio);
     openModal('modal-renovar');
   }
 
@@ -699,6 +751,7 @@
       const result = await api.post(`/membresias/${id}/renovar`, {
         metodo_pago: document.getElementById('renovar-metodo').value,
         estado_pago: document.getElementById('renovar-estado-pago').value,
+        descuento: parseFloat(document.getElementById('renovar-descuento').value) || 0,
         caja_id: cajaActual.id,
         notas: document.getElementById('renovar-notas').value || null,
       }, false, {
@@ -826,6 +879,31 @@
       });
     }
 
+    // Descuento inputs: recalcular monto final en tiempo real
+    const elMemDescuento = document.getElementById('mem-descuento');
+    if (elMemDescuento) {
+      elMemDescuento.addEventListener('input', () => {
+        const sel = document.getElementById('mem-plan');
+        const opt = sel ? sel.options[sel.selectedIndex] : null;
+        actualizarMontoFinal('mem', opt && opt.value ? parseFloat(opt.dataset.precio) : 0);
+      });
+    }
+    const elCambioDescuento = document.getElementById('cambio-descuento');
+    if (elCambioDescuento) {
+      elCambioDescuento.addEventListener('input', () => {
+        const sel = document.getElementById('cambio-plan');
+        const opt = sel ? sel.options[sel.selectedIndex] : null;
+        actualizarMontoFinal('cambio', opt && opt.value ? parseFloat(opt.dataset.precio) : 0);
+      });
+    }
+    const elRenovarDescuento = document.getElementById('renovar-descuento');
+    if (elRenovarDescuento) {
+      elRenovarDescuento.addEventListener('input', () => {
+        const precioBase = parseFloat(elRenovarDescuento.dataset.precioBase) || 0;
+        actualizarMontoFinal('renovar', precioBase);
+      });
+    }
+
     const elBtnNew = document.getElementById('btn-new');
     if (elBtnNew) {
       elBtnNew.onclick = () => {
@@ -837,6 +915,8 @@
         document.getElementById('mem-metodo').value = 'efectivo';
         document.getElementById('mem-estado-pago').value = 'pagado';
         document.getElementById('mem-notas').value = '';
+        document.getElementById('mem-descuento').value = '0';
+        document.getElementById('mem-monto-final').innerHTML = '';
         document.getElementById('alerta-activa').classList.add('hidden');
         document.getElementById('plan-info').classList.add('hidden');
         document.getElementById('btn-guardar-nueva').disabled = false;
