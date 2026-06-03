@@ -54,7 +54,7 @@
           </div>
         </div>
         <div style="display:flex;gap:10px" id="caja-actions">
-          <button class="btn btn-success" id="btn-abrir" style="display:inline-flex;align-items:center;gap:6px" onclick="openModal('modal-abrir')"><span id="icon-unlock-caja"></span> Abrir Caja</button>
+          <button class="btn btn-success" id="btn-abrir" style="display:inline-flex;align-items:center;gap:6px" onclick="prepararModalAbrir();openModal('modal-abrir')"><span id="icon-unlock-caja"></span> Abrir Caja</button>
         </div>
       </div>
 
@@ -66,12 +66,8 @@
             <div class="caja-info-value" id="info-inicial">S/ 0.00</div>
           </div>
           <div class="caja-info-item">
-            <div class="caja-info-label">Ventas del turno</div>
+            <div class="caja-info-label">Ingresos totales</div>
             <div class="caja-info-value" style="color:var(--success)" id="info-ventas">S/ 0.00</div>
-          </div>
-          <div class="caja-info-item">
-            <div class="caja-info-label">Efectivo</div>
-            <div class="caja-info-value" style="color:#28a745" id="info-efectivo">S/ 0.00</div>
           </div>
           <div class="caja-info-item">
             <div class="caja-info-label">Yape</div>
@@ -107,7 +103,7 @@
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap">
           <div class="tabs" style="margin-bottom:0">
             <button class="tab active" id="tab-venta" onclick="switchTab('venta')" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-tab-venta"></span> Nueva Venta</button>
-            <button class="tab" id="tab-ventas" onclick="switchTab('ventas')" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-tab-ventas"></span> Ventas del turno</button>
+            <button class="tab" id="tab-ventas" onclick="switchTab('ventas')" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-tab-ventas"></span> Ingresos totales</button>
             <button class="tab" id="tab-movimientos" onclick="switchTab('movimientos')" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-tab-movimientos"></span> Ingresos / Egresos</button>
           </div>
           <button id="btn-export-ventas" onclick="exportarVentasTurno()" style="display:none;align-items:center;gap:6px" class="btn btn-success"><span id="icon-tab-export"></span> Exportar Excel</button>
@@ -244,7 +240,7 @@
         <div class="card">
           <div class="table-wrapper">
             <table>
-              <thead><tr><th>Apertura</th><th>Cierre</th><th>Cajero</th><th>M. Inicial</th><th>Ventas</th><th>M. Final</th><th>Estado</th><th></th></tr></thead>
+              <thead><tr><th>Apertura</th><th>Cierre</th><th>Cajero</th><th>M. Inicial</th><th>Ingresos totales</th><th>Egresos</th><th>M. Final</th><th>Estado</th><th></th></tr></thead>
               <tbody id="historial-table"></tbody>
             </table>
           </div>
@@ -258,67 +254,133 @@
 
 <!-- Modal abrir caja -->
 <div class="modal-overlay hidden" id="modal-abrir">
-  <div class="modal" style="max-width:420px">
-    <div class="modal-header">
-      <h3>🔓 Abrir Caja</h3>
-      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-abrir')">✕</button>
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header" style="background:linear-gradient(135deg,#28a745,#20c997);color:#fff;border-radius:12px 12px 0 0">
+      <div>
+        <h3 style="margin:0;font-size:18px">🔓 Abrir Nueva Caja</h3>
+        <div style="font-size:12px;opacity:0.9;margin-top:4px">Registrar apertura de turno</div>
+      </div>
+      <button class="btn btn-icon" style="color:#fff;border-color:rgba(255,255,255,0.3)" onclick="closeModal('modal-abrir')">✕</button>
     </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label>Monto inicial en caja (S/)</label>
-        <input type="number" id="abrir-monto" class="form-control" value="0" step="0.01" min="0">
+    <div class="modal-body" style="padding:24px">
+      <div style="display:flex;gap:16px;margin-bottom:20px;padding:12px 16px;background:var(--bg);border-radius:10px">
+        <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-light)">
+          <span>📅</span> <span id="abrir-fecha"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-light)">
+          <span>🕐</span> <span id="abrir-hora"></span>
+        </div>
       </div>
       <div class="form-group">
-        <label>Notas</label>
-        <textarea id="abrir-notas" class="form-control" rows="2" placeholder="Opcional..."></textarea>
+        <label style="font-weight:600;margin-bottom:6px;display:block">Monto inicial en caja (S/)</label>
+        <input type="number" id="abrir-monto" class="form-control" value="0" step="0.01" min="0" style="font-size:20px;font-weight:700;text-align:center;padding:14px" oninput="validarMontoAbrir()">
+        <div style="font-size:12px;color:var(--text-light);margin-top:6px;text-align:center">💡 Dinero con el que inicia la caja</div>
+        <div id="abrir-monto-error" style="font-size:12px;color:var(--danger);margin-top:4px;display:none;text-align:center"></div>
+      </div>
+      <div class="form-group">
+        <label style="font-weight:600;margin-bottom:6px;display:block">Notas <span style="font-weight:400;color:var(--text-light)">(opcional)</span></label>
+        <textarea id="abrir-notas" class="form-control" rows="2" placeholder="Ej: Apertura normal del turno mañana..."></textarea>
       </div>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer" style="padding:16px 24px;border-top:1px solid var(--border)">
       <button class="btn btn-outline" onclick="closeModal('modal-abrir')">Cancelar</button>
-      <button class="btn btn-success" onclick="withLoading(this, abrirCaja, 'Abriendo...')">🔓 Abrir Caja</button>
+      <button class="btn btn-success" style="min-width:140px;display:inline-flex;align-items:center;justify-content:center;gap:6px" onclick="withLoading(this, abrirCaja, 'Abriendo...')">🔓 Abrir Caja</button>
     </div>
   </div>
 </div>
 
 <!-- Modal cerrar caja -->
 <div class="modal-overlay hidden" id="modal-cerrar">
-  <div class="modal" style="max-width:420px">
-    <div class="modal-header">
-      <h3>🔒 Cerrar Caja</h3>
-      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-cerrar')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="alert alert-warning">Asegúrate de haber registrado todas las ventas antes de cerrar.</div>
-      <div class="form-group mt-2">
-        <label>Monto final contado en caja (S/)</label>
-        <input type="number" id="cerrar-monto" class="form-control" step="0.01" min="0">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header" style="background:linear-gradient(135deg,#dc3545,#e83e8c);color:#fff;border-radius:12px 12px 0 0">
+      <div>
+        <h3 style="margin:0;font-size:18px">🔒 Cerrar Caja</h3>
+        <div style="font-size:12px;opacity:0.9;margin-top:4px">Verificar y cerrar turno</div>
       </div>
+      <button class="btn btn-icon" style="color:#fff;border-color:rgba(255,255,255,0.3)" onclick="closeModal('modal-cerrar')">✕</button>
+    </div>
+    <div class="modal-body" style="padding:24px">
+      <!-- Resumen de lo que hay en caja -->
+      <div style="background:linear-gradient(135deg,#f8f9fa,#e9ecef);border-radius:12px;padding:16px;margin-bottom:20px">
+        <div style="font-size:12px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">💰 Resumen de caja</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <div style="font-size:11px;color:var(--text-light)">Monto inicial</div>
+            <div style="font-size:16px;font-weight:700" id="cerrar-inicial">S/ 0.00</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-light)">Ingresos (efectivo)</div>
+            <div style="font-size:16px;font-weight:700;color:var(--success)" id="cerrar-ingresos-efectivo">S/ 0.00</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-light)">Egresos (efectivo)</div>
+            <div style="font-size:16px;font-weight:700;color:var(--danger)" id="cerrar-egresos-efectivo">S/ 0.00</div>
+          </div>
+          <div style="padding-left:12px;border-left:2px solid var(--primary)">
+            <div style="font-size:11px;color:var(--primary);font-weight:600">Monto esperado</div>
+            <div style="font-size:20px;font-weight:700;color:var(--primary)" id="cerrar-esperado">S/ 0.00</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input del monto contado -->
       <div class="form-group">
-        <label>Notas de cierre</label>
-        <textarea id="cerrar-notas" class="form-control" rows="2" placeholder="Opcional..."></textarea>
+        <label style="font-weight:600;margin-bottom:6px;display:block">💵 Cuéntate el efectivo y registra:</label>
+        <div style="position:relative">
+          <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:18px;font-weight:700;color:var(--text-light)">S/</span>
+          <input type="number" id="cerrar-monto" class="form-control" step="0.01" min="0" style="font-size:24px;font-weight:700;text-align:center;padding:16px 16px 16px 50px" oninput="calcularDiferencia()">
+        </div>
+      </div>
+
+      <!-- Indicador de diferencia -->
+      <div id="cerrar-diferencia-container" style="display:none;margin-bottom:20px">
+        <div id="cerrar-diferencia-badge" style="padding:12px 16px;border-radius:10px;text-align:center;font-weight:600"></div>
+      </div>
+
+      <div class="form-group">
+        <label style="font-weight:600;margin-bottom:6px;display:block">Notas de cierre <span style="font-weight:400;color:var(--text-light)">(opcional)</span></label>
+        <textarea id="cerrar-notas" class="form-control" rows="2" placeholder="Ej: Cierre normal, todo cuadrado..."></textarea>
       </div>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer" style="padding:16px 24px;border-top:1px solid var(--border)">
       <button class="btn btn-outline" onclick="closeModal('modal-cerrar')">Cancelar</button>
-      <button class="btn btn-danger" onclick="withLoading(this, cerrarCaja, 'Cerrando...')">🔒 Cerrar Caja</button>
+      <button class="btn btn-danger" id="btn-cerrar-caja" style="min-width:140px;display:inline-flex;align-items:center;justify-content:center;gap:6px" onclick="withLoading(this, cerrarCaja, 'Cerrando...')">🔒 Cerrar Caja</button>
     </div>
   </div>
 </div>
 
 <!-- Modal detalle caja -->
 <div class="modal-overlay hidden" id="modal-detalle">
-  <div class="modal" style="max-width:700px">
-    <div class="modal-header">
-      <h3>Detalle de Caja</h3>
-      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-detalle')">✕</button>
+  <div class="modal" style="max-width:900px;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-header" style="background:linear-gradient(135deg,#6f42c1,#007bff);color:#fff;border-radius:12px 12px 0 0;flex-shrink:0">
+      <div>
+        <h3 style="margin:0;font-size:18px">📊 Detalle de Caja</h3>
+        <div style="font-size:12px;opacity:0.9;margin-top:4px" id="detalle-header-info">-</div>
+      </div>
+      <button class="btn btn-icon" style="color:#fff;border-color:rgba(255,255,255,0.3)" onclick="closeModal('modal-detalle')">✕</button>
     </div>
-    <div class="modal-body">
-      <div class="table-wrapper">
+    <div class="modal-body" style="padding:24px;overflow-y:auto;flex:1">
+      <!-- Resumen -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px" id="detalle-resumen"></div>
+
+      <!-- Tabs -->
+      <div style="display:flex;gap:4px;background:var(--bg);padding:4px;border-radius:10px;width:fit-content;margin-bottom:16px">
+        <button class="tab active" id="detalle-tab-todos" onclick="switchDetalleTab('todos')" style="padding:8px 16px;font-size:13px">Todos</button>
+        <button class="tab" id="detalle-tab-pagos" onclick="switchDetalleTab('pagos')" style="padding:8px 16px;font-size:13px">💳 Pagos</button>
+        <button class="tab" id="detalle-tab-ventas" onclick="switchDetalleTab('ventas')" style="padding:8px 16px;font-size:13px">🛒 Ventas</button>
+        <button class="tab" id="detalle-tab-movimientos" onclick="switchDetalleTab('movimientos')" style="padding:8px 16px;font-size:13px">📝 Movimientos</button>
+      </div>
+
+      <!-- Tabla -->
+      <div class="table-wrapper" style="max-height:400px;overflow-y:auto">
         <table>
-          <thead><tr><th>Tipo</th><th>Descripción</th><th>Miembro/Usuario</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Hora</th></tr></thead>
+          <thead><tr><th>Tipo</th><th>Descripción</th><th>Persona</th><th>Método</th><th>Monto</th><th>Hora</th></tr></thead>
           <tbody id="detalle-table"></tbody>
         </table>
       </div>
+    </div>
+    <div class="modal-footer" style="padding:16px 24px;border-top:1px solid var(--border);flex-shrink:0">
+      <button class="btn btn-outline" onclick="closeModal('modal-detalle')">Cerrar</button>
     </div>
   </div>
 </div>
@@ -395,27 +457,23 @@
         dot.className = 'caja-dot dot-green';
         text.textContent = 'Caja Abierta';
         sub.textContent  = `Cajero: ${caja.usuario_nombre} · Desde ${fmtDateTime(caja.apertura)}`;
-        acts.innerHTML = `<button class="btn btn-danger" style="display:inline-flex;align-items:center;gap:6px" onclick="openModal('modal-cerrar')">${icon('lock')} Cerrar Caja</button>`;
+        acts.innerHTML = `<button class="btn btn-danger" style="display:inline-flex;align-items:center;gap:6px" onclick="prepararModalCerrar();openModal('modal-cerrar')">${icon('lock')} Cerrar Caja</button>`;
         info.classList.remove('hidden');
 
-        // Calcular ventas del turno
-        const detalle = await api.get(`/caja/${caja.id}/detalle`);
-        const totalPagos  = detalle.pagos.reduce((s, p) => s + parseFloat(p.monto || 0), 0);
-        const totalVentas = detalle.ventas.filter(v => !v.anulada).reduce((s, v) => s + parseFloat(v.subtotal || 0), 0);
-        const totalVentasAll = totalPagos + totalVentas;
-        const inicial = parseFloat(caja.monto_inicial);
+        const ingresosTotales = parseFloat(caja.ingresos_totales || 0);
+        const totalEnCaja  = parseFloat(caja.total_en_caja || 0);
+        const inicial      = parseFloat(caja.monto_inicial);
         const ingresosManuales = parseFloat(caja.ingresos_manuales || 0);
         const egresosManuales  = parseFloat(caja.egresos_manuales  || 0);
 
         document.getElementById('info-inicial').textContent           = `S/ ${inicial.toFixed(2)}`;
-        document.getElementById('info-ventas').textContent            = `S/ ${totalVentasAll.toFixed(2)}`;
-        document.getElementById('info-efectivo').textContent          = `S/ ${parseFloat(caja.total_efectivo || 0).toFixed(2)}`;
+        document.getElementById('info-ventas').textContent            = `S/ ${ingresosTotales.toFixed(2)}`;
         document.getElementById('info-yape').textContent              = `S/ ${parseFloat(caja.total_yape || 0).toFixed(2)}`;
         document.getElementById('info-plin').textContent              = `S/ ${parseFloat(caja.total_plin || 0).toFixed(2)}`;
         document.getElementById('info-transferencia').textContent     = `S/ ${parseFloat(caja.total_transferencia || 0).toFixed(2)}`;
         document.getElementById('info-ingresos-manuales').textContent = `S/ ${ingresosManuales.toFixed(2)}`;
         document.getElementById('info-egresos-manuales').textContent  = `S/ ${egresosManuales.toFixed(2)}`;
-        document.getElementById('info-total').textContent             = `S/ ${(inicial + totalVentasAll + ingresosManuales - egresosManuales).toFixed(2)}`;
+        document.getElementById('info-total').textContent             = `S/ ${totalEnCaja.toFixed(2)}`;
         document.getElementById('info-apertura').textContent          = fmtDateTime(caja.apertura);
 
         await loadVentaSelects();
@@ -424,7 +482,7 @@
         dot.className = 'caja-dot dot-red';
         text.textContent = 'Caja Cerrada';
         sub.textContent  = 'No hay caja abierta';
-        acts.innerHTML   = `<button class="btn btn-success" id="btn-abrir" style="display:inline-flex;align-items:center;gap:6px" onclick="openModal('modal-abrir')">${icon('unlock')} Abrir Caja</button>`;
+        acts.innerHTML   = `<button class="btn btn-success" id="btn-abrir" style="display:inline-flex;align-items:center;gap:6px" onclick="prepararModalAbrir();openModal('modal-abrir')">${icon('unlock')} Abrir Caja</button>`;
         info.classList.add('hidden');
       }
     } catch (err) { toast(err.message, 'error'); }
@@ -528,7 +586,30 @@
     } catch (err) { toast(err.message, 'error'); }
   }
 
+  // ── Modal Abrir Caja ────────────────────────────────────────────────────────
+  function prepararModalAbrir() {
+    const ahora = new Date();
+    document.getElementById('abrir-fecha').textContent = ahora.toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    document.getElementById('abrir-hora').textContent = ahora.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('abrir-monto').value = '0';
+    document.getElementById('abrir-notas').value = '';
+    document.getElementById('abrir-monto-error').style.display = 'none';
+  }
+
+  function validarMontoAbrir() {
+    const val = parseFloat(document.getElementById('abrir-monto').value) || 0;
+    const err = document.getElementById('abrir-monto-error');
+    if (val < 0) {
+      err.textContent = 'El monto no puede ser negativo';
+      err.style.display = 'block';
+      return false;
+    }
+    err.style.display = 'none';
+    return true;
+  }
+
   async function abrirCaja() {
+    if (!validarMontoAbrir()) return;
     const monto_inicial = document.getElementById('abrir-monto').value;
     const notas         = document.getElementById('abrir-notas').value;
     try {
@@ -542,10 +623,63 @@
     } catch (err) { toast(err.message, 'error'); }
   }
 
+  // ── Modal Cerrar Caja ───────────────────────────────────────────────────────
+  function prepararModalCerrar() {
+    if (!cajaActual) return;
+    const inicial = parseFloat(cajaActual.monto_inicial || 0);
+    const efectivo = parseFloat(cajaActual.total_en_caja || 0) - inicial;
+    const egresos = parseFloat(cajaActual.egresos_manuales || 0);
+    const esperado = inicial + efectivo - egresos;
+
+    document.getElementById('cerrar-inicial').textContent = `S/ ${inicial.toFixed(2)}`;
+    document.getElementById('cerrar-ingresos-efectivo').textContent = `S/ ${efectivo.toFixed(2)}`;
+    document.getElementById('cerrar-egresos-efectivo').textContent = `S/ -${egresos.toFixed(2)}`;
+    document.getElementById('cerrar-esperado').textContent = `S/ ${esperado.toFixed(2)}`;
+    document.getElementById('cerrar-monto').value = '';
+    document.getElementById('cerrar-notas').value = '';
+    document.getElementById('cerrar-diferencia-container').style.display = 'none';
+  }
+
+  function calcularDiferencia() {
+    if (!cajaActual) return;
+    const inicial = parseFloat(cajaActual.monto_inicial || 0);
+    const efectivo = parseFloat(cajaActual.total_en_caja || 0) - inicial;
+    const egresos = parseFloat(cajaActual.egresos_manuales || 0);
+    const esperado = inicial + efectivo - egresos;
+    const contado = parseFloat(document.getElementById('cerrar-monto').value) || 0;
+    const container = document.getElementById('cerrar-diferencia-container');
+    const badge = document.getElementById('cerrar-diferencia-badge');
+
+    if (contado === 0) {
+      container.style.display = 'none';
+      return;
+    }
+
+    const diferencia = contado - esperado;
+    container.style.display = 'block';
+
+    if (Math.abs(diferencia) < 0.01) {
+      badge.style.background = 'rgba(40,167,69,0.15)';
+      badge.style.color = '#28a745';
+      badge.innerHTML = '✅ <strong>¡Cuadra perfecto!</strong> Diferencia: S/ 0.00';
+    } else if (diferencia > 0) {
+      badge.style.background = 'rgba(255,193,7,0.15)';
+      badge.style.color = '#e0a800';
+      badge.innerHTML = `⚠️ <strong>Sobrante:</strong> S/ ${diferencia.toFixed(2)}`;
+    } else {
+      badge.style.background = 'rgba(220,53,69,0.15)';
+      badge.style.color = '#dc3545';
+      badge.innerHTML = `⚠️ <strong>Faltante:</strong> S/ ${Math.abs(diferencia).toFixed(2)}`;
+    }
+  }
+
   async function cerrarCaja() {
     if (!cajaActual) return;
     const monto_final = document.getElementById('cerrar-monto').value;
     const notas       = document.getElementById('cerrar-notas').value;
+    if (monto_final === '' || parseFloat(monto_final) < 0) {
+      return toast('Ingresa el monto contado en caja', 'warning');
+    }
     try {
       await api.put(`/caja/cerrar/${cajaActual.id}`, { monto_final, notas }, {
         invalidate: ['caja'],
@@ -556,6 +690,118 @@
       loadEstado();
       loadHistorial();
     } catch (err) { toast(err.message, 'error'); }
+  }
+
+  // ── Modal Detalle Caja ──────────────────────────────────────────────────────
+  let detalleData = null;
+  let detalleTabActual = 'todos';
+
+  async function verDetalle(id) {
+    try {
+      const detalle = await api.get(`/caja/${id}/detalle`);
+      detalleData = detalle;
+      detalleTabActual = 'todos';
+
+      // Calcular resúmenes
+      const totalPagos = detalle.pagos.reduce((s, p) => s + parseFloat(p.monto || 0), 0);
+      const totalVentas = detalle.ventas.filter(v => !v.anulada).reduce((s, v) => s + parseFloat(v.subtotal || 0), 0);
+      const totalIngresos = (detalle.movimientos || []).filter(m => m.tipo === 'ingreso').reduce((s, m) => s + parseFloat(m.monto || 0), 0);
+      const totalEgresos = (detalle.movimientos || []).filter(m => m.tipo === 'egreso').reduce((s, m) => s + parseFloat(m.monto || 0), 0);
+      const neto = totalPagos + totalVentas + totalIngresos - totalEgresos;
+
+      document.getElementById('detalle-resumen').innerHTML = `
+        <div style="background:linear-gradient(135deg,rgba(40,167,69,0.1),rgba(40,167,69,0.05));padding:14px;border-radius:10px;border-left:3px solid var(--success)">
+          <div style="font-size:11px;color:var(--text-light);text-transform:uppercase">Pagos membresías</div>
+          <div style="font-size:18px;font-weight:700;color:var(--success)">S/ ${totalPagos.toFixed(2)}</div>
+        </div>
+        <div style="background:linear-gradient(135deg,rgba(111,66,193,0.1),rgba(111,66,193,0.05));padding:14px;border-radius:10px;border-left:3px solid #6f42c1">
+          <div style="font-size:11px;color:var(--text-light);text-transform:uppercase">Ventas productos</div>
+          <div style="font-size:18px;font-weight:700;color:#6f42c1">S/ ${totalVentas.toFixed(2)}</div>
+        </div>
+        <div style="background:linear-gradient(135deg,rgba(0,123,255,0.1),rgba(0,123,255,0.05));padding:14px;border-radius:10px;border-left:3px solid var(--primary)">
+          <div style="font-size:11px;color:var(--text-light);text-transform:uppercase">Ingresos manuales</div>
+          <div style="font-size:18px;font-weight:700;color:var(--primary)">S/ ${totalIngresos.toFixed(2)}</div>
+        </div>
+        <div style="background:linear-gradient(135deg,rgba(220,53,69,0.1),rgba(220,53,69,0.05));padding:14px;border-radius:10px;border-left:3px solid var(--danger)">
+          <div style="font-size:11px;color:var(--text-light);text-transform:uppercase">Egresos manuales</div>
+          <div style="font-size:18px;font-weight:700;color:var(--danger)">S/ ${totalEgresos.toFixed(2)}</div>
+        </div>
+        <div style="background:linear-gradient(135deg,rgba(255,193,7,0.15),rgba(255,193,7,0.05));padding:14px;border-radius:10px;border-left:3px solid #ffc107">
+          <div style="font-size:11px;color:var(--text-light);text-transform:uppercase">Neto total</div>
+          <div style="font-size:18px;font-weight:700;color:#e0a800">S/ ${neto.toFixed(2)}</div>
+        </div>
+      `;
+
+      document.getElementById('detalle-header-info').textContent = `${fmtDateTime(detalle.pagos[0]?.fecha_pago || detalle.ventas[0]?.fecha_venta || new Date())}`;
+      
+      renderDetalleTabla('todos');
+      openModal('modal-detalle');
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  function switchDetalleTab(tab) {
+    detalleTabActual = tab;
+    ['todos', 'pagos', 'ventas', 'movimientos'].forEach(t => {
+      document.getElementById(`detalle-tab-${t}`).classList.toggle('active', t === tab);
+    });
+    renderDetalleTabla(tab);
+  }
+
+  function renderDetalleTabla(tab) {
+    if (!detalleData) return;
+    const { pagos, ventas, movimientos } = detalleData;
+    let rows = [];
+
+    const metodoBadge = {
+      efectivo: '<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(40,167,69,0.12);color:#28a745">💵 Efectivo</span>',
+      yape: '<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(123,47,247,0.12);color:#7b2ff7">💜 Yape</span>',
+      plin: '<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(0,180,216,0.12);color:#00b4d8">🔵 Plin</span>',
+      transferencia: '<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(253,126,20,0.12);color:#fd7e14">🏦 Transf.</span>',
+    };
+
+    if (tab === 'todos' || tab === 'pagos') {
+      rows.push(...pagos.map(p => `
+        <tr>
+          <td><span class="badge badge-info">💳 Membresía</span></td>
+          <td>${p.plan_nombre || 'Membresía'}</td>
+          <td>${p.cliente_nombre || '-'}</td>
+          <td>${metodoBadge[p.metodo_pago] || '-'}</td>
+          <td style="font-weight:700;color:var(--success)">S/ ${parseFloat(p.monto).toFixed(2)}</td>
+          <td style="font-size:12px">${fmtDateTime(p.fecha_pago)}</td>
+        </tr>
+      `));
+    }
+
+    if (tab === 'todos' || tab === 'ventas') {
+      rows.push(...ventas.map(v => `
+        <tr style="${v.anulada ? 'opacity:0.45' : ''}">
+          <td><span class="badge badge-success">🛒 Venta</span>${v.anulada ? ' <span style="font-size:10px;color:var(--danger);font-weight:700">ANULADA</span>' : ''}</td>
+          <td>${v.producto_nombre || '-'}</td>
+          <td>${v.cliente_nombre || '-'}</td>
+          <td>${metodoBadge[v.metodo_pago] || '-'}</td>
+          <td style="font-weight:700;color:${v.anulada ? 'var(--danger)' : 'var(--success)'}">S/ ${parseFloat(v.subtotal).toFixed(2)}</td>
+          <td style="font-size:12px">${fmtDateTime(v.fecha_venta)}</td>
+        </tr>
+      `));
+    }
+
+    if (tab === 'todos' || tab === 'movimientos') {
+      rows.push(...(movimientos || []).map(m => `
+        <tr>
+          <td><span class="badge ${m.tipo === 'ingreso' ? 'badge-success' : 'badge-danger'}">${m.tipo === 'ingreso' ? '▲ Ingreso' : '▼ Egreso'}</span></td>
+          <td>${m.concepto}</td>
+          <td>${m.usuario_nombre || '-'}</td>
+          <td>${metodoBadge[m.metodo_pago] || '-'}</td>
+          <td style="font-weight:700;color:${m.tipo === 'ingreso' ? 'var(--success)' : 'var(--danger)'}">
+            ${m.tipo === 'ingreso' ? '+' : '-'}S/ ${parseFloat(m.monto).toFixed(2)}
+          </td>
+          <td style="font-size:12px">${fmtDateTime(m.fecha)}</td>
+        </tr>
+      `));
+    }
+
+    document.getElementById('detalle-table').innerHTML = rows.join('') ||
+      '<tr><td colspan="6" class="text-center" style="padding:30px;color:var(--text-light)">Sin registros</td></tr>';
   }
 
   async function loadHistorial(page = 1) {
@@ -574,12 +820,13 @@
           <td style="font-size:12px">${c.cierre ? fmtDateTime(c.cierre) : '-'}</td>
           <td>${c.usuario_nombre || '-'}</td>
           <td>S/ ${parseFloat(c.monto_inicial).toFixed(2)}</td>
-          <td style="color:var(--success);font-weight:600">S/ ${(parseFloat(c.ingresos_membresias||0) + parseFloat(c.ingresos_ventas||0)).toFixed(2)}</td>
+          <td style="color:var(--success);font-weight:600">S/ ${parseFloat(c.total_turno||0).toFixed(2)}</td>
+          <td style="color:var(--danger);font-weight:600">S/ ${parseFloat(c.egresos_manuales||0).toFixed(2)}</td>
           <td>${c.monto_final != null ? `S/ ${parseFloat(c.monto_final).toFixed(2)}` : '-'}</td>
           <td><span class="badge ${c.estado === 'abierta' ? 'badge-success' : 'badge-info'}">${c.estado}</span></td>
           <td><button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center" onclick="verDetalle('${c.id}')">${icon('eye')}</button></td>
         </tr>
-      `).join('') || '<tr><td colspan="8" class="text-center" style="padding:20px;color:var(--text-light)">Sin historial</td></tr>';
+      `).join('') || '<tr><td colspan="9" class="text-center" style="padding:20px;color:var(--text-light)">Sin historial</td></tr>';
       
       const paginacion = document.getElementById('pagination-hist');
       if (paginacion) {
@@ -588,19 +835,7 @@
     } catch (err) { toast(err.message, 'error'); }
   }
 
-  async function verDetalle(id) {
-    try {
-      const detalle = await api.get(`/caja/${id}/detalle`);
-      const rows = [
-        ...detalle.pagos.map(p => `<tr><td><span class="badge badge-info">Membresía</span></td><td>💳 ${p.plan_nombre||'Membresía'}</td><td>${p.cliente_nombre||'-'}</td><td>1</td><td>S/ ${parseFloat(p.monto).toFixed(2)}</td><td style="font-weight:700;color:var(--success)">S/ ${parseFloat(p.monto).toFixed(2)}</td><td style="font-size:12px">${fmtDateTime(p.fecha_pago)}</td></tr>`),
-        ...detalle.ventas.map(v => `<tr style="${v.anulada ? 'opacity:0.45;text-decoration:line-through' : ''}"><td><span class="badge badge-success">Venta</span></td><td>🛒 ${v.producto_nombre||'-'}${v.anulada ? ' <span style="font-size:10px;color:var(--danger);font-weight:700;text-decoration:none">[ANULADA]</span>' : ''}</td><td>${v.cliente_nombre||'-'}</td><td>${v.cantidad}</td><td>S/ ${parseFloat(v.precio_unit).toFixed(2)}</td><td style="font-weight:700;color:${v.anulada ? 'var(--danger)' : 'var(--success)'}">S/ ${parseFloat(v.subtotal).toFixed(2)}</td><td style="font-size:12px">${fmtDateTime(v.fecha_venta)}</td></tr>`),
-        ...(detalle.movimientos||[]).map(m => `<tr><td><span class="badge ${m.tipo==='ingreso' ? 'badge-success' : 'badge-danger'}">${m.tipo==='ingreso' ? '▲ Ingreso' : '▼ Egreso'}</span></td><td>${m.concepto}</td><td>${m.usuario_nombre||'-'}</td><td>-</td><td>-</td><td style="font-weight:700;color:${m.tipo==='ingreso' ? 'var(--success)' : 'var(--danger)'}">${m.tipo==='ingreso' ? '+' : '-'}S/ ${parseFloat(m.monto).toFixed(2)}</td><td style="font-size:12px">${fmtDateTime(m.fecha)}</td></tr>`),
-      ];
-      document.getElementById('detalle-table').innerHTML = rows.join('') ||
-        '<tr><td colspan="7" class="text-center" style="padding:20px;color:var(--text-light)">Sin movimientos</td></tr>';
-      openModal('modal-detalle');
-    } catch (err) { toast(err.message, 'error'); }
-  }
+  // verDetalle y renderDetalleTabla están definidos arriba con las funciones del modal
 
   function setTipoMovimiento(tipo) {
     document.getElementById('mov-tipo').value = tipo;
@@ -758,6 +993,11 @@
   window.eliminarMovimiento  = eliminarMovimiento;
   window.onVProductChange    = onVProductChange;
   window.updateVTotal        = updateVTotal;
+  window.prepararModalAbrir  = prepararModalAbrir;
+  window.validarMontoAbrir   = validarMontoAbrir;
+  window.prepararModalCerrar = prepararModalCerrar;
+  window.calcularDiferencia  = calcularDiferencia;
+  window.switchDetalleTab    = switchDetalleTab;
 </script>
 </body>
 </html>

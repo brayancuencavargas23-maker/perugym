@@ -25,25 +25,30 @@ router.get('/estado', async (req, res) => {
     const ingresosManuales = movs.find(m => m._id === 'ingreso')?.total || 0;
     const egresosManuales  = movs.find(m => m._id === 'egreso')?.total  || 0;
 
-    // Sumar movimientos manuales por método de pago (solo ingresos)
+    // Sumar movimientos manuales por método de pago (ingresos y egresos)
     const movsMetodo = await MovimientoCaja.aggregate([
-      { $match: { caja_id: caja._id, tipo: 'ingreso' } },
-      { $group: { _id: '$metodo_pago', total: { $sum: '$monto' } } },
+      { $match: { caja_id: caja._id } },
+      { $group: { _id: { tipo: '$tipo', metodo: '$metodo_pago' }, total: { $sum: '$monto' } } },
     ]);
-    const ingresosManEfectivo      = movsMetodo.find(m => m._id === 'efectivo')?.total      || 0;
-    const ingresosManYape          = movsMetodo.find(m => m._id === 'yape')?.total          || 0;
-    const ingresosManPlin          = movsMetodo.find(m => m._id === 'plin')?.total          || 0;
-    const ingresosManTransferencia = movsMetodo.find(m => m._id === 'transferencia')?.total || 0;
+    const getMov = (tipo, metodo) => movsMetodo.find(m => m._id?.tipo === tipo && m._id?.metodo === metodo)?.total || 0;
+    const ingresosManEfectivo      = getMov('ingreso', 'efectivo');
+    const ingresosManYape          = getMov('ingreso', 'yape');
+    const ingresosManPlin          = getMov('ingreso', 'plin');
+    const ingresosManTransferencia = getMov('ingreso', 'transferencia');
+    const egresosManEfectivo       = getMov('egreso', 'efectivo');
+    const egresosManYape           = getMov('egreso', 'yape');
+    const egresosManPlin           = getMov('egreso', 'plin');
+    const egresosManTransferencia  = getMov('egreso', 'transferencia');
 
     // Sumar pagos de membresías por método de pago (yape / plin)
     const pagosPorMetodo = await Pago.aggregate([
-      { $match: { caja_id: caja._id, estado: 'pagado', metodo_pago: { $in: ['efectivo', 'yape', 'plin'] } } },
+      { $match: { caja_id: caja._id, estado: 'pagado', metodo_pago: { $in: ['efectivo', 'yape', 'plin', 'transferencia'] } } },
       { $group: { _id: '$metodo_pago', total: { $sum: '$monto' } } },
     ]);
 
     // Sumar ventas de productos por método de pago (yape / plin)
     const ventasPorMetodo = await Venta.aggregate([
-      { $match: { caja_id: caja._id, anulada: false, metodo_pago: { $in: ['efectivo', 'yape', 'plin'] } } },
+      { $match: { caja_id: caja._id, anulada: false, metodo_pago: { $in: ['efectivo', 'yape', 'plin', 'transferencia'] } } },
       { $unwind: '$items' },
       { $group: { _id: '$metodo_pago', total: { $sum: '$items.subtotal' } } },
     ]);
@@ -51,9 +56,25 @@ router.get('/estado', async (req, res) => {
     const totalEfectivoPagos = pagosPorMetodo.find(m => m._id === 'efectivo')?.total || 0;
     const totalYapePagos     = pagosPorMetodo.find(m => m._id === 'yape')?.total     || 0;
     const totalPlinPagos     = pagosPorMetodo.find(m => m._id === 'plin')?.total     || 0;
+    const totalTransPagos    = pagosPorMetodo.find(m => m._id === 'transferencia')?.total || 0;
     const totalEfectivoVentas = ventasPorMetodo.find(m => m._id === 'efectivo')?.total || 0;
     const totalYapeVentas     = ventasPorMetodo.find(m => m._id === 'yape')?.total    || 0;
     const totalPlinVentas     = ventasPorMetodo.find(m => m._id === 'plin')?.total    || 0;
+    const totalTransVentas    = ventasPorMetodo.find(m => m._id === 'transferencia')?.total || 0;
+
+    const totalPagos    = totalEfectivoPagos + totalYapePagos + totalPlinPagos + totalTransPagos;
+    const totalVentas   = totalEfectivoVentas + totalYapeVentas + totalPlinVentas + totalTransVentas;
+    const total_turno   = totalPagos + totalVentas + ingresosManuales;
+
+    // Total en caja: monto inicial + efectivo físico (ventas en efectivo + pagos en efectivo + ingresos manuales efectivo - egresos manuales efectivo)
+    const totalEfectivo = totalEfectivoPagos + totalEfectivoVentas + ingresosManEfectivo - egresosManEfectivo;
+    const total_en_caja = parseFloat(caja.monto_inicial || 0) + totalEfectivo;
+
+    // Ingresos totales: todo el dinero disponible (caja + digitales)
+    const total_yape          = totalYapePagos     + totalYapeVentas     + ingresosManYape - egresosManYape;
+    const total_plin          = totalPlinPagos     + totalPlinVentas     + ingresosManPlin - egresosManPlin;
+    const total_transferencia = totalTransPagos + totalTransVentas + ingresosManTransferencia - egresosManTransferencia;
+    const ingresos_totales    = total_en_caja + total_yape + total_plin + total_transferencia;
 
     res.json({
       ...caja.toObject(),
@@ -61,10 +82,11 @@ router.get('/estado', async (req, res) => {
       usuario_nombre: caja.usuario_id?.usuario,
       ingresos_manuales: ingresosManuales,
       egresos_manuales: egresosManuales,
-      total_efectivo:      totalEfectivoPagos + totalEfectivoVentas + ingresosManEfectivo,
-      total_yape:          totalYapePagos     + totalYapeVentas     + ingresosManYape,
-      total_plin:          totalPlinPagos     + totalPlinVentas     + ingresosManPlin,
-      total_transferencia: ingresosManTransferencia,
+      total_yape,
+      total_plin,
+      total_transferencia,
+      total_en_caja,
+      ingresos_totales,
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -95,14 +117,18 @@ router.get('/', async (req, res) => {
       ]);
       const ingresosManuales = movs.find(m => m._id === 'ingreso')?.total || 0;
       const egresosManuales  = movs.find(m => m._id === 'egreso')?.total  || 0;
+      const totalPagos  = ingresosMem[0]?.total || 0;
+      const totalVentas = ingresosVentas[0]?.total || 0;
+      const total_turno = totalPagos + totalVentas + ingresosManuales;
       return {
         ...c.toObject(),
         id: c._id,
         usuario_nombre: c.usuario_id?.usuario,
-        ingresos_membresias: ingresosMem[0]?.total || 0,
-        ingresos_ventas: ingresosVentas[0]?.total || 0,
+        ingresos_membresias: totalPagos,
+        ingresos_ventas: totalVentas,
         ingresos_manuales: ingresosManuales,
         egresos_manuales: egresosManuales,
+        total_turno,
       };
     }));
 
@@ -135,7 +161,7 @@ router.put('/cerrar/:id', asyncHandler(async (req, res) => {
 
 router.get('/:id/detalle', async (req, res) => {
   try {
-    const pagos = await Pago.find({ caja_id: req.params.id })
+    const pagos = await Pago.find({ caja_id: req.params.id, estado: 'pagado' })
       .populate('cliente_id', 'nombre apellido_paterno apellido_materno')
       .populate({ path: 'membresia_id', populate: { path: 'plan_id', select: 'nombre' } })
       .sort({ fecha_pago: -1 });
