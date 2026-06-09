@@ -9,7 +9,7 @@
   <title>Dashboard - PeruGym</title>
   <link rel="stylesheet" href="/css/main.css">
   <link rel="stylesheet" href="/css/styles-responsive.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" onerror="console.warn('Chart.js CDN failed, using fallback')"></script>
   <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
   <style>
     .period-filter {
@@ -355,7 +355,6 @@
   }
 
   function renderPlanChart(clientesPorPlan) {
-    const canvas = document.getElementById('plan-chart-canvas');
     const container = document.getElementById('plan-chart');
 
     if (!clientesPorPlan || clientesPorPlan.length === 0) {
@@ -363,11 +362,28 @@
       return;
     }
 
-    if (!canvas) {
-      container.innerHTML = '<canvas id="plan-chart-canvas"></canvas>';
+    if (typeof Chart === 'undefined') {
+      const maxCount = Math.max(...clientesPorPlan.map(p => parseInt(p.count)), 1);
+      container.innerHTML = clientesPorPlan.map(p => `
+        <div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+            <span>${p.nombre}</span><span>${p.count}</span>
+          </div>
+          <div style="background:var(--bg);border-radius:4px;height:8px">
+            <div style="background:var(--primary);height:8px;border-radius:4px;width:${(p.count/maxCount*100).toFixed(0)}%"></div>
+          </div>
+        </div>
+      `).join('');
+      return;
     }
 
-    const ctx = document.getElementById('plan-chart-canvas').getContext('2d');
+    let canvas = document.getElementById('plan-chart-canvas');
+    if (!canvas) {
+      container.innerHTML = '<canvas id="plan-chart-canvas"></canvas>';
+      canvas = document.getElementById('plan-chart-canvas');
+    }
+
+    const ctx = canvas.getContext('2d');
 
     if (_chartInstance) {
       _chartInstance.destroy();

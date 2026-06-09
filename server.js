@@ -14,7 +14,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc:    ["'self'"],
-      scriptSrc:     ["'self'", "'unsafe-inline'"],      // <script> blocks inline
+      scriptSrc:     ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
       scriptSrcAttr: ["'unsafe-inline'"],                // onclick/onchange/etc. en atributos HTML
       styleSrc:      ["'self'", "'unsafe-inline'"],
       imgSrc:        ["'self'", "data:", "https://res.cloudinary.com", "blob:"],
