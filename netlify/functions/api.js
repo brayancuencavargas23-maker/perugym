@@ -3,7 +3,7 @@ const serverless = require('serverless-http');
 const express = require('express');
 const cors = require('cors');
 const fileUpload = require('express-fileupload');
-const { initDB } = require('../../config/database');
+const { connectDB } = require('../../config/database');
 
 const app = express();
 
@@ -16,7 +16,7 @@ app.use(fileUpload({ limits: { fileSize: 5 * 1024 * 1024 } }));
 let dbReady = false;
 app.use(async (req, res, next) => {
   if (!dbReady) {
-    await initDB();
+    await connectDB();
     dbReady = true;
   }
   next();
