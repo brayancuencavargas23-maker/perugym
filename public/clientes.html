@@ -28,6 +28,19 @@
           <option value="true">Activos</option>
           <option value="false">Inactivos</option>
         </select>
+        <select id="filter-membresia" class="form-control" style="width:160px">
+          <option value="">Membresía</option>
+          <option value="con">Con membresía</option>
+          <option value="sin">Sin membresía</option>
+          <option value="activo">Membresía activa</option>
+          <option value="vencida">Membresía vencida</option>
+        </select>
+        <select id="filter-vence" class="form-control" style="width:170px">
+          <option value="">Vence pronto</option>
+          <option value="7">Vence en 7 días</option>
+          <option value="15">Vence en 15 días</option>
+          <option value="30">Vence en 30 días</option>
+        </select>
         <button class="btn btn-primary" id="btn-new" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-new-cliente"></span> Nuevo Cliente</button>
         <button class="btn btn-success" id="btn-exportar-cl" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-excel-cl"></span> Exportar Excel</button>
       </div>
@@ -104,25 +117,25 @@
 <script src="/js/layout.js"></script>
 <script>
   let currentPage = 1;
+  let allClientes = [];
+  let tablePaginator = null;
 
-  async function loadClientes(page = 1) {
-    currentPage = page;
+  async function loadClientes() {
     const searchEl = document.getElementById('search');
     const activoEl = document.getElementById('filter-activo');
-    if (!searchEl || !activoEl) return; // página ya no activa
-    const search = searchEl.value;
+    const memEl = document.getElementById('filter-membresia');
+    const venceEl = document.getElementById('filter-vence');
+    if (!searchEl || !activoEl) return;
+    const search = searchEl.value.toLowerCase();
     const activo = activoEl.value;
-    let qs = `?page=${page}&limit=15`;
-    if (search) qs += `&search=${encodeURIComponent(search)}`;
-    if (activo) qs += `&activo=${activo}`;
-    if (page === 1 && !search && !activo) showTableSkeleton('clientes-table', 6);
+    const membresia = memEl ? memEl.value : '';
+    const vence = venceEl ? venceEl.value : '';
+    showTableSkeleton('clientes-table', 6);
     try {
-      const data = await api.get(`/clientes${qs}`);
-      
-      const tbody = document.getElementById('clientes-table');
-      if (!tbody) return;
-      
-      tbody.innerHTML = data.data.map(c => {
+      const data = await api.get('/clientes?limit=500');
+      allClientes = data.data;
+
+      const renderRow = (c) => {
         const days = daysUntil(c.fecha_fin);
         const expClass = days !== null && days <= 7 ? 'badge-warning' : days !== null && days < 0 ? 'badge-danger' : 'badge-info';
         const estadoMem = c.membresia_estado
@@ -150,14 +163,37 @@
             <button class="btn btn-sm btn-danger" title="Eliminar" onclick="withLoading(this, () => deleteCliente('${c.id}', '${c.nombre.replace(/'/g, "\\'")}'), 'Eliminando...')">${icon('trash')}</button>
           </td>
         </tr>`;
-      }).join('') || '<tr><td colspan="6" class="text-center" style="padding:30px;color:var(--text-light)">Sin clientes</td></tr>';
-      
-      console.log(`[Clientes] ✅ Tabla renderizada con ${data.data.length} filas`);
-      renderPagination(document.getElementById('pagination'), data.page, data.pages, loadClientes);
-    } catch (err) { 
-      console.error('[Clientes] ❌ Error en loadClientes:', err);
-      toast(err.message, 'error'); 
-    }
+      };
+
+      function applyFilters(data) {
+        return data.filter(c => {
+          if (search) {
+            const fullName = [c.nombre, c.apellido_paterno, c.apellido_materno, c.dni, c.email].filter(Boolean).join(' ').toLowerCase();
+            if (!fullName.includes(search)) return false;
+          }
+          if (activo === 'true' && !c.activo) return false;
+          if (activo === 'false' && c.activo) return false;
+          if (membresia === 'con' && !c.membresia_estado) return false;
+          if (membresia === 'sin' && c.membresia_estado) return false;
+          if (membresia === 'activo' && c.membresia_estado !== 'activo') return false;
+          if (membresia === 'vencida' && c.membresia_estado !== 'vencido') return false;
+          if (vence && c.fecha_fin) {
+            const d = daysUntil(c.fecha_fin);
+            if (d === null || d < 0 || d > parseInt(vence)) return false;
+          }
+          if (vence && !c.fecha_fin) return false;
+          return true;
+        });
+      }
+
+      const filtered = applyFilters(allClientes);
+
+      if (tablePaginator) {
+        tablePaginator.setData(filtered);
+      } else {
+        tablePaginator = initTablePagination('pagination', 'clientes-table', filtered, 10, renderRow);
+      }
+    } catch (err) { toast(err.message, 'error'); }
   }
 
   async function editCliente(id) {
@@ -217,7 +253,7 @@
 
       toast(id ? 'Cliente actualizado' : 'Cliente creado');
       closeModal('modal-overlay');
-      loadClientes(currentPage);
+      loadClientes();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -278,7 +314,7 @@
         remove: { ns: 'clientes', id },
       });
       toast('Cliente eliminado');
-      loadClientes(currentPage);
+      loadClientes();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -369,9 +405,13 @@
 
     let searchTimer;
     const elSearchInput = document.getElementById('search');
-    if (elSearchInput) elSearchInput.oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => loadClientes(1), 400); };
+    if (elSearchInput) elSearchInput.oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => loadClientes(), 400); };
     const elFilterActivo = document.getElementById('filter-activo');
-    if (elFilterActivo) elFilterActivo.onchange = () => loadClientes(1);
+    if (elFilterActivo) elFilterActivo.onchange = () => loadClientes();
+    const elFilterMembresia = document.getElementById('filter-membresia');
+    if (elFilterMembresia) elFilterMembresia.onchange = () => loadClientes();
+    const elFilterVence = document.getElementById('filter-vence');
+    if (elFilterVence) elFilterVence.onchange = () => loadClientes();
 
     console.log('[Clientes] 🔄 Cargando datos...');
     loadClientes().catch(err => {

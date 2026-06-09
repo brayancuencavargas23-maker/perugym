@@ -176,6 +176,107 @@ function renderPagination(container, current, total, onPage) {
   container.appendChild(next);
 }
 
+/**
+ * Paginación client-side con selector de filas por página.
+ * @param {string} containerId - ID del contenedor de paginación
+ * @param {string} tbodyId - ID del tbody de la tabla
+ * @param {Array} allData - Todos los datos a paginar
+ * @param {number} defaultPageSize - Tamaño de página por defecto
+ * @param {function} renderRow - Función que renderiza una fila: (item, index) => HTML string
+ * @returns {Object} - { setPageSize, getCurrentPage, refresh }
+ */
+function initTablePagination(containerId, tbodyId, allData, defaultPageSize = 10, renderRow) {
+  const container = document.getElementById(containerId);
+  const tbody = document.getElementById(tbodyId);
+  if (!container || !tbody) return null;
+
+  let currentPage = 1;
+  let pageSize = defaultPageSize;
+  let data = allData;
+
+  function getTotalPages() {
+    return Math.max(1, Math.ceil(data.length / pageSize));
+  }
+
+  function render() {
+    const total = getTotalPages();
+    if (currentPage > total) currentPage = total;
+
+    const start = (currentPage - 1) * pageSize;
+    const pageData = data.slice(start, start + pageSize);
+
+    tbody.innerHTML = pageData.map((item, i) => renderRow(item, start + i)).join('');
+
+    container.innerHTML = '';
+
+    const info = document.createElement('span');
+    info.className = 'page-info';
+    info.textContent = `Mostrando ${start + 1}-${Math.min(start + pageSize, data.length)} de ${data.length}`;
+    container.appendChild(info);
+
+    const select = document.createElement('select');
+    select.className = 'page-size-select';
+    [10, 20, 50].forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n;
+      opt.textContent = `${n} filas`;
+      opt.selected = n === pageSize;
+      select.appendChild(opt);
+    });
+    select.onchange = () => {
+      pageSize = parseInt(select.value);
+      currentPage = 1;
+      render();
+    };
+    container.appendChild(select);
+
+    if (total <= 1) return;
+
+    const prev = document.createElement('button');
+    prev.className = 'page-btn';
+    prev.textContent = '‹';
+    prev.disabled = currentPage === 1;
+    prev.onclick = () => { currentPage--; render(); };
+    container.appendChild(prev);
+
+    for (let i = 1; i <= total; i++) {
+      if (total > 7 && Math.abs(i - currentPage) > 2 && i !== 1 && i !== total) {
+        if (i === 2 || i === total - 1) {
+          const dots = document.createElement('span');
+          dots.textContent = '…';
+          dots.style.padding = '0 4px';
+          container.appendChild(dots);
+        }
+        continue;
+      }
+      const btn = document.createElement('button');
+      btn.className = `page-btn${i === currentPage ? ' active' : ''}`;
+      btn.textContent = i;
+      btn.onclick = () => { currentPage = i; render(); };
+      container.appendChild(btn);
+    }
+
+    const next = document.createElement('button');
+    next.className = 'page-btn';
+    next.textContent = '›';
+    next.disabled = currentPage === total;
+    next.onclick = () => { currentPage++; render(); };
+    container.appendChild(next);
+  }
+
+  render();
+
+  return {
+    setData(newData) {
+      data = newData;
+      currentPage = 1;
+      render();
+    },
+    getPage() { return currentPage; },
+    getPageSize() { return pageSize; }
+  };
+}
+
 // Avatar initials
 function avatarInitials(name) {
   return name ? name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() : '?';

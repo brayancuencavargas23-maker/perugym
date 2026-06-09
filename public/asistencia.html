@@ -104,6 +104,30 @@
             <input type="number" id="filter-dur-max" class="form-control" style="width:120px" placeholder="∞" min="0">
           </div>
 
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">Día semana</label>
+            <select id="filter-dia-semana" class="form-control" style="width:140px">
+              <option value="">Todos</option>
+              <option value="1">Lunes</option>
+              <option value="2">Martes</option>
+              <option value="3">Miércoles</option>
+              <option value="4">Jueves</option>
+              <option value="5">Viernes</option>
+              <option value="6">Sábado</option>
+              <option value="0">Domingo</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">Hora entrada desde</label>
+            <input type="time" id="filter-hora-desde" class="form-control" style="width:130px">
+          </div>
+
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">Hora entrada hasta</label>
+            <input type="time" id="filter-hora-hasta" class="form-control" style="width:130px">
+          </div>
+
         </div>
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="loadAsistencia(1)" style="display:inline-flex;align-items:center;gap:6px" id="btn-filter-asis"></button>
@@ -137,6 +161,8 @@
 <script src="/js/layout.js"></script>
 <script>
   let currentPage = 1;
+  let allAsistencia = [];
+  let tablePaginator = null;
 
   // Guard: devuelve true si la página de asistencia sigue activa en el DOM.
   function _pageActive() {
@@ -262,14 +288,13 @@
     document.getElementById('checkin-dropdown').style.display = 'none';
   };
 
-  async function loadAsistencia(page) {
-    page = page || 1;
+  async function loadAsistencia() {
     if (!_pageActive()) return;
-    currentPage = page;
-    if (page === 1) showTableSkeleton('asistencia-table', 6);
+    showTableSkeleton('asistencia-table', 6);
     try {
-      const data = await api.get('/asistencia' + buildQS(page, 20));
+      const data = await api.get('/asistencia?limit=500');
       if (!_pageActive()) return;
+      allAsistencia = data.data;
 
       // Actualizar stats
       if (data.stats) {
@@ -282,15 +307,7 @@
         if (statPromedio) statPromedio.textContent = data.stats.promedio_min ? data.stats.promedio_min + ' min' : '-';
       }
 
-      // Info de resultados
-      const resultInfo = document.getElementById('result-info');
-      if (resultInfo) {
-        resultInfo.textContent = data.total + ' registro' + (data.total !== 1 ? 's' : '') + ' encontrado' + (data.total !== 1 ? 's' : '');
-      }
-
-      const tabla = document.getElementById('asistencia-table');
-      if (!tabla) return;
-      tabla.innerHTML = data.data.map(function(a) {
+      const renderRow = (a) => {
         const durMin = a.salida
           ? Math.round((new Date(a.salida) - new Date(a.entrada)) / 60000)
           : null;
@@ -308,9 +325,75 @@
           '<td data-label="Duración">' + duration + '</td>' +
           '<td data-label="Acciones">' + (!a.salida ? '<button class="btn btn-sm btn-warning" style="display:inline-flex;align-items:center;gap:4px" onclick="withLoading(this, () => checkoutById(\'' + a.id + '\'), \'Registrando...\')">' + icon('checkout') + ' Checkout</button>' : '') + '</td>' +
           '</tr>';
-      }).join('') || '<tr><td colspan="6" class="text-center" style="padding:30px;color:var(--text-light)">Sin registros</td></tr>';
+      };
 
-      renderPagination(document.getElementById('pagination'), data.page, data.pages, loadAsistencia);
+      function applyFilters(data) {
+        const nombre = document.getElementById('filter-nombre')?.value.trim().toLowerCase() || '';
+        const clienteId = document.getElementById('filter-cliente')?.value || '';
+        const estado = document.getElementById('filter-estado')?.value || '';
+        const fecha = document.getElementById('filter-date')?.value || '';
+        const from = document.getElementById('filter-from')?.value || '';
+        const to = document.getElementById('filter-to')?.value || '';
+        const durMin = parseInt(document.getElementById('filter-dur-min')?.value) || 0;
+        const durMax = parseInt(document.getElementById('filter-dur-max')?.value) || Infinity;
+        const diaSemana = document.getElementById('filter-dia-semana')?.value || '';
+        const horaDesde = document.getElementById('filter-hora-desde')?.value || '';
+        const horaHasta = document.getElementById('filter-hora-hasta')?.value || '';
+
+        return data.filter(a => {
+          if (nombre) {
+            const name = (a.cliente_nombre || '').toLowerCase();
+            if (!name.includes(nombre)) return false;
+          }
+          if (clienteId && a.cliente_id !== clienteId) return false;
+          if (estado === 'en_curso' && a.salida) return false;
+          if (estado === 'completado' && !a.salida) return false;
+          if (fecha && a.fecha) {
+            const aDate = new Date(a.fecha).toISOString().split('T')[0];
+            if (aDate !== fecha) return false;
+          }
+          if (from && a.fecha) {
+            if (new Date(a.fecha) < new Date(from)) return false;
+          }
+          if (to && a.fecha) {
+            const toDate = new Date(to);
+            toDate.setHours(23, 59, 59);
+            if (new Date(a.fecha) > toDate) return false;
+          }
+          if (durMin || durMax !== Infinity) {
+            const dur = a.salida ? Math.round((new Date(a.salida) - new Date(a.entrada)) / 60000) : null;
+            if (dur === null) return false;
+            if (dur < durMin || dur > durMax) return false;
+          }
+          if (diaSemana !== '' && a.fecha) {
+            const d = new Date(a.fecha).getDay();
+            if (d !== parseInt(diaSemana)) return false;
+          }
+          if (horaDesde && a.entrada) {
+            const h = new Date(a.entrada).toTimeString().slice(0, 5);
+            if (h < horaDesde) return false;
+          }
+          if (horaHasta && a.entrada) {
+            const h = new Date(a.entrada).toTimeString().slice(0, 5);
+            if (h > horaHasta) return false;
+          }
+          return true;
+        });
+      }
+
+      const filtered = applyFilters(allAsistencia);
+
+      // Info de resultados
+      const resultInfo = document.getElementById('result-info');
+      if (resultInfo) {
+        resultInfo.textContent = filtered.length + ' registro' + (filtered.length !== 1 ? 's' : '') + ' encontrado' + (filtered.length !== 1 ? 's' : '');
+      }
+
+      if (tablePaginator) {
+        tablePaginator.setData(filtered);
+      } else {
+        tablePaginator = initTablePagination('pagination', 'asistencia-table', filtered, 10, renderRow);
+      }
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -323,7 +406,10 @@
     document.getElementById('filter-to').value       = '';
     document.getElementById('filter-dur-min').value  = '';
     document.getElementById('filter-dur-max').value  = '';
-    loadAsistencia(1);
+    document.getElementById('filter-dia-semana').value = '';
+    document.getElementById('filter-hora-desde').value = '';
+    document.getElementById('filter-hora-hasta').value = '';
+    loadAsistencia();
   }
 
   function exportarCSV() {
@@ -357,7 +443,7 @@
       document.getElementById('checkin-search').value = '';
       document.getElementById('checkin-cliente').value = '';
       gymCache.invalidateMany(['asistencia', 'dashboard']);
-      loadAsistencia(currentPage);
+      loadAsistencia();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -372,7 +458,7 @@
       document.getElementById('checkin-search').value = '';
       document.getElementById('checkin-cliente').value = '';
       gymCache.invalidateMany(['asistencia', 'dashboard']);
-      loadAsistencia(currentPage);
+      loadAsistencia();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -383,7 +469,7 @@
       });
       toast('Check-out registrado');
       gymCache.invalidateMany(['asistencia', 'dashboard']);
-      loadAsistencia(currentPage);
+      loadAsistencia();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -414,6 +500,14 @@
   window.loadAsistencia = loadAsistencia;
   window.clearFilters   = clearFilters;
   window.exportarCSV    = exportarCSV;
+
+  // ── Event listeners filtros ────────────────────────────────────────────────
+  ['filter-nombre','filter-cliente','filter-estado','filter-date','filter-from','filter-to',
+   'filter-dur-min','filter-dur-max','filter-dia-semana','filter-hora-desde','filter-hora-hasta'
+  ].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => loadAsistencia());
+  });
 </script>
 </body>
 </html>

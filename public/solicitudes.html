@@ -51,6 +51,17 @@
           <option value="convertido">Convertido</option>
           <option value="descartado">Descartado</option>
         </select>
+        <select id="filter-plan-sol" class="form-control" style="width:160px">
+          <option value="">Todos los planes</option>
+        </select>
+        <input type="date" id="filter-sol-desde" class="form-control" style="width:150px" title="Fecha desde">
+        <input type="date" id="filter-sol-hasta" class="form-control" style="width:150px" title="Fecha hasta">
+        <select id="filter-sin-contacto" class="form-control" style="width:170px">
+          <option value="">Seguimiento</option>
+          <option value="3">Sin contacto 3+ días</option>
+          <option value="7">Sin contacto 7+ días</option>
+          <option value="15">Sin contacto 15+ días</option>
+        </select>
         <button class="btn btn-outline" id="btn-refresh" style="display:inline-flex;align-items:center;gap:6px">
           <span id="icon-refresh-sol"></span> Actualizar
         </button>
@@ -205,6 +216,8 @@
 <script>
   let currentPage = 1;
   let cajaActual = null;
+  let allSolicitudes = [];
+  let tablePaginator = null;
 
   // Guard: devuelve true si la página de solicitudes sigue activa en el DOM.
   function _pageActive() {
@@ -238,20 +251,33 @@
   }
 
   // ── Cargar tabla ────────────────────────────────────────────────────────────
-  async function loadSolicitudes(page = 1, force = false) {
+  async function loadSolicitudes(force = false) {
     if (!_pageActive()) return;
-    currentPage = page;
     const estadoEl = document.getElementById('filter-estado');
+    const planEl = document.getElementById('filter-plan-sol');
+    const desdeEl = document.getElementById('filter-sol-desde');
+    const hastaEl = document.getElementById('filter-sol-hasta');
+    const sinContactoEl = document.getElementById('filter-sin-contacto');
     const estado = estadoEl ? estadoEl.value : '';
-    let qs = `?page=${page}&limit=15`;
-    if (estado) qs += `&estado=${estado}`;
-    if (page === 1 && !estado && !force) showTableSkeleton('solicitudes-table', 7);
+    const plan = planEl ? planEl.value : '';
+    const desde = desdeEl ? desdeEl.value : '';
+    const hasta = hastaEl ? hastaEl.value : '';
+    const sinContacto = sinContactoEl ? sinContactoEl.value : '';
+    showTableSkeleton('solicitudes-table', 7);
     try {
-      const data = await api.get(`/solicitudes${qs}`, force);
+      const data = await api.get('/solicitudes?limit=500', force);
       if (!_pageActive()) return;
-      const tbody = document.getElementById('solicitudes-table');
-      if (!tbody) return;
-      tbody.innerHTML = data.data.map(s => {
+      allSolicitudes = data.data;
+
+      // Poblar select de planes
+      const filterPlanSol = document.getElementById('filter-plan-sol');
+      if (filterPlanSol && filterPlanSol.options.length <= 1) {
+        const planes = [...new Set(allSolicitudes.map(s => s.plan_nombre).filter(Boolean))];
+        filterPlanSol.innerHTML = '<option value="">Todos los planes</option>' +
+          planes.map(p => `<option value="${p}">${p}</option>`).join('');
+      }
+
+      const renderRow = (s) => {
         const estadoClass = {
           pendiente:  'estado-badge-pendiente',
           contactado: 'estado-badge-contactado',
@@ -284,24 +310,43 @@
           <td data-label="Notas" style="font-size:12px;color:var(--text-light);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.notas || ''}">${s.notas || '-'}</td>
           <td data-label="Acciones" style="display:flex;gap:4px;flex-wrap:wrap">${acciones}</td>
         </tr>`;
-      }).join('') || '<tr><td colspan="7" class="text-center" style="padding:30px;color:var(--text-light)">Sin solicitudes</td></tr>';
+      };
 
-      renderPagination(document.getElementById('pagination'), data.page, data.pages, loadSolicitudes);
-    } catch (err) { 
-      console.error('[Solicitudes] ❌ Error en loadSolicitudes:', err);
-      toast(err.message, 'error'); 
-    }
+      function applyFilters(data) {
+        return data.filter(s => {
+          if (estado && s.estado !== estado) return false;
+          if (plan && s.plan_nombre !== plan) return false;
+          if (desde && s.created_at) {
+            if (new Date(s.created_at) < new Date(desde)) return false;
+          }
+          if (hasta && s.created_at) {
+            const hastaDate = new Date(hasta);
+            hastaDate.setHours(23, 59, 59);
+            if (new Date(s.created_at) > hastaDate) return false;
+          }
+          if (sinContacto && s.created_at) {
+            const dias = daysUntil(s.created_at);
+            if (dias === null || Math.abs(dias) < parseInt(sinContacto)) return false;
+          }
+          return true;
+        });
+      }
+
+      const filtered = applyFilters(allSolicitudes);
+
+      if (tablePaginator) {
+        tablePaginator.setData(filtered);
+      } else {
+        tablePaginator = initTablePagination('pagination', 'solicitudes-table', filtered, 10, renderRow);
+      }
+    } catch (err) { toast(err.message, 'error'); }
   }
 
   // ── Modal detalle / cambio de estado ───────────────────────────────────────
   async function abrirDetalle(id) {
     try {
       // Buscar en los datos ya cargados para evitar un fetch extra
-      const estado = document.getElementById('filter-estado').value;
-      let qs = `?page=${currentPage}&limit=15`;
-      if (estado) qs += `&estado=${estado}`;
-      const data = await api.get(`/solicitudes${qs}`, false);
-      const s = data.data.find(x => x.id === id || x._id === id);
+      const s = allSolicitudes.find(x => x.id === id || x._id === id);
       if (!s) return toast('Solicitud no encontrada', 'error');
 
       document.getElementById('det-id').value = s.id;
@@ -327,7 +372,7 @@
       await api.put(`/solicitudes/${id}/estado`, { estado, notas });
       toast('Solicitud actualizada');
       closeModal('modal-detalle');
-      loadSolicitudes(currentPage, true);
+      loadSolicitudes(true);
       loadStats(true);
     } catch (err) { toast(err.message, 'error'); }
   }
@@ -419,7 +464,7 @@
       }, false, { invalidate: ['solicitudes', 'clientes', 'membresias', 'pagos'] });
       toast('¡Cliente creado con membresía y pago registrados!', 'success');
       closeModal('modal-convertir');
-      loadSolicitudes(currentPage, true);
+      loadSolicitudes(true);
       loadStats(true);
     } catch (err) { toast(err.message, 'error'); }
   }
@@ -444,7 +489,7 @@
       if (_lastPendingCount !== null && nuevasCantidad > _lastPendingCount) {
         const diff = nuevasCantidad - _lastPendingCount;
         gymCache.invalidate('solicitudes');
-        await loadSolicitudes(currentPage, true);
+        await loadSolicitudes(true);
         await loadStats(true);
         toast(`🔔 ${diff} nueva${diff > 1 ? 's' : ''} solicitud${diff > 1 ? 'es' : ''} recibida${diff > 1 ? 's' : ''}`, 'success');
       }
@@ -472,12 +517,20 @@
 
   // ── Eventos ─────────────────────────────────────────────────────────────────
   const _elFilterEstado = document.getElementById('filter-estado');
-  if (_elFilterEstado) _elFilterEstado.onchange = () => loadSolicitudes(1);
+  if (_elFilterEstado) _elFilterEstado.onchange = () => loadSolicitudes();
+  const _elFilterPlanSol = document.getElementById('filter-plan-sol');
+  if (_elFilterPlanSol) _elFilterPlanSol.onchange = () => loadSolicitudes();
+  const _elFilterSolDesde = document.getElementById('filter-sol-desde');
+  if (_elFilterSolDesde) _elFilterSolDesde.onchange = () => loadSolicitudes();
+  const _elFilterSolHasta = document.getElementById('filter-sol-hasta');
+  if (_elFilterSolHasta) _elFilterSolHasta.onchange = () => loadSolicitudes();
+  const _elFilterSinContacto = document.getElementById('filter-sin-contacto');
+  if (_elFilterSinContacto) _elFilterSinContacto.onchange = () => loadSolicitudes();
   const _elBtnRefresh = document.getElementById('btn-refresh');
   if (_elBtnRefresh) _elBtnRefresh.onclick = () => {
     gymCache.invalidate('solicitudes');
     loadStats(true);
-    loadSolicitudes(currentPage, true);
+    loadSolicitudes(true);
   };
 
   // ── Init ────────────────────────────────────────────────────────────────────

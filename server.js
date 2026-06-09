@@ -5,7 +5,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const fileUpload = require('express-fileupload');
 const path = require('path');
-const { initDB } = require('./config/database');
+const { connectDB } = require('./config/database');
 
 const app = express();
 
@@ -108,8 +108,36 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
 
-initDB()
-  .then(() => app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`)))
+connectDB()
+  .then(async () => {
+    if (process.env.DB_MODE !== 'json') {
+      const bcrypt = require('bcryptjs');
+      const Usuario = require('./models/Usuario');
+      const Plan = require('./models/Plan');
+
+      const existing = await Usuario.findOne({ email: 'admin@gym.com' });
+      if (!existing) {
+        const hash = await bcrypt.hash('admin123', 10);
+        await Usuario.create({
+          usuario: 'admin',
+          email: 'admin@gym.com',
+          password: hash,
+          rol: 'admin',
+        });
+        console.log('Usuario admin creado: usuario=admin / admin123');
+      }
+      const count = await Plan.countDocuments();
+      if (count === 0) {
+        await Plan.insertMany([
+          { nombre: 'Básico', precio: 99, duracion_dias: 30, descripcion: 'Ideal para empezar', caracteristicas: ['Acceso a sala de musculación', 'Clases grupales básicas', '1 evaluación física mensual'], mostrar_landing: true, destacado: false },
+          { nombre: 'Pro', precio: 149, duracion_dias: 30, descripcion: 'Para resultados reales', caracteristicas: ['Acceso ilimitado a todas las áreas', 'Clases grupales ilimitadas', 'Evaluaciones físicas mensuales'], mostrar_landing: true, destacado: true },
+          { nombre: 'Premium', precio: 199, duracion_dias: 30, descripcion: 'Máximo rendimiento', caracteristicas: ['Todo en plan PRO', 'Nutricionista incluido', 'Acceso a zonas exclusivas'], mostrar_landing: true, destacado: false },
+        ]);
+        console.log('Planes de ejemplo creados');
+      }
+    }
+    app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));
+  })
   .catch(err => { console.error('Error iniciando DB:', err); process.exit(1); });
 
 module.exports = app;

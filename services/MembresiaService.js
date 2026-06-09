@@ -46,7 +46,7 @@ class MembresiaService {
    * @throws {NotFoundError} - If plan not found or inactive
    */
   static async crear(data, session) {
-    const { cliente_id, plan_id, fecha_inicio, estado_pago = 'pagado' } = data;
+    const { cliente_id, plan_id, fecha_inicio, fecha_fin, estado_pago = 'pagado' } = data;
 
     // Check for existing active membership
     const tieneActiva = await this.tieneMembresiaActiva(cliente_id, session);
@@ -65,8 +65,13 @@ class MembresiaService {
 
     // Calculate dates
     const inicio = fecha_inicio ? new Date(fecha_inicio) : new Date();
-    const fin = new Date(inicio);
-    fin.setDate(fin.getDate() + plan.duracion_dias);
+    let fin;
+    if (fecha_fin) {
+      fin = new Date(fecha_fin);
+    } else {
+      fin = new Date(inicio);
+      fin.setDate(fin.getDate() + plan.duracion_dias);
+    }
 
     // Determine membership status based on payment status
     const estadoMembresia = estado_pago === 'pendiente' ? 'pendiente' : 'activo';

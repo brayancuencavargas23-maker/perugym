@@ -35,6 +35,12 @@
     .tab.active { background:#fff; color:var(--primary); box-shadow:var(--shadow); }
     .product-img { width:40px; height:40px; border-radius:8px; object-fit:cover; }
     .product-img-ph { width:40px; height:40px; border-radius:8px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:18px; }
+
+    /* Tabs principales */
+    .tabs-main { display:flex; gap:4px; background:var(--card-bg); padding:6px; border-radius:12px; margin-bottom:24px; box-shadow:var(--shadow); width:fit-content; }
+    .tab-main { padding:10px 24px; border-radius:8px; border:none; background:transparent; cursor:pointer; font-size:14px; font-weight:600; color:var(--text-light); transition:all .2s; display:inline-flex; align-items:center; gap:6px; }
+    .tab-main:hover { color:var(--text); background:var(--bg); }
+    .tab-main.active { background:var(--primary); color:#fff; box-shadow:0 2px 8px rgba(var(--primary-rgb),0.3); }
   </style>
 </head>
 <body>
@@ -43,6 +49,15 @@
   <div class="main-content">
     <div class="topbar" id="topbar"></div>
     <div class="page-content">
+
+      <!-- Tabs principales -->
+      <div class="tabs-main">
+        <button class="tab-main active" id="tab-main-caja" onclick="switchMainTab('caja')">💰 Caja</button>
+        <button class="tab-main" id="tab-main-historial" onclick="switchMainTab('historial')">📋 Historial de Caja</button>
+      </div>
+
+      <!-- ═══ Sección: Caja ═══ -->
+      <div id="main-section-caja">
 
       <!-- Estado de caja -->
       <div id="caja-status-bar" class="caja-status-bar caja-cerrada">
@@ -162,6 +177,7 @@
                 <tbody id="turno-ventas-table"></tbody>
               </table>
             </div>
+            <div class="pagination" id="pagination-ventas"></div>
           </div>
         </div>
 
@@ -229,14 +245,29 @@
                   <tbody id="movimientos-table"></tbody>
                 </table>
               </div>
+              <div class="pagination" id="pagination-movimientos"></div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Historial de cajas -->
-      <div id="historial-section">
+      </div><!-- /main-section-caja -->
+
+      <!-- ═══ Sección: Historial de Caja ═══ -->
+      <div id="main-section-historial" class="hidden">
         <h3 style="font-size:15px;margin-bottom:16px;margin-top:8px;display:flex;align-items:center;gap:6px" id="h-historial"></h3>
+        <div class="search-bar" style="margin-bottom:12px">
+          <select id="filter-estado-caja" class="form-control" style="width:140px">
+            <option value="">Todos</option>
+            <option value="abierto">Abierta</option>
+            <option value="cerrado">Cerrada</option>
+          </select>
+          <select id="filter-cajero" class="form-control" style="width:160px">
+            <option value="">Todos los cajeros</option>
+          </select>
+          <input type="date" id="filter-from-caja" class="form-control" style="width:160px">
+          <input type="date" id="filter-to-caja" class="form-control" style="width:160px">
+        </div>
         <div class="card">
           <div class="table-wrapper">
             <table>
@@ -246,7 +277,7 @@
           </div>
           <div class="pagination" id="pagination-hist"></div>
         </div>
-      </div>
+      </div><!-- /main-section-historial -->
 
     </div>
   </div>
@@ -393,10 +424,29 @@
 <script>
   let cajaActual = null;
   let currentTabCaja = 'venta';
+  let allHistorial = [];
+  let allVentas = [];
+  let allMovimientos = [];
+  let histPaginator = null;
+  let ventasPaginator = null;
+  let movimientosPaginator = null;
 
   // Guard: devuelve true si la página de caja sigue activa en el DOM.
   function _pageActive() {
     return !!document.getElementById('caja-status-bar');
+  }
+
+  let historialLoaded = false;
+
+  function switchMainTab(tab) {
+    document.getElementById('main-section-caja').classList.toggle('hidden', tab !== 'caja');
+    document.getElementById('main-section-historial').classList.toggle('hidden', tab !== 'historial');
+    document.getElementById('tab-main-caja').classList.toggle('active', tab === 'caja');
+    document.getElementById('tab-main-historial').classList.toggle('active', tab === 'historial');
+    if (tab === 'historial' && !historialLoaded) {
+      historialLoaded = true;
+      loadHistorial();
+    }
   }
 
   function switchTab(tab) {
@@ -565,7 +615,9 @@
     if (!cajaActual) return;
     try {
       const detalle = await api.get(`/caja/${cajaActual.id}/detalle`);
-      document.getElementById('turno-ventas-table').innerHTML = detalle.ventas.map(v => `
+      allVentas = detalle.ventas;
+
+      const renderRow = (v) => `
         <tr style="${v.anulada ? 'opacity:0.45;text-decoration:line-through' : ''}">
           <td>${v.producto_nombre || '-'}</td>
           <td>${v.cliente_nombre || '-'}</td>
@@ -582,7 +634,13 @@
               : ''}
           </td>
         </tr>
-      `).join('') || '<tr><td colspan="8" class="text-center" style="padding:20px;color:var(--text-light)">Sin ventas en este turno</td></tr>';
+      `;
+
+      if (ventasPaginator) {
+        ventasPaginator.setData(allVentas);
+      } else {
+        ventasPaginator = initTablePagination('pagination-ventas', 'turno-ventas-table', allVentas, 10, renderRow);
+      }
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -618,6 +676,7 @@
       });
       toast('Caja abierta ✅');
       closeModal('modal-abrir');
+      histPaginator = null;
       loadEstado();
       loadHistorial();
     } catch (err) { toast(err.message, 'error'); }
@@ -687,6 +746,7 @@
       toast('Caja cerrada 🔒');
       closeModal('modal-cerrar');
       cajaActual = null;
+      histPaginator = null;
       loadEstado();
       loadHistorial();
     } catch (err) { toast(err.message, 'error'); }
@@ -804,17 +864,23 @@
       '<tr><td colspan="6" class="text-center" style="padding:30px;color:var(--text-light)">Sin registros</td></tr>';
   }
 
-  async function loadHistorial(page = 1) {
+  async function loadHistorial() {
     try {
-      // Validar que estamos en la página de caja
       const tabla = document.getElementById('historial-table');
-      if (!tabla) {
-        console.log('[Caja] No estamos en la página de caja, saltando loadHistorial');
-        return;
-      }
+      if (!tabla) return;
       
-      const data = await api.get(`/caja?page=${page}&limit=15`);
-      tabla.innerHTML = data.data.map(c => `
+      const data = await api.get('/caja?limit=500');
+      allHistorial = data.data;
+
+      // Poblar select de cajeros
+      const filterCajero = document.getElementById('filter-cajero');
+      if (filterCajero && filterCajero.options.length <= 1) {
+        const cajeros = [...new Set(allHistorial.map(c => c.usuario_nombre).filter(Boolean))];
+        filterCajero.innerHTML = '<option value="">Todos los cajeros</option>' +
+          cajeros.map(c => `<option value="${c}">${c}</option>`).join('');
+      }
+
+      const renderRow = (c) => `
         <tr>
           <td style="font-size:12px">${fmtDateTime(c.apertura)}</td>
           <td style="font-size:12px">${c.cierre ? fmtDateTime(c.cierre) : '-'}</td>
@@ -826,11 +892,34 @@
           <td><span class="badge ${c.estado === 'abierta' ? 'badge-success' : 'badge-info'}">${c.estado}</span></td>
           <td><button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center" onclick="verDetalle('${c.id}')">${icon('eye')}</button></td>
         </tr>
-      `).join('') || '<tr><td colspan="9" class="text-center" style="padding:20px;color:var(--text-light)">Sin historial</td></tr>';
-      
-      const paginacion = document.getElementById('pagination-hist');
-      if (paginacion) {
-        renderPagination(paginacion, data.page, data.pages, loadHistorial);
+      `;
+
+      function applyFilters(data) {
+        return data.filter(c => {
+          const estado = document.getElementById('filter-estado-caja')?.value || '';
+          const cajero = document.getElementById('filter-cajero')?.value || '';
+          const from   = document.getElementById('filter-from-caja')?.value || '';
+          const to     = document.getElementById('filter-to-caja')?.value || '';
+          if (estado && c.estado !== estado) return false;
+          if (cajero && c.usuario_nombre !== cajero) return false;
+          if (from && c.apertura) {
+            if (new Date(c.apertura) < new Date(from)) return false;
+          }
+          if (to && c.apertura) {
+            const toDate = new Date(to);
+            toDate.setHours(23, 59, 59);
+            if (new Date(c.apertura) > toDate) return false;
+          }
+          return true;
+        });
+      }
+
+      const filtered = applyFilters(allHistorial);
+
+      if (histPaginator) {
+        histPaginator.setData(filtered);
+      } else {
+        histPaginator = initTablePagination('pagination-hist', 'historial-table', filtered, 10, renderRow);
       }
     } catch (err) { toast(err.message, 'error'); }
   }
@@ -898,18 +987,16 @@
     if (!cajaActual) return;
     try {
       const movs = await api.get(`/caja/${cajaActual.id}/movimientos`);
-      const tbody = document.getElementById('movimientos-table');
-      if (!movs.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding:20px;color:var(--text-light)">Sin movimientos registrados</td></tr>';
-        return;
-      }
+      allMovimientos = movs;
+
       const metodoBadge = {
         efectivo:      '<span class="badge" style="background:#28a74522;color:#28a745">💵 Efectivo</span>',
         yape:          '<span class="badge" style="background:#7b2ff722;color:#7b2ff7">💜 Yape</span>',
         plin:          '<span class="badge" style="background:#00b4d822;color:#00b4d8">🔵 Plin</span>',
         transferencia: '<span class="badge" style="background:#fd7e1422;color:#fd7e14">🏦 Transf.</span>',
       };
-      tbody.innerHTML = movs.map(m => `
+
+      const renderRow = (m) => `
         <tr>
           <td>
             <span class="badge ${m.tipo === 'ingreso' ? 'badge-success' : 'badge-danger'}">${m.tipo === 'ingreso' ? '▲ Ingreso' : '▼ Egreso'}</span>
@@ -926,7 +1013,13 @@
             <button class="btn btn-sm btn-danger" style="display:inline-flex;align-items:center;gap:4px" onclick="eliminarMovimiento('${m.id}')">${icon('trash')}</button>
           </td>
         </tr>
-      `).join('');
+      `;
+
+      if (movimientosPaginator) {
+        movimientosPaginator.setData(allMovimientos);
+      } else {
+        movimientosPaginator = initTablePagination('pagination-movimientos', 'movimientos-table', allMovimientos, 10, renderRow);
+      }
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -975,11 +1068,11 @@
     if (hHistorial) hHistorial.innerHTML = icon('calendar') + ' Historial de Cajas';
 
     loadEstado();
-    loadHistorial();
   })();
   
   // Exponer funciones al scope global para que los onclick del HTML funcionen
   // cuando la página se carga dentro del SPA (el router envuelve el script en un IIFE)
+  window.switchMainTab        = switchMainTab;
   window.abrirCaja           = abrirCaja;
   window.cerrarCaja          = cerrarCaja;
   window.switchTab           = switchTab;
@@ -998,6 +1091,12 @@
   window.prepararModalCerrar = prepararModalCerrar;
   window.calcularDiferencia  = calcularDiferencia;
   window.switchDetalleTab    = switchDetalleTab;
+
+  // ── Event listeners filtros historial ──────────────────────────────────────
+  ['filter-estado-caja','filter-cajero','filter-from-caja','filter-to-caja'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(el.tagName === 'INPUT' ? 'change' : 'change', () => loadHistorial());
+  });
 </script>
 </body>
 </html>

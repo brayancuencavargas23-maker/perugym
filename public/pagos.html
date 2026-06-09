@@ -36,9 +36,14 @@
           <option value="plin">Plin</option>
           <option value="transferencia">Transferencia</option>
         </select>
+        <select id="filter-plan-pag" class="form-control" style="width:160px">
+          <option value="">Todos los planes</option>
+        </select>
+        <input type="number" id="filter-monto-min" class="form-control" style="width:120px" placeholder="Monto mín" min="0" step="0.01">
+        <input type="number" id="filter-monto-max" class="form-control" style="width:120px" placeholder="Monto máx" min="0" step="0.01">
         <input type="date" id="filter-from" class="form-control" style="width:160px">
         <input type="date" id="filter-to" class="form-control" style="width:160px">
-        <button class="btn btn-outline" onclick="loadPagos(1)" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-filter-pag"></span> Filtrar</button>
+        <button class="btn btn-outline" onclick="loadPagos()" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-filter-pag"></span> Filtrar</button>
         <button class="btn btn-success" onclick="exportarPagos()" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-excel-pag"></span> Exportar Excel</button>
       </div>
       <div class="card">
@@ -92,6 +97,8 @@
 <script>
   let currentPage = 1;
   let cajaActual = null;
+  let allPagos = [];
+  let tablePaginator = null;
 
   // Guard: devuelve true si la página de pagos sigue activa en el DOM.
   function _pageActive() {
@@ -105,27 +112,37 @@
     if (banner) banner.classList.toggle('hidden', !!cajaActual);
   }
 
-  async function loadPagos(page = 1) {
-    currentPage = page;
+  async function loadPagos() {
     const estadoEl = document.getElementById('filter-estado');
     const metodoEl = document.getElementById('filter-metodo');
     const fromEl   = document.getElementById('filter-from');
     const toEl     = document.getElementById('filter-to');
-    if (!estadoEl || !metodoEl) return; // página ya no activa
+    const planEl   = document.getElementById('filter-plan-pag');
+    const minEl    = document.getElementById('filter-monto-min');
+    const maxEl    = document.getElementById('filter-monto-max');
+    if (!estadoEl || !metodoEl) return;
     const estado = estadoEl.value;
     const metodo = metodoEl.value;
     const from = fromEl ? fromEl.value : '';
     const to   = toEl   ? toEl.value   : '';
-    let qs = `?page=${page}&limit=15`;
-    if (estado) qs += `&estado=${estado}`;
-    if (metodo) qs += `&metodo_pago=${metodo}`;
-    if (from) qs += `&from=${from}`;
-    if (to) qs += `&to=${to}`;
-    if (page === 1 && !estado && !metodo && !from && !to) showTableSkeleton('pagos-table', 7);
+    const plan = planEl ? planEl.value : '';
+    const min  = minEl ? parseFloat(minEl.value) || 0 : 0;
+    const max  = maxEl ? parseFloat(maxEl.value) || Infinity : Infinity;
+    showTableSkeleton('pagos-table', 7);
     try {
-      const data = await api.get(`/pagos${qs}`);
+      const data = await api.get('/pagos?limit=500');
       if (!_pageActive()) return;
-      document.getElementById('pagos-table').innerHTML = data.data.map(p => `
+      allPagos = data.data;
+
+      // Poblar select de planes
+      const filterPlanPag = document.getElementById('filter-plan-pag');
+      if (filterPlanPag && filterPlanPag.options.length <= 1) {
+        const planes = [...new Set(allPagos.map(p => p.plan_nombre).filter(Boolean))];
+        filterPlanPag.innerHTML = '<option value="">Todos los planes</option>' +
+          planes.map(p => `<option value="${p}">${p}</option>`).join('');
+      }
+
+      const renderRow = (p) => `
         <tr>
           <td data-label="Cliente">${p.cliente_nombre || '-'}</td>
           <td data-label="Plan">${p.plan_nombre || '-'}</td>
@@ -140,8 +157,33 @@
             <button class="btn btn-sm btn-danger" title="Eliminar" onclick="withLoading(this, () => deletePago('${p.id}'), 'Eliminando...')">${icon('trash')}</button>
           </td>
         </tr>
-      `).join('') || '<tr><td colspan="7" class="text-center" style="padding:30px;color:var(--text-light)">Sin pagos</td></tr>';
-      renderPagination(document.getElementById('pagination'), data.page, data.pages, loadPagos);
+      `;
+
+      function applyFilters(data) {
+        return data.filter(p => {
+          if (estado && p.estado !== estado) return false;
+          if (metodo && p.metodo_pago !== metodo) return false;
+          if (plan && p.plan_nombre !== plan) return false;
+          if (p.monto < min || p.monto > max) return false;
+          if (from && p.fecha_pago) {
+            if (new Date(p.fecha_pago) < new Date(from)) return false;
+          }
+          if (to && p.fecha_pago) {
+            const toDate = new Date(to);
+            toDate.setHours(23, 59, 59);
+            if (new Date(p.fecha_pago) > toDate) return false;
+          }
+          return true;
+        });
+      }
+
+      const filtered = applyFilters(allPagos);
+
+      if (tablePaginator) {
+        tablePaginator.setData(filtered);
+      } else {
+        tablePaginator = initTablePagination('pagination', 'pagos-table', filtered, 10, renderRow);
+      }
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -181,7 +223,7 @@
       }
       toast('Pago confirmado y membresía activada');
       closeModal('modal-confirmar');
-      loadPagos(currentPage);
+      loadPagos();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -198,7 +240,7 @@
         remove: { ns: 'pagos', id },
       });
       toast('Pago eliminado');
-      loadPagos(currentPage);
+      loadPagos();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -226,8 +268,18 @@
 
     const elEstado = document.getElementById('filter-estado');
     const elMetodo = document.getElementById('filter-metodo');
-    if (elEstado) elEstado.onchange = () => loadPagos(1);
-    if (elMetodo) elMetodo.onchange = () => loadPagos(1);
+    const elPlanPag = document.getElementById('filter-plan-pag');
+    const elMontoMin = document.getElementById('filter-monto-min');
+    const elMontoMax = document.getElementById('filter-monto-max');
+    const elFrom = document.getElementById('filter-from');
+    const elTo = document.getElementById('filter-to');
+    if (elEstado) elEstado.onchange = () => loadPagos();
+    if (elMetodo) elMetodo.onchange = () => loadPagos();
+    if (elPlanPag) elPlanPag.onchange = () => loadPagos();
+    if (elMontoMin) elMontoMin.oninput = () => loadPagos();
+    if (elMontoMax) elMontoMax.oninput = () => loadPagos();
+    if (elFrom) elFrom.onchange = () => loadPagos();
+    if (elTo) elTo.onchange = () => loadPagos();
 
     loadPagos();
     checkCaja();

@@ -33,6 +33,18 @@
           <option value="vencido">Vencido</option>
           <option value="cancelado">Cancelado</option>
         </select>
+        <select id="filter-plan" class="form-control" style="width:160px">
+          <option value="">Todos los planes</option>
+        </select>
+        <select id="filter-vence-mes" class="form-control" style="width:150px">
+          <option value="">Vencimiento</option>
+          <option value="7">Vence en 7 días</option>
+          <option value="15">Vence en 15 días</option>
+          <option value="30">Vence en 30 días</option>
+          <option value="mes">Vence este mes</option>
+        </select>
+        <input type="date" id="filter-inicio-desde" class="form-control" style="width:150px" title="Inicio desde">
+        <input type="date" id="filter-inicio-hasta" class="form-control" style="width:150px" title="Inicio hasta">
         <button class="btn btn-outline" id="btn-vencen" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-warning-mem"></span> Vencen pronto</button>
         <button class="btn btn-success" id="btn-exportar-mem" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-excel-mem"></span> Exportar Excel</button>
         <button class="btn btn-primary" id="btn-new" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-plus-mem"></span> Nueva Membresía</button>
@@ -77,8 +89,8 @@
           <small id="mem-inicio-error" class="text-danger hidden">Ingresa la fecha de inicio.</small>
         </div>
         <div class="form-group">
-          <label>Fecha fin (calculada)</label>
-          <input type="date" id="mem-fin" class="form-control" readonly style="background:var(--bg)">
+          <label>Fecha fin</label>
+          <input type="date" id="mem-fin" class="form-control">
         </div>
       </div>
       <div class="form-row">
@@ -335,6 +347,8 @@
   let vencenFilter = false;
   let planesCache = [];
   let cajaActual = null; // caja abierta activa
+  let allMembresias = []; // todos los datos para paginación client-side
+  let tablePaginator = null; // instancia de paginación
 
   // Guard: devuelve true si la página de membresías sigue activa en el DOM.
   // Evita que promesas en vuelo escriban en elementos que ya no existen
@@ -444,37 +458,37 @@
     document.getElementById(targetId).value = d.toISOString().split('T')[0];
   }
 
-  async function loadMembresias(page = 1) {
-    currentPage = page;
+  async function loadMembresias() {
     const estadoEl = document.getElementById('filter-estado');
     const nombreEl = document.getElementById('search-nombre');
-    if (!estadoEl || !nombreEl) return; // página ya no está activa
+    const planEl = document.getElementById('filter-plan');
+    const venceMesEl = document.getElementById('filter-vence-mes');
+    const inicioDesde = document.getElementById('filter-inicio-desde');
+    const inicioHasta = document.getElementById('filter-inicio-hasta');
+    if (!estadoEl || !nombreEl) return;
     const estado = estadoEl.value;
-    const nombre = nombreEl.value.trim();
-    let qs = `?page=${page}&limit=15`;
-    if (estado) qs += `&estado=${estado}`;
-    if (nombre) qs += `&nombre=${encodeURIComponent(nombre)}`;
-    if (vencenFilter) qs += `&vencen_pronto=true`;
-    if (page === 1 && !estado && !nombre && !vencenFilter) showTableSkeleton('membresias-table', 7);
+    const nombre = nombreEl.value.trim().toLowerCase();
+    const plan = planEl ? planEl.value : '';
+    const venceMes = venceMesEl ? venceMesEl.value : '';
+    const desde = inicioDesde ? inicioDesde.value : '';
+    const hasta = inicioHasta ? inicioHasta.value : '';
+    showTableSkeleton('membresias-table', 7);
     try {
-      const data = await api.get(`/membresias${qs}`); // Usar caché por defecto
-      if (!_pageActive()) return; // navegaron mientras cargaba la lista
-      // Construir set de cliente_ids que ya tienen membresía activa en esta página
-      const clientesConActiva = new Set(
-        data.data.filter(m => m.estado === 'activo' || m.estado === 'pendiente').map(m => m.cliente_id)
-      );
-      document.getElementById('membresias-table').innerHTML = data.data.map(m => {
+      const data = await api.get('/membresias?limit=500');
+      if (!_pageActive()) return;
+      allMembresias = data.data;
+
+      const renderRow = (m) => {
         const days = daysUntil(m.fecha_fin);
         const expClass = days !== null && days <= 7 && days >= 0 ? 'badge-warning' : days !== null && days < 0 ? 'badge-danger' : 'badge-info';
         const estadoClass = { activo: 'badge-success', vencido: 'badge-danger', cancelado: 'badge-warning', pendiente: 'badge-warning' }[m.estado] || 'badge-info';
         const esActivo = m.estado === 'activo';
         const esPendiente = m.estado === 'pendiente';
-        // Solo mostrar renovar si está vencido/cancelado Y el cliente NO tiene ya otra activa/pendiente
-        const puedeRenovar = (m.estado === 'vencido' || m.estado === 'cancelado') && !clientesConActiva.has(m.cliente_id);
+        const clientesConActiva = allMembresias.filter(x => (x.estado === 'activo' || x.estado === 'pendiente') && x.cliente_id === m.cliente_id);
+        const puedeRenovar = (m.estado === 'vencido' || m.estado === 'cancelado') && clientesConActiva.length === 0;
         const cajaBloqueado = !cajaActual;
         const disabledAttr = cajaBloqueado ? 'disabled title="Abre la caja primero"' : '';
 
-        // Badge de estado de pago: buscar en pagos_estado si existe, sino inferir
         let pagoBadge = '';
         if (m.estado === 'cancelado') {
           pagoBadge = '<span class="badge badge-warning">Cancelado</span>';
@@ -509,8 +523,41 @@
             ${(esActivo || esPendiente) ? `<button class="btn btn-sm btn-danger" title="Cancelar membresía" onclick="abrirCancelar('${m.id}','${m.cliente_nombre}','${m.plan_nombre}')">${icon('cancel')}</button>` : ''}
           </td>
         </tr>`;
-      }).join('') || '<tr><td colspan="7" class="text-center" style="padding:30px;color:var(--text-light)">Sin membresías</td></tr>';
-      renderPagination(document.getElementById('pagination'), data.page, data.pages, loadMembresias);
+      };
+
+      function applyFilters(data) {
+        return data.filter(m => {
+          if (nombre) {
+            const name = (m.cliente_nombre || '').toLowerCase();
+            if (!name.includes(nombre)) return false;
+          }
+          if (estado && m.estado !== estado) return false;
+          if (plan && m.plan_nombre !== plan) return false;
+          if (venceMes === 'mes') {
+            const d = new Date(m.fecha_fin);
+            const hoy = new Date();
+            if (d.getMonth() !== hoy.getMonth() || d.getFullYear() !== hoy.getFullYear()) return false;
+          } else if (venceMes) {
+            const d = daysUntil(m.fecha_fin);
+            if (d === null || d < 0 || d > parseInt(venceMes)) return false;
+          }
+          if (desde && m.fecha_inicio) {
+            if (new Date(m.fecha_inicio) < new Date(desde)) return false;
+          }
+          if (hasta && m.fecha_inicio) {
+            if (new Date(m.fecha_inicio) > new Date(hasta)) return false;
+          }
+          return true;
+        });
+      }
+
+      const filtered = applyFilters(allMembresias);
+
+      if (tablePaginator) {
+        tablePaginator.setData(filtered);
+      } else {
+        tablePaginator = initTablePagination('pagination', 'membresias-table', filtered, 10, renderRow);
+      }
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -518,7 +565,7 @@
   let searchTimeout = null;
   function onSearchInput() {
     clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => loadMembresias(1), 350);
+    searchTimeout = setTimeout(() => loadMembresias(), 350);
   }
 
   // --- Cancelar membresía ---
@@ -535,7 +582,7 @@
       await api.delete(`/membresias/${id}`, { invalidate: ['membresias'] });
       toast('Membresía cancelada correctamente');
       closeModal('modal-cancelar');
-      loadMembresias(currentPage);
+      loadMembresias();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -619,7 +666,7 @@
       // Limpiar filtro de estado para que la membresía recién activada sea visible
       const filterEstado = document.getElementById('filter-estado');
       if (filterEstado) filterEstado.value = '';
-      loadMembresias(1);
+      loadMembresias();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -654,10 +701,12 @@
     if (!valid) return;
 
     try {
+      const fechaFin = document.getElementById('mem-fin').value;
       const result = await api.post('/membresias/suscribir', {
         cliente_id: clienteId,
         plan_id: planId,
         fecha_inicio: inicio,
+        fecha_fin: fechaFin || undefined,
         metodo_pago: document.getElementById('mem-metodo').value,
         estado_pago: document.getElementById('mem-estado-pago').value,
         descuento: parseFloat(document.getElementById('mem-descuento').value) || 0,
@@ -680,7 +729,7 @@
       }
       toast('Membresía y pago registrados correctamente');
       closeModal('modal-nueva');
-      loadMembresias(currentPage);
+      loadMembresias();
     } catch (err) { toast(err.message, 'error'); }
   }
   function abrirCambioPlan(id, planActual, cliente) {
@@ -726,7 +775,7 @@
       }
       toast('Plan cambiado correctamente');
       closeModal('modal-cambio');
-      loadMembresias(currentPage);
+      loadMembresias();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -767,7 +816,7 @@
       }
       toast('Membresía renovada correctamente');
       closeModal('modal-renovar');
-      loadMembresias(currentPage);
+      loadMembresias();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -791,7 +840,7 @@
       });
       toast('Membresía actualizada');
       closeModal('modal-editar');
-      loadMembresias(currentPage);
+      loadMembresias();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -930,17 +979,35 @@
       elBtnVencen.onclick = () => {
         vencenFilter = !vencenFilter;
         elBtnVencen.classList.toggle('btn-warning', vencenFilter);
-        loadMembresias(1);
+        loadMembresias();
       };
     }
 
     const elFilterEstado = document.getElementById('filter-estado');
-    if (elFilterEstado) elFilterEstado.onchange = () => loadMembresias(1);
+    if (elFilterEstado) elFilterEstado.onchange = () => loadMembresias();
+
+    const elFilterPlan = document.getElementById('filter-plan');
+    if (elFilterPlan) elFilterPlan.onchange = () => loadMembresias();
+
+    const elFilterVenceMes = document.getElementById('filter-vence-mes');
+    if (elFilterVenceMes) elFilterVenceMes.onchange = () => loadMembresias();
+
+    const elInicioDesde = document.getElementById('filter-inicio-desde');
+    if (elInicioDesde) elInicioDesde.onchange = () => loadMembresias();
+
+    const elInicioHasta = document.getElementById('filter-inicio-hasta');
+    if (elInicioHasta) elInicioHasta.onchange = () => loadMembresias();
 
     const elSearchNombre = document.getElementById('search-nombre');
     if (elSearchNombre) elSearchNombre.oninput = onSearchInput;
 
     loadSelects().then(() => {
+      // Poblar select de planes para filtro
+      const filterPlan = document.getElementById('filter-plan');
+      if (filterPlan && planesCache.length) {
+        filterPlan.innerHTML = '<option value="">Todos los planes</option>' +
+          planesCache.map(p => `<option value="${p.nombre}">${p.nombre}</option>`).join('');
+      }
       const params = new URLSearchParams(window.location.search);
       let clienteId = params.get('cliente_id');
       if (!clienteId && window.__SPA_SHELL__) {

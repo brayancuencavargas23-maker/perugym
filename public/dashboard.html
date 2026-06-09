@@ -9,8 +9,97 @@
   <title>Dashboard - PeruGym</title>
   <link rel="stylesheet" href="/css/main.css">
   <link rel="stylesheet" href="/css/styles-responsive.css">
-  <!-- SPA redirect: si se accede directamente, redirigir al shell -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
+  <style>
+    .period-filter {
+      display: flex;
+      gap: 6px;
+      background: var(--bg);
+      padding: 4px;
+      border-radius: 8px;
+    }
+    .period-btn {
+      padding: 6px 14px;
+      border: none;
+      background: transparent;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-light);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .period-btn:hover { color: var(--text); }
+    .period-btn.active {
+      background: var(--card-bg);
+      color: var(--primary);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+    .trend-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-top: 4px;
+    }
+    .trend-up { background: rgba(40,167,69,0.12); color: #198754; }
+    .trend-down { background: rgba(220,53,69,0.12); color: #dc3545; }
+    .trend-neutral { background: rgba(108,99,255,0.12); color: var(--primary); }
+    .export-btn {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      background: var(--card-bg);
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s;
+    }
+    .export-btn:hover { background: var(--bg); border-color: var(--primary); }
+    .alert-banner {
+      background: linear-gradient(135deg, rgba(255,193,7,0.15), rgba(220,53,69,0.1));
+      border: 1px solid rgba(255,193,7,0.3);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .alert-banner.visible { display: block; }
+    .alert-banner-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      color: #856404;
+      margin-bottom: 8px;
+    }
+    .alert-banner-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .alert-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,0.8);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .stat-card .stat-value { line-height: 1; }
+    .chart-container { position: relative; height: 200px; }
+  </style>
 </head>
 <body>
 <div class="app-layout">
@@ -19,12 +108,61 @@
     <div class="topbar" id="topbar"></div>
     <div class="page-content">
 
+      <div class="alert-banner" id="alert-banner">
+        <div class="alert-banner-header">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Membresías vencen hoy o mañana
+        </div>
+        <div class="alert-banner-list" id="alert-list"></div>
+      </div>
+
+      <div class="flex-between" style="margin-bottom:20px">
+        <div class="period-filter">
+          <button class="period-btn active" data-period="mes">Mes</button>
+          <button class="period-btn" data-period="semana">Semana</button>
+          <button class="period-btn" data-period="hoy">Hoy</button>
+        </div>
+      </div>
+
       <div class="stats-grid" id="stats-grid">
-        <div class="stat-card"><div class="stat-icon purple" id="si-members"></div><div><div class="stat-value" id="stat-members">-</div><div class="stat-label">Clientes Activos</div></div></div>
-        <div class="stat-card"><div class="stat-icon green" id="si-income"></div><div><div class="stat-value" id="stat-income">-</div><div class="stat-label">Ingresos del Mes</div></div></div>
-        <div class="stat-card"><div class="stat-icon orange" id="si-attendance"></div><div><div class="stat-value" id="stat-attendance">-</div><div class="stat-label">Asistencia Hoy</div></div></div>
-        <div class="stat-card"><div class="stat-icon red" id="si-pending"></div><div><div class="stat-value" id="stat-pending">-</div><div class="stat-label">Pagos Pendientes</div></div></div>
-        <div class="stat-card"><div class="stat-icon blue" id="si-engym"></div><div><div class="stat-value" id="stat-engym">-</div><div class="stat-label">En el Gym Ahora</div></div></div>      </div>
+        <div class="stat-card">
+          <div class="stat-icon purple" id="si-members"></div>
+          <div>
+            <div class="stat-value" id="stat-members">-</div>
+            <div class="stat-label">Clientes Activos</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green" id="si-income"></div>
+          <div>
+            <div class="stat-value" id="stat-income">-</div>
+            <div class="stat-label">Ingresos del Mes</div>
+            <div id="trend-income"></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange" id="si-attendance"></div>
+          <div>
+            <div class="stat-value" id="stat-attendance">-</div>
+            <div class="stat-label">Asistencia</div>
+            <div id="trend-attendance"></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red" id="si-pending"></div>
+          <div>
+            <div class="stat-value" id="stat-pending">-</div>
+            <div class="stat-label">Pagos Pendientes</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue" id="si-engym"></div>
+          <div>
+            <div class="stat-value" id="stat-engym">-</div>
+            <div class="stat-label">En el Gym Ahora</div>
+          </div>
+        </div>
+      </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px" id="mid-grid">
         <div class="card">
@@ -33,35 +171,47 @@
             <a href="/membresias.html" style="font-size:12px;color:var(--primary)">Ver todas</a>
           </div>
           <div class="expiring-list" id="expiring-list">
-            <p style="color:var(--text-light);font-size:13px">Cargando...</p>
+            <div class="skeleton-card"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div><div class="skeleton-line medium"></div></div>
           </div>
         </div>
         <div class="card">
           <h3 style="font-size:15px;margin-bottom:16px;display:flex;align-items:center;gap:6px" id="h-planes"></h3>
-          <div id="plan-chart"></div>
+          <div class="chart-container" id="plan-chart">
+            <div class="skeleton-card" style="height:100%"><div class="skeleton-line full"></div><div class="skeleton-line full"></div><div class="skeleton-line full"></div></div>
+          </div>
         </div>
       </div>
 
-      <!-- Widget solicitudes pendientes -->
       <div class="card" id="card-solicitudes" style="margin-bottom:20px;display:none">
         <div class="flex-between mb-2">
           <h3 style="font-size:15px;display:flex;align-items:center;gap:6px" id="h-solicitudes"></h3>
           <a href="/solicitudes.html" style="font-size:12px;color:var(--primary)">Ver todas</a>
         </div>
         <div id="solicitudes-list">
-          <p style="color:var(--text-light);font-size:13px">Cargando...</p>
+          <div class="skeleton-card"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>
         </div>
       </div>
 
       <div class="card">
         <div class="flex-between mb-2">
           <h3 style="font-size:15px;display:flex;align-items:center;gap:6px" id="h-pagos"></h3>
-          <a href="/pagos.html" style="font-size:12px;color:var(--primary)">Ver todos</a>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="export-btn" id="export-csv">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              CSV
+            </button>
+            <a href="/pagos.html" style="font-size:12px;color:var(--primary)">Ver todos</a>
+          </div>
         </div>
         <div class="table-wrapper">
           <table>
             <thead><tr><th>Cliente</th><th>Monto</th><th>Fecha</th><th>Estado</th></tr></thead>
-            <tbody id="recent-payments"></tbody>
+            <tbody id="recent-payments">
+              <tr class="skeleton-row"><td><div class="skeleton-cell w-70"></div></td><td><div class="skeleton-cell w-40"></div></td><td><div class="skeleton-cell w-55"></div></td><td><div class="skeleton-cell w-30"></div></td></tr>
+              <tr class="skeleton-row"><td><div class="skeleton-cell w-55"></div></td><td><div class="skeleton-cell w-30"></div></td><td><div class="skeleton-cell w-70"></div></td><td><div class="skeleton-cell w-40"></div></td></tr>
+              <tr class="skeleton-row"><td><div class="skeleton-cell w-80"></div></td><td><div class="skeleton-cell w-55"></div></td><td><div class="skeleton-cell w-40"></div></td><td><div class="skeleton-cell w-30"></div></td></tr>
+              <tr class="skeleton-row"><td><div class="skeleton-cell w-40"></div></td><td><div class="skeleton-cell w-70"></div></td><td><div class="skeleton-cell w-55"></div></td><td><div class="skeleton-cell w-40"></div></td></tr>
+            </tbody>
           </table>
         </div>
       </div>
@@ -76,24 +226,63 @@
 <script src="/js/icons.js"></script>
 <script src="/js/layout.js"></script>
 <script>
-  // Guard: devuelve true si la página de dashboard sigue activa en el DOM.
+  let _currentPeriod = 'mes';
+  let _chartInstance = null;
+  let _autoRefreshTimer = null;
+
   function _pageActive() {
     return !!document.getElementById('recent-payments');
   }
 
+  function showSectionSkeletons() {
+    showTableSkeleton('recent-payments', 4, 4);
+    const expiringEl = document.getElementById('expiring-list');
+    if (expiringEl) expiringEl.innerHTML = '<div class="skeleton-card"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div><div class="skeleton-line medium"></div></div>';
+    const planEl = document.getElementById('plan-chart');
+    if (planEl) planEl.innerHTML = '<div class="skeleton-card" style="height:100%"><div class="skeleton-line full"></div><div class="skeleton-line full"></div><div class="skeleton-line full"></div></div>';
+  }
+
+  function renderTrend(elementId, value) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    if (value === 0) {
+      el.innerHTML = '<span class="trend-indicator trend-neutral">= 0%</span>';
+    } else if (value > 0) {
+      el.innerHTML = `<span class="trend-indicator trend-up"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>+${value}%</span>`;
+    } else {
+      el.innerHTML = `<span class="trend-indicator trend-down"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>${value}%</span>`;
+    }
+  }
+
+  function renderAlerts(alertas) {
+    const banner = document.getElementById('alert-banner');
+    const list = document.getElementById('alert-list');
+    if (!banner || !list) return;
+
+    if (!alertas || !alertas.vencenManana || alertas.vencenManana.length === 0) {
+      banner.classList.remove('visible');
+      return;
+    }
+
+    banner.classList.add('visible');
+    list.innerHTML = alertas.vencenManana.map(m => {
+      const days = daysUntil(m.fecha_fin);
+      const label = days === 0 ? 'Vence hoy' : days === 1 ? 'Vence mañana' : `${days} días`;
+      return `<span class="alert-chip"><strong>${m.nombre}</strong> — ${m.plan_nombre || 'Sin plan'} (${label})</span>`;
+    }).join('');
+  }
+
   async function loadDashboard() {
-    // Mostrar datos cacheados inmediatamente si existen (sin esperar el await)
-    const cached = gymCache.get('/dashboard');
+    const cached = gymCache.get(`/dashboard?periodo=${_currentPeriod}`);
     if (cached) renderDashboard(cached);
-    else showTableSkeleton('recent-payments', 4, 5);
+    else showSectionSkeletons();
 
     try {
-      const data = await api.get('/dashboard');
+      const data = await api.get(`/dashboard?periodo=${_currentPeriod}`);
       if (!_pageActive()) return;
       renderDashboard(data);
     } catch (err) { toast(err.message, 'error'); }
 
-    // Cargar solicitudes pendientes (independiente del dashboard)
     try {
       const stats = await api.get('/solicitudes/stats', true);
       if (!_pageActive()) return;
@@ -123,54 +312,184 @@
 
   function renderDashboard(data) {
     if (!_pageActive()) return;
-      document.getElementById('stat-members').textContent    = data.stats.clientesActivos;
-      document.getElementById('stat-income').textContent     = fmtMoney(data.stats.ingresosDelMes);
-      document.getElementById('stat-attendance').textContent = data.stats.asistenciaHoy;
-      document.getElementById('stat-pending').textContent    = data.stats.pagosPendientes;
-      document.getElementById('stat-engym').textContent      = data.stats.enElGym;
 
-      const expiringEl = document.getElementById('expiring-list');
-      if (data.membresiasVencenPronto.length === 0) {
-        expiringEl.innerHTML = '<p style="color:var(--text-light);font-size:13px">Sin membresías próximas a vencer</p>';
-      } else {
-        expiringEl.innerHTML = data.membresiasVencenPronto.map(m => {
-          const days = daysUntil(m.fecha_fin);
-          return `<div class="expiring-item">
-            <div>
-              <strong>${m.nombre}</strong>
-              <div style="font-size:11px;color:var(--text-light)">${m.plan_nombre || 'Sin plan'}</div>
-            </div>
-            <span class="badge badge-warning">${days === 0 ? 'Hoy' : `${days}d`}</span>
-          </div>`;
-        }).join('');
+    document.getElementById('stat-members').textContent = data.stats.clientesActivos;
+    document.getElementById('stat-income').textContent = fmtMoney(data.stats.ingresosDelMes);
+    document.getElementById('stat-attendance').textContent = data.stats.asistenciaHoy;
+    document.getElementById('stat-pending').textContent = data.stats.pagosPendientes;
+    document.getElementById('stat-engym').textContent = data.stats.enElGym;
+
+    if (data.stats.tendencias) {
+      renderTrend('trend-income', data.stats.tendencias.ingresos || 0);
+      renderTrend('trend-attendance', data.stats.tendencias.asistencia || 0);
+    }
+
+    renderAlerts(data.alertas);
+
+    const expiringEl = document.getElementById('expiring-list');
+    if (data.membresiasVencenPronto.length === 0) {
+      expiringEl.innerHTML = '<p style="color:var(--text-light);font-size:13px">Sin membresías próximas a vencer</p>';
+    } else {
+      expiringEl.innerHTML = data.membresiasVencenPronto.map(m => {
+        const days = daysUntil(m.fecha_fin);
+        return `<div class="expiring-item">
+          <div>
+            <strong>${m.nombre}</strong>
+            <div style="font-size:11px;color:var(--text-light)">${m.plan_nombre || 'Sin plan'}</div>
+          </div>
+          <span class="badge badge-warning">${days === 0 ? 'Hoy' : `${days}d`}</span>
+        </div>`;
+      }).join('');
+    }
+
+    renderPlanChart(data.clientesPorPlan);
+
+    document.getElementById('recent-payments').innerHTML = data.pagosRecientes.map(p => `
+      <tr>
+        <td data-label="Cliente">${p.cliente_nombre || '-'}</td>
+        <td data-label="Monto">${fmtMoney(p.monto)}</td>
+        <td data-label="Fecha">${fmtDate(p.fecha_pago)}</td>
+        <td data-label="Estado"><span class="badge ${p.estado === 'pagado' ? 'badge-success' : 'badge-warning'}">${p.estado}</span></td>
+      </tr>
+    `).join('') || '<tr><td colspan="4" class="text-center" style="color:var(--text-light)">Sin pagos recientes</td></tr>';
+  }
+
+  function renderPlanChart(clientesPorPlan) {
+    const canvas = document.getElementById('plan-chart-canvas');
+    const container = document.getElementById('plan-chart');
+
+    if (!clientesPorPlan || clientesPorPlan.length === 0) {
+      container.innerHTML = '<p style="color:var(--text-light);font-size:13px;text-align:center;padding-top:40px">Sin datos de planes</p>';
+      return;
+    }
+
+    if (!canvas) {
+      container.innerHTML = '<canvas id="plan-chart-canvas"></canvas>';
+    }
+
+    const ctx = document.getElementById('plan-chart-canvas').getContext('2d');
+
+    if (_chartInstance) {
+      _chartInstance.destroy();
+    }
+
+    const colors = [
+      'rgba(108, 99, 255, 0.85)',
+      'rgba(40, 167, 69, 0.85)',
+      'rgba(255, 193, 7, 0.85)',
+      'rgba(220, 53, 69, 0.85)',
+      'rgba(14, 165, 233, 0.85)',
+      'rgba(168, 139, 250, 0.85)',
+      'rgba(251, 146, 60, 0.85)',
+    ];
+
+    _chartInstance = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: clientesPorPlan.map(p => p.nombre),
+        datasets: [{
+          data: clientesPorPlan.map(p => p.count),
+          backgroundColor: colors.slice(0, clientesPorPlan.length),
+          borderWidth: 2,
+          borderColor: '#fff',
+          hoverOffset: 6,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '60%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              padding: 12,
+              usePointStyle: true,
+              pointStyle: 'circle',
+              font: { size: 11, weight: '600' },
+            },
+          },
+          tooltip: {
+            backgroundColor: '#1c2333',
+            titleFont: { size: 13, weight: '700' },
+            bodyFont: { size: 12 },
+            padding: 10,
+            cornerRadius: 8,
+            callbacks: {
+              label: function(context) {
+                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                const pct = Math.round((context.parsed / total) * 100);
+                return ` ${context.label}: ${context.parsed} (${pct}%)`;
+              }
+            }
+          },
+        },
+      },
+    });
+  }
+
+  function exportCSV() {
+    const cached = gymCache.get(`/dashboard?periodo=${_currentPeriod}`);
+    if (!cached || !cached.pagosRecientes || cached.pagosRecientes.length === 0) {
+      toast('No hay datos para exportar', 'warning');
+      return;
+    }
+
+    const headers = ['Cliente', 'Monto', 'Fecha', 'Estado'];
+    const rows = cached.pagosRecientes.map(p => [
+      p.cliente_nombre || '-',
+      p.monto,
+      fmtDate(p.fecha_pago),
+      p.estado,
+    ]);
+
+    const csvContent = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pagos_recientes_${_currentPeriod}_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('CSV exportado correctamente', 'success');
+  }
+
+  function startAutoRefresh() {
+    stopAutoRefresh();
+    _autoRefreshTimer = setInterval(() => {
+      if (_pageActive()) {
+        gymCache.invalidate(`/dashboard?periodo=${_currentPeriod}`);
+        loadDashboard();
       }
+    }, 60000);
+  }
 
-      const planEl = document.getElementById('plan-chart');
-      const maxCount = Math.max(...data.clientesPorPlan.map(p => parseInt(p.count)), 1);
-      planEl.innerHTML = data.clientesPorPlan.map(p => `
-        <div style="margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
-            <span>${p.nombre}</span><span>${p.count}</span>
-          </div>
-          <div style="background:var(--bg);border-radius:4px;height:8px">
-            <div style="background:var(--primary);height:8px;border-radius:4px;width:${(p.count/maxCount*100).toFixed(0)}%"></div>
-          </div>
-        </div>
-      `).join('') || '<p style="color:var(--text-light);font-size:13px">Sin datos</p>';
-
-      document.getElementById('recent-payments').innerHTML = data.pagosRecientes.map(p => `
-        <tr>
-          <td data-label="Cliente">${p.cliente_nombre || '-'}</td>
-          <td data-label="Monto">${fmtMoney(p.monto)}</td>
-          <td data-label="Fecha">${fmtDate(p.fecha_pago)}</td>
-          <td data-label="Estado"><span class="badge ${p.estado === 'pagado' ? 'badge-success' : 'badge-warning'}">${p.estado}</span></td>
-        </tr>
-      `).join('') || '<tr><td colspan="4" class="text-center" style="color:var(--text-light)">Sin pagos recientes</td></tr>';
+  function stopAutoRefresh() {
+    if (_autoRefreshTimer) {
+      clearInterval(_autoRefreshTimer);
+      _autoRefreshTimer = null;
+    }
   }
 
   loadDashboard();
+  startAutoRefresh();
 
-  // ── Inicialización ──────────────────────────────────────────────────────────
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _currentPeriod = btn.dataset.period;
+      gymCache.invalidate(`/dashboard?periodo=${_currentPeriod}`);
+      loadDashboard();
+    });
+  });
+
+  document.getElementById('export-csv').addEventListener('click', exportCSV);
+
+  window.addEventListener('beforeunload', stopAutoRefresh);
+
   (function _initPage() {
     initLayout('dashboard', 'Dashboard');
     const iconMap = {

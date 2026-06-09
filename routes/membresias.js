@@ -83,7 +83,7 @@ router.post(
     handleValidationErrors
   ],
   asyncHandler(async (req, res) => {
-    const { cliente_id, plan_id, fecha_inicio, metodo_pago, estado_pago = 'pagado', notas, descuento = 0 } = req.body;
+    const { cliente_id, plan_id, fecha_inicio, fecha_fin, metodo_pago, estado_pago = 'pagado', notas, descuento = 0 } = req.body;
     const caja_id = req.cajaActual._id;
 
     await MembresiaService.autoVencer();
@@ -91,7 +91,7 @@ router.post(
     const result = await TransactionManager.execute(async (session) => {
       // Create membership using service
       const membresia = await MembresiaService.crear(
-        { cliente_id, plan_id, fecha_inicio, estado_pago },
+        { cliente_id, plan_id, fecha_inicio, fecha_fin, estado_pago },
         session
       );
 
