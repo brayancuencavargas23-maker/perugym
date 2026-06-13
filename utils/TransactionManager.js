@@ -12,6 +12,13 @@ class TransactionManager {
    * @throws {Error} - If the transaction fails
    */
   static async execute(operation) {
+    const skipTransactions = process.env.DISABLE_TRANSACTIONS === 'true';
+
+    if (skipTransactions) {
+      logger.debug('Transactions disabled (DISABLE_TRANSACTIONS=true)', { service: 'TransactionManager' });
+      return await operation(null);
+    }
+
     const session = await mongoose.startSession();
     session.startTransaction();
 

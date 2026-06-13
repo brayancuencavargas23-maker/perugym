@@ -124,21 +124,6 @@
     } catch (err) { toast(err.message, 'error'); }
   }
 
-  document.getElementById('btn-new') && (document.getElementById('btn-new').onclick = () => {
-    if (user.role !== 'admin') return toast('Solo administradores pueden crear planes', 'warning');
-    document.getElementById('plan-id').value = '';
-    document.getElementById('p-name').value = '';
-    document.getElementById('p-desc').value = '';
-    document.getElementById('p-price').value = '';
-    document.getElementById('p-days').value = 30;
-    document.getElementById('p-features').value = '';
-    document.getElementById('p-show-landing').checked = false;
-    document.getElementById('p-featured').checked = false;
-    document.getElementById('active-group').classList.add('hidden');
-    document.getElementById('modal-title').textContent = 'Nuevo Plan';
-    openModal('modal-overlay');
-  });
-
   async function editPlan(id) {
     const plans = await api.get('/planes');
     const p = plans.find(x => x._id === id || x.id === id);
@@ -216,10 +201,10 @@
       document.getElementById('p-desc').value = '';
       document.getElementById('p-price').value = '';
       document.getElementById('p-days').value = 30;
-      document.getElementById('p-active').checked = true;
-      document.getElementById('p-landing').checked = false;
+      document.getElementById('p-features').value = '';
+      document.getElementById('p-show-landing').checked = false;
       document.getElementById('p-featured').checked = false;
-      document.getElementById('p-feats').value = '';
+      document.getElementById('active-group').classList.add('hidden');
       document.getElementById('modal-title').textContent = 'Nuevo Plan';
       openModal('modal-overlay');
     };
