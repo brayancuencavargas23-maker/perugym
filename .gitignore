@@ -5,3 +5,4 @@ node_modules/
 .kiro
 db-export/
 scripts/
+coverage/
