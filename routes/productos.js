@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const Producto = require('../models/Producto');
+const Venta = require('../models/Venta');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const { saveImage, deleteImage } = require('../config/storage');
 
@@ -26,6 +27,47 @@ router.get('/categorias', async (req, res) => {
   try {
     const cats = await Producto.distinct('categoria', { categoria: { $ne: null } });
     res.json(cats.sort());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Productos más vendidos (top 8) — agregación global de ventas no anuladas
+router.get('/mas-vendidos', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 9;
+    const top = await Venta.aggregate([
+      { $match: { anulada: { $ne: true } } },
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: '$items.producto_id',
+          total_vendido: { $sum: '$items.cantidad' },
+        }
+      },
+      { $sort: { total_vendido: -1 } },
+      { $limit: limit },
+      {
+        $lookup: {
+          from: 'productos',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'producto'
+        }
+      },
+      { $unwind: { path: '$producto', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          total_vendido: 1,
+          nombre: '$producto.nombre',
+          precio_venta: '$producto.precio_venta',
+          stock: '$producto.stock',
+          foto_url: '$producto.foto_url',
+          activo: '$producto.activo',
+        }
+      },
+      { $match: { activo: { $ne: false } } },
+    ]);
+    res.json(top);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

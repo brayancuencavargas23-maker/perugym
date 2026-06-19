@@ -9,6 +9,107 @@ const { validators, handleValidationErrors } = require('../middleware/validation
 
 router.use(verifyToken);
 
+// ── POST /abono — registrar abono parcial para una membresía ────────────────
+router.post(
+  '/abono',
+  [
+    body('membresia_id').isMongoId().withMessage('membresia_id inválido.'),
+    body('monto').isFloat({ min: 0.01 }).withMessage('El monto debe ser mayor a 0.'),
+    body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']).withMessage('Método de pago inválido.'),
+    body('caja_id').isMongoId().withMessage('caja_id inválido.'),
+    handleValidationErrors
+  ],
+  async (req, res) => {
+    const { membresia_id, monto, metodo_pago, caja_id, notas } = req.body;
+    try {
+      const caja = await Caja.findOne({ _id: caja_id, estado: 'abierta' });
+      if (!caja) return res.status(400).json({ error: 'La caja no está abierta.' });
+
+      const membresia = await Membresia.findById(membresia_id).populate('plan_id');
+      if (!membresia) return res.status(404).json({ error: 'Membresía no encontrada.' });
+
+      const totalPlan = membresia.monto_total;
+
+      const pagosExistentes = await Pago.find({ membresia_id, estado: 'pagado' });
+      const totalPagado = pagosExistentes.reduce((sum, p) => sum + p.monto, 0);
+
+      if (totalPagado >= totalPlan) {
+        return res.status(400).json({ error: 'Esta membresía ya está pagada completamente.' });
+      }
+
+      if (totalPagado + monto > totalPlan) {
+        return res.status(400).json({
+          error: `El monto excede el saldo pendiente. Saldo restante: S/ ${(totalPlan - totalPagado).toFixed(2)}`
+        });
+      }
+
+      const numeroAbono = pagosExistentes.length + 1;
+
+      const [pago] = await Pago.create([{
+        cliente_id: membresia.cliente_id,
+        membresia_id,
+        caja_id,
+        monto,
+        metodo_pago: metodo_pago || 'efectivo',
+        estado: 'pagado',
+        notas: notas || `Abono ${numeroAbono} de ${totalPlan.toFixed(2)}`,
+        es_abono: true,
+        numero_abono: numeroAbono,
+        total_esperado: totalPlan
+      }]);
+
+      const nuevoTotalPagado = totalPagado + monto;
+      const completado = nuevoTotalPagado >= totalPlan;
+
+      if (membresia.estado === 'pendiente') {
+        await Membresia.findByIdAndUpdate(membresia_id, { $set: { estado: 'activo' } });
+      }
+
+      res.status(201).json({
+        pago,
+        resumen: {
+          total_plan: totalPlan,
+          total_pagado: nuevoTotalPagado,
+          pendiente: Math.max(totalPlan - nuevoTotalPagado, 0),
+          completado
+        }
+      });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  }
+);
+
+// ── GET /:membresia_id/estado-pago — consultar estado de pagos de una membresía ─
+router.get('/:membresia_id/estado-pago', [
+  validators.mongoId('membresia_id'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const membresia = await Membresia.findById(req.params.membresia_id).populate('plan_id');
+    if (!membresia) return res.status(404).json({ error: 'Membresía no encontrada.' });
+
+    const pagos = await Pago.find({ membresia_id: req.params.membresia_id, estado: 'pagado' })
+      .sort({ fecha_pago: 1 });
+
+    const totalPlan = membresia.monto_total || membresia.plan_id.precio;
+    const totalPagado = pagos.reduce((sum, p) => sum + p.monto, 0);
+
+    res.json({
+      total_plan: totalPlan,
+      total_pagado: totalPagado,
+      pendiente: Math.max(totalPlan - totalPagado, 0),
+      completado: totalPagado >= totalPlan,
+      pagos: pagos.map(p => ({
+        id: p._id,
+        monto: p.monto,
+        metodo_pago: p.metodo_pago,
+        fecha_pago: p.fecha_pago,
+        numero_abono: p.numero_abono,
+        es_abono: p.es_abono
+      }))
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ── GET / — listar pagos ──────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
   const { cliente_id, estado, metodo_pago, from, to, page = 1, limit = 20 } = req.query;
@@ -68,7 +169,8 @@ router.put(
 
       const update = { estado: 'pagado', caja_id };
       if (metodo_pago) update.metodo_pago = metodo_pago;
-      const pagoActualizado = await Pago.findByIdAndUpdate(req.params.id, update, { new: true })
+      await Pago.findByIdAndUpdate(req.params.id, update, { new: true });
+      const pagoActualizado = await Pago.findById(req.params.id)
         .populate('cliente_id', 'nombre apellido_paterno apellido_materno')
         .populate({ path: 'membresia_id', populate: { path: 'plan_id', select: 'nombre precio' } });
 

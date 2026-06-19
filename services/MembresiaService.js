@@ -46,7 +46,7 @@ class MembresiaService {
    * @throws {NotFoundError} - If plan not found or inactive
    */
   static async crear(data, session) {
-    const { cliente_id, plan_id, fecha_inicio, fecha_fin, estado_pago = 'pagado' } = data;
+    const { cliente_id, plan_id, fecha_inicio, fecha_fin, estado_pago = 'pagado', monto_total } = data;
 
     // Check for existing active membership
     const tieneActiva = await this.tieneMembresiaActiva(cliente_id, session);
@@ -83,7 +83,8 @@ class MembresiaService {
         plan_id,
         fecha_inicio: inicio,
         fecha_fin: fin,
-        estado: estadoMembresia
+        estado: estadoMembresia,
+        monto_total: monto_total != null ? monto_total : plan.precio
       }],
       { session }
     );
@@ -104,7 +105,7 @@ class MembresiaService {
    * @throws {BusinessError} - If membership is not active or pending
    */
   static async cambiarPlan(membresiaId, data, session) {
-    const { plan_id, fecha_inicio, estado_pago = 'pagado' } = data;
+    const { plan_id, fecha_inicio, estado_pago = 'pagado', monto_total } = data;
 
     // Get current membership
     const mem = await Membresia.findById(membresiaId).session(session);
@@ -145,7 +146,8 @@ class MembresiaService {
         plan_id,
         fecha_inicio: inicio,
         fecha_fin: fin,
-        estado: estadoMembresia
+        estado: estadoMembresia,
+        monto_total: monto_total != null ? monto_total : plan.precio
       }],
       { session }
     );
@@ -190,7 +192,7 @@ class MembresiaService {
    * @throws {NotFoundError} - If membership not found
    * @throws {BusinessError} - If membership is still active or client has another active membership
    */
-  static async renovar(membresiaId, estado_pago, session) {
+  static async renovar(membresiaId, estado_pago, session, monto_total = null) {
     // Get expired membership
     const mem = await Membresia.findById(membresiaId)
       .populate('plan_id')
@@ -229,7 +231,8 @@ class MembresiaService {
         plan_id: mem.plan_id._id,
         fecha_inicio: inicio,
         fecha_fin: fin,
-        estado: estadoMembresia
+        estado: estadoMembresia,
+        monto_total: monto_total != null ? monto_total : mem.plan_id.precio
       }],
       { session }
     );

@@ -252,11 +252,13 @@ router.post('/checkin', async (req, res) => {
 
 router.put('/checkout/:id', async (req, res) => {
   try {
-    const asistencia = await Asistencia.findByIdAndUpdate(
+    await Asistencia.findByIdAndUpdate(
       req.params.id,
       { salida: new Date() },
       { new: true }
-    ).populate('cliente_id', 'nombre apellido_paterno apellido_materno foto_url');
+    );
+    const asistencia = await Asistencia.findById(req.params.id)
+      .populate('cliente_id', 'nombre apellido_paterno apellido_materno foto_url');
 
     // Devolver con el mismo shape que GET /asistencia para que el patch del caché funcione
     res.json({
@@ -274,11 +276,13 @@ router.put('/checkout/cliente/:cliente_id', async (req, res) => {
       .sort({ entrada: -1 });
     if (!active) return res.status(404).json({ error: 'No hay check-in activo' });
 
-    const asistencia = await Asistencia.findByIdAndUpdate(
+    await Asistencia.findByIdAndUpdate(
       active._id,
       { salida: new Date() },
       { new: true }
-    ).populate('cliente_id', 'nombre apellido_paterno apellido_materno foto_url');
+    );
+    const asistencia = await Asistencia.findById(active._id)
+      .populate('cliente_id', 'nombre apellido_paterno apellido_materno foto_url');
 
     res.json({
       ...asistencia.toObject(),

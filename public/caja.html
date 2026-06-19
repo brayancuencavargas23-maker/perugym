@@ -41,6 +41,34 @@
     .tab-main { padding:10px 24px; border-radius:8px; border:none; background:transparent; cursor:pointer; font-size:14px; font-weight:600; color:var(--text-light); transition:all .2s; display:inline-flex; align-items:center; gap:6px; }
     .tab-main:hover { color:var(--text); background:var(--bg); }
     .tab-main.active { background:var(--primary); color:#fff; box-shadow:0 2px 8px rgba(var(--primary-rgb),0.3); }
+
+    /* Ventas rápidas */
+    .venta-layout { display:flex; gap:20px; align-items:flex-start; }
+    .venta-layout > .card:first-child { flex:0 0 420px; min-width:0; }
+    .quick-sales-card { flex:1; min-width:0; }
+    .quick-sales-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .quick-sale-btn {
+      display:flex; flex-direction:column; align-items:center; gap:6px;
+      padding:12px 8px; border-radius:10px; border:1.5px solid var(--border);
+      background:var(--card-bg); cursor:pointer; transition:all .2s; text-align:center;
+    }
+    .quick-sale-btn:hover { border-color:var(--primary); background:rgba(var(--primary-rgb),0.04); transform:translateY(-1px); box-shadow:var(--shadow); }
+    .quick-sale-btn:active { transform:translateY(0); }
+    .quick-sale-btn.disabled { opacity:0.4; cursor:not-allowed; pointer-events:none; }
+    .quick-sale-img { width:44px; height:44px; border-radius:8px; object-fit:cover; background:var(--bg); }
+    .quick-sale-img-ph { width:44px; height:44px; border-radius:8px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:20px; }
+    .quick-sale-name { font-size:12px; font-weight:600; color:var(--text); line-height:1.2; max-height:30px; overflow:hidden; }
+    .quick-sale-price { font-size:13px; font-weight:700; color:var(--success); }
+    .quick-sale-stock { font-size:10px; color:var(--text-light); }
+    .quick-sale-rank { position:absolute; top:4px; left:4px; background:var(--primary); color:#fff; font-size:9px; font-weight:700; width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+    .quick-sale-btn { position:relative; }
+
+    @media (max-width:768px) {
+      .venta-layout { flex-direction:column; }
+      .venta-layout > .card:first-child { flex:none; width:100%; }
+      .quick-sales-card { flex:none; width:100%; }
+      .quick-sales-grid { grid-template-columns:repeat(3,1fr); }
+    }
   </style>
 </head>
 <body>
@@ -126,7 +154,8 @@
 
         <!-- Nueva venta -->
         <div id="section-venta">
-          <div class="card" style="max-width:600px">
+          <div class="venta-layout">
+          <div class="card">
             <h3 style="font-size:15px;margin-bottom:16px">Registrar Venta</h3>
             <div class="form-group">
               <label>Producto *</label>
@@ -165,6 +194,16 @@
               <input type="text" id="v-notes" class="form-control" placeholder="Opcional...">
             </div>
             <button class="btn btn-success w-full" id="btn-confirmar-venta" style="margin-top:8px;display:inline-flex;align-items:center;justify-content:center;gap:6px" onclick="withLoading(this, registrarVenta, 'Registrando...')"><span id="icon-confirm-venta"></span> Confirmar Venta</button>
+          </div>
+
+          <!-- Ventas Rápidas -->
+          <div class="card quick-sales-card">
+            <h3 style="font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:6px">⚡ Ventas Rápidas</h3>
+            <div style="font-size:11px;color:var(--text-light);margin-bottom:12px">Productos más vendidos — toca para agregar rápido</div>
+            <div class="quick-sales-grid" id="quick-sales-grid">
+              <div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-light);font-size:12px">Cargando productos...</div>
+            </div>
+          </div>
           </div>
         </div>
 
@@ -472,18 +511,17 @@
     if (!ok) return;
     try {
       const result = await api.put(`/ventas/${id}/anular`, {});
-      // Patch quirúrgico: actualizar solo los productos afectados en caché
-      // sin borrar toda la lista de productos
       if (result?.productos?.length) {
         result.productos.forEach(p => {
           gymCache.patchItem('productos', p._id || p.id, () => p);
         });
       }
-      // Invalidar solo caja (totales cambian) y el detalle de esta caja
       gymCache.invalidate('caja');
+      const idx = allVentas.findIndex(v => v.id === id || v._id === id);
+      if (idx !== -1) allVentas[idx] = { ...allVentas[idx], anulada: true };
       toast('Venta anulada — stock revertido', 'warning');
       loadEstado();
-      if (currentTabCaja === 'ventas') loadTurnoVentas();
+      refreshVentasTable();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -494,48 +532,70 @@
       if (!bar) return;
       
       const caja = await api.get('/caja/estado');
-      if (!_pageActive()) return; // navegaron mientras esperábamos la respuesta
+      if (!_pageActive()) return;
       cajaActual = caja;
-      const dot  = document.getElementById('caja-dot');
-      const text = document.getElementById('caja-status-text');
-      const sub  = document.getElementById('caja-status-sub');
-      const acts = document.getElementById('caja-actions');
-      const info = document.getElementById('caja-info');
+      renderCardCaja(caja);
 
-      if (caja) {
-        bar.className = 'caja-status-bar caja-abierta';
-        dot.className = 'caja-dot dot-green';
-        text.textContent = 'Caja Abierta';
-        sub.textContent  = `Cajero: ${caja.usuario_nombre} · Desde ${fmtDateTime(caja.apertura)}`;
-        acts.innerHTML = `<button class="btn btn-danger" style="display:inline-flex;align-items:center;gap:6px" onclick="prepararModalCerrar();openModal('modal-cerrar')">${icon('lock')} Cerrar Caja</button>`;
-        info.classList.remove('hidden');
-
-        const ingresosTotales = parseFloat(caja.ingresos_totales || 0);
-        const totalEnCaja  = parseFloat(caja.total_en_caja || 0);
-        const inicial      = parseFloat(caja.monto_inicial);
-        const ingresosManuales = parseFloat(caja.ingresos_manuales || 0);
-        const egresosManuales  = parseFloat(caja.egresos_manuales  || 0);
-
-        document.getElementById('info-inicial').textContent           = `S/ ${inicial.toFixed(2)}`;
-        document.getElementById('info-ventas').textContent            = `S/ ${ingresosTotales.toFixed(2)}`;
-        document.getElementById('info-yape').textContent              = `S/ ${parseFloat(caja.total_yape || 0).toFixed(2)}`;
-        document.getElementById('info-plin').textContent              = `S/ ${parseFloat(caja.total_plin || 0).toFixed(2)}`;
-        document.getElementById('info-transferencia').textContent     = `S/ ${parseFloat(caja.total_transferencia || 0).toFixed(2)}`;
-        document.getElementById('info-ingresos-manuales').textContent = `S/ ${ingresosManuales.toFixed(2)}`;
-        document.getElementById('info-egresos-manuales').textContent  = `S/ ${egresosManuales.toFixed(2)}`;
-        document.getElementById('info-total').textContent             = `S/ ${totalEnCaja.toFixed(2)}`;
-        document.getElementById('info-apertura').textContent          = fmtDateTime(caja.apertura);
-
+      // Si se restaura desde caché del router, los selects ya están en el DOM
+      // pero los productos rápidos se generan dinámicamente, hay que recargarlos
+      if (caja && !window.__spaRestoring) {
         await loadVentaSelects();
-      } else {
-        bar.className = 'caja-status-bar caja-cerrada';
-        dot.className = 'caja-dot dot-red';
-        text.textContent = 'Caja Cerrada';
-        sub.textContent  = 'No hay caja abierta';
-        acts.innerHTML   = `<button class="btn btn-success" id="btn-abrir" style="display:inline-flex;align-items:center;gap:6px" onclick="prepararModalAbrir();openModal('modal-abrir')">${icon('unlock')} Abrir Caja</button>`;
-        info.classList.add('hidden');
+      } else if (caja) {
+        loadTopProductos();
       }
     } catch (err) { toast(err.message, 'error'); }
+  }
+
+  function renderCardCaja(caja) {
+    const bar  = document.getElementById('caja-status-bar');
+    const dot  = document.getElementById('caja-dot');
+    const text = document.getElementById('caja-status-text');
+    const sub  = document.getElementById('caja-status-sub');
+    const acts = document.getElementById('caja-actions');
+    const info = document.getElementById('caja-info');
+    if (!bar) return;
+
+    if (caja) {
+      bar.className = 'caja-status-bar caja-abierta';
+      dot.className = 'caja-dot dot-green';
+      text.textContent = 'Caja Abierta';
+      sub.textContent  = `Cajero: ${caja.usuario_nombre} · Desde ${fmtDateTime(caja.apertura)}`;
+      acts.innerHTML = `<button class="btn btn-danger" style="display:inline-flex;align-items:center;gap:6px" onclick="prepararModalCerrar();openModal('modal-cerrar')">${icon('lock')} Cerrar Caja</button>`;
+      info.classList.remove('hidden');
+
+      const ingresosTotales = parseFloat(caja.ingresos_totales || 0);
+      const totalEnCaja  = parseFloat(caja.total_en_caja || 0);
+      const inicial      = parseFloat(caja.monto_inicial);
+      const ingresosManuales = parseFloat(caja.ingresos_manuales || 0);
+      const egresosManuales  = parseFloat(caja.egresos_manuales  || 0);
+
+      document.getElementById('info-inicial').textContent           = `S/ ${inicial.toFixed(2)}`;
+      document.getElementById('info-ventas').textContent            = `S/ ${ingresosTotales.toFixed(2)}`;
+      document.getElementById('info-yape').textContent              = `S/ ${parseFloat(caja.total_yape || 0).toFixed(2)}`;
+      document.getElementById('info-plin').textContent              = `S/ ${parseFloat(caja.total_plin || 0).toFixed(2)}`;
+      document.getElementById('info-transferencia').textContent     = `S/ ${parseFloat(caja.total_transferencia || 0).toFixed(2)}`;
+      document.getElementById('info-ingresos-manuales').textContent = `S/ ${ingresosManuales.toFixed(2)}`;
+      document.getElementById('info-egresos-manuales').textContent  = `S/ ${egresosManuales.toFixed(2)}`;
+      document.getElementById('info-total').textContent             = `S/ ${totalEnCaja.toFixed(2)}`;
+      document.getElementById('info-apertura').textContent          = fmtDateTime(caja.apertura);
+    } else {
+      bar.className = 'caja-status-bar caja-cerrada';
+      dot.className = 'caja-dot dot-red';
+      text.textContent = 'Caja Cerrada';
+      sub.textContent  = 'No hay caja abierta';
+      acts.innerHTML   = `<button class="btn btn-success" id="btn-abrir" style="display:inline-flex;align-items:center;gap:6px" onclick="prepararModalAbrir();openModal('modal-abrir')">${icon('unlock')} Abrir Caja</button>`;
+      info.classList.add('hidden');
+    }
+  }
+
+  async function refreshCardSolo() {
+    try {
+      if (!_pageActive()) return;
+      const caja = await api.get('/caja/estado');
+      if (!_pageActive()) return;
+      cajaActual = caja;
+      renderCardCaja(caja);
+    } catch (err) { /* silencioso — no mostrar error por refresco en background */ }
   }
 
   async function loadVentaSelects() {
@@ -553,6 +613,7 @@
     vMember.innerHTML =
       '<option value="">Sin cliente asociado</option>' +
       clientes.data.map(c => `<option value="${c._id || c.id}">${c.nombre}</option>`).join('');
+    loadTopProductos();
   }
 
   function onVProductChange() {
@@ -571,6 +632,64 @@
     document.getElementById('v-total').value = price ? `S/ ${(price * qty).toFixed(2)}` : '';
   }
 
+  async function loadTopProductos() {
+    const grid = document.getElementById('quick-sales-grid');
+    if (!grid) return;
+    try {
+      const top = await api.get('/productos/mas-vendidos?limit=9');
+      if (!_pageActive()) return;
+      if (!top || !top.length) {
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-light);font-size:12px">Sin ventas registradas aún</div>';
+        return;
+      }
+      grid.innerHTML = top.map((p, i) => {
+        const sinStock = p.stock <= 0;
+        const imgHtml = p.foto_url
+          ? `<img src="${p.foto_url}" class="quick-sale-img" alt="">`
+          : `<div class="quick-sale-img-ph">📦</div>`;
+        return `
+          <button class="quick-sale-btn ${sinStock ? 'disabled' : ''}"
+                  onclick="seleccionarVentaRapida('${p._id}', ${p.precio_venta}, ${p.stock})"
+                  title="${p.nombre} — S/${parseFloat(p.precio_venta).toFixed(2)} (stock: ${p.stock})">
+            <span class="quick-sale-rank">${i + 1}</span>
+            ${imgHtml}
+            <div class="quick-sale-name">${p.nombre}</div>
+            <div class="quick-sale-price">S/ ${parseFloat(p.precio_venta).toFixed(2)}</div>
+            <div class="quick-sale-stock">${sinStock ? 'Sin stock' : 'Stock: ' + p.stock}</div>
+          </button>`;
+      }).join('');
+    } catch (err) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-light);font-size:12px">Error al cargar</div>';
+    }
+  }
+
+  function seleccionarVentaRapida(id, price, stock) {
+    const sel = document.getElementById('v-product');
+    if (!sel) return;
+    // Buscar si el producto ya existe en el select
+    let found = false;
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === id) {
+        sel.selectedIndex = i;
+        found = true;
+        break;
+      }
+    }
+    // Si no está en el select (puede ser que se cargaron con cache viejo), agregarlo
+    if (!found) {
+      const opt = new Option(`${sel.dataset.productName || 'Producto'} — S/${price.toFixed(2)} (stock: ${stock})`, id);
+      opt.dataset.price = price;
+      opt.dataset.stock = stock;
+      sel.appendChild(opt);
+      sel.value = id;
+    }
+    onVProductChange();
+    // Feedback visual: brief highlight
+    sel.style.transition = 'box-shadow 0.3s';
+    sel.style.boxShadow = '0 0 0 2px var(--primary)';
+    setTimeout(() => { sel.style.boxShadow = ''; }, 800);
+  }
+
   async function registrarVenta() {
     if (!cajaActual) return toast('Debes abrir la caja primero', 'warning');
     const product_id = document.getElementById('v-product').value;
@@ -586,8 +705,6 @@
         items: [{ producto_id: product_id, cantidad: quantity }]
       });
 
-      // Patch quirúrgico: decrementar stock solo del producto vendido en caché
-      // sin borrar toda la lista de productos
       if (venta?.items?.length) {
         venta.items.forEach(item => {
           const pid = item.producto_id?._id || item.producto_id;
@@ -597,8 +714,8 @@
           }));
         });
       }
-      // Invalidar solo caja (totales del turno cambian)
       gymCache.invalidate('caja');
+      allVentas.unshift(venta);
 
       toast('Venta registrada ✅');
       document.getElementById('v-product').value = '';
@@ -608,7 +725,37 @@
       document.getElementById('v-metodo').value = 'efectivo';
       document.getElementById('v-stock-info').textContent = '';
       loadEstado();
+      refreshVentasTable();
     } catch (err) { toast(err.message, 'error'); }
+  }
+
+  function renderVentaRow(v) {
+    return `
+      <tr style="${v.anulada ? 'opacity:0.45;text-decoration:line-through' : ''}">
+        <td>${v.producto_nombre || '-'}</td>
+        <td>${v.cliente_nombre || '-'}</td>
+        <td><span class="badge badge-info">${v.metodo_pago || 'efectivo'}</span></td>
+        <td style="text-align:center">${v.cantidad}</td>
+        <td>S/ ${parseFloat(v.precio_unit).toFixed(2)}</td>
+        <td style="font-weight:700;color:${v.anulada ? 'var(--danger)' : 'var(--success)'}">
+          ${v.anulada ? '<span style="font-size:11px;font-weight:600">ANULADA</span>' : `S/ ${parseFloat(v.subtotal).toFixed(2)}`}
+        </td>
+        <td style="font-size:12px">${fmtDateTime(v.fecha_venta)}</td>
+        <td>
+          ${!v.anulada
+            ? `<button class="btn btn-sm btn-danger" style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap" onclick="anularVenta('${v.id}')">${icon('trash')} Anular</button>`
+            : ''}
+        </td>
+      </tr>
+    `;
+  }
+
+  function refreshVentasTable() {
+    if (ventasPaginator) {
+      ventasPaginator.setData(allVentas);
+    } else {
+      ventasPaginator = initTablePagination('pagination-ventas', 'turno-ventas-table', allVentas, 10, renderVentaRow);
+    }
   }
 
   async function loadTurnoVentas() {
@@ -616,31 +763,7 @@
     try {
       const detalle = await api.get(`/caja/${cajaActual.id}/detalle`);
       allVentas = detalle.ventas;
-
-      const renderRow = (v) => `
-        <tr style="${v.anulada ? 'opacity:0.45;text-decoration:line-through' : ''}">
-          <td>${v.producto_nombre || '-'}</td>
-          <td>${v.cliente_nombre || '-'}</td>
-          <td><span class="badge badge-info">${v.metodo_pago || 'efectivo'}</span></td>
-          <td style="text-align:center">${v.cantidad}</td>
-          <td>S/ ${parseFloat(v.precio_unit).toFixed(2)}</td>
-          <td style="font-weight:700;color:${v.anulada ? 'var(--danger)' : 'var(--success)'}">
-            ${v.anulada ? '<span style="font-size:11px;font-weight:600">ANULADA</span>' : `S/ ${parseFloat(v.subtotal).toFixed(2)}`}
-          </td>
-          <td style="font-size:12px">${fmtDateTime(v.fecha_venta)}</td>
-          <td>
-            ${!v.anulada
-              ? `<button class="btn btn-sm btn-danger" style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap" onclick="anularVenta('${v.id}')">${icon('trash')} Anular</button>`
-              : ''}
-          </td>
-        </tr>
-      `;
-
-      if (ventasPaginator) {
-        ventasPaginator.setData(allVentas);
-      } else {
-        ventasPaginator = initTablePagination('pagination-ventas', 'turno-ventas-table', allVentas, 10, renderRow);
-      }
+      refreshVentasTable();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -671,14 +794,16 @@
     const monto_inicial = document.getElementById('abrir-monto').value;
     const notas         = document.getElementById('abrir-notas').value;
     try {
-      await api.post('/caja/abrir', { monto_inicial, notas }, false, {
+      const nuevaCaja = await api.post('/caja/abrir', { monto_inicial, notas }, false, {
         invalidate: ['caja'],
       });
+      cajaActual = nuevaCaja;
+      allHistorial.unshift(nuevaCaja);
       toast('Caja abierta ✅');
       closeModal('modal-abrir');
       histPaginator = null;
       loadEstado();
-      loadHistorial();
+      renderHistorial();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -743,12 +868,16 @@
       await api.put(`/caja/cerrar/${cajaActual.id}`, { monto_final, notas }, {
         invalidate: ['caja'],
       });
+      const idx = allHistorial.findIndex(c => c.id === cajaActual.id);
+      if (idx !== -1) {
+        allHistorial[idx] = { ...allHistorial[idx], estado: 'cerrada', monto_final: parseFloat(monto_final), cierre: new Date().toISOString() };
+      }
       toast('Caja cerrada 🔒');
       closeModal('modal-cerrar');
       cajaActual = null;
       histPaginator = null;
       loadEstado();
-      loadHistorial();
+      renderHistorial();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -864,6 +993,51 @@
       '<tr><td colspan="6" class="text-center" style="padding:30px;color:var(--text-light)">Sin registros</td></tr>';
   }
 
+  function renderHistorialRow(c) {
+    return `
+      <tr>
+        <td style="font-size:12px">${fmtDateTime(c.apertura)}</td>
+        <td style="font-size:12px">${c.cierre ? fmtDateTime(c.cierre) : '-'}</td>
+        <td>${c.usuario_nombre || '-'}</td>
+        <td>S/ ${parseFloat(c.monto_inicial).toFixed(2)}</td>
+        <td style="color:var(--success);font-weight:600">S/ ${parseFloat(c.total_turno||0).toFixed(2)}</td>
+        <td style="color:var(--danger);font-weight:600">S/ ${parseFloat(c.egresos_manuales||0).toFixed(2)}</td>
+        <td>${c.monto_final != null ? `S/ ${parseFloat(c.monto_final).toFixed(2)}` : '-'}</td>
+        <td><span class="badge ${c.estado === 'abierta' ? 'badge-success' : 'badge-info'}">${c.estado}</span></td>
+        <td><button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center" onclick="verDetalle('${c.id}')">${icon('eye')}</button></td>
+      </tr>
+    `;
+  }
+
+  function getFilteredHistorial() {
+    return allHistorial.filter(c => {
+      const estado = document.getElementById('filter-estado-caja')?.value || '';
+      const cajero = document.getElementById('filter-cajero')?.value || '';
+      const from   = document.getElementById('filter-from-caja')?.value || '';
+      const to     = document.getElementById('filter-to-caja')?.value || '';
+      if (estado && c.estado !== estado) return false;
+      if (cajero && c.usuario_nombre !== cajero) return false;
+      if (from && c.apertura) {
+        if (new Date(c.apertura) < new Date(from)) return false;
+      }
+      if (to && c.apertura) {
+        const toDate = new Date(to);
+        toDate.setHours(23, 59, 59);
+        if (new Date(c.apertura) > toDate) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderHistorial() {
+    const filtered = getFilteredHistorial();
+    if (histPaginator) {
+      histPaginator.setData(filtered);
+    } else {
+      histPaginator = initTablePagination('pagination-hist', 'historial-table', filtered, 10, renderHistorialRow);
+    }
+  }
+
   async function loadHistorial() {
     try {
       const tabla = document.getElementById('historial-table');
@@ -872,7 +1046,6 @@
       const data = await api.get('/caja?limit=500');
       allHistorial = data.data;
 
-      // Poblar select de cajeros
       const filterCajero = document.getElementById('filter-cajero');
       if (filterCajero && filterCajero.options.length <= 1) {
         const cajeros = [...new Set(allHistorial.map(c => c.usuario_nombre).filter(Boolean))];
@@ -880,47 +1053,7 @@
           cajeros.map(c => `<option value="${c}">${c}</option>`).join('');
       }
 
-      const renderRow = (c) => `
-        <tr>
-          <td style="font-size:12px">${fmtDateTime(c.apertura)}</td>
-          <td style="font-size:12px">${c.cierre ? fmtDateTime(c.cierre) : '-'}</td>
-          <td>${c.usuario_nombre || '-'}</td>
-          <td>S/ ${parseFloat(c.monto_inicial).toFixed(2)}</td>
-          <td style="color:var(--success);font-weight:600">S/ ${parseFloat(c.total_turno||0).toFixed(2)}</td>
-          <td style="color:var(--danger);font-weight:600">S/ ${parseFloat(c.egresos_manuales||0).toFixed(2)}</td>
-          <td>${c.monto_final != null ? `S/ ${parseFloat(c.monto_final).toFixed(2)}` : '-'}</td>
-          <td><span class="badge ${c.estado === 'abierta' ? 'badge-success' : 'badge-info'}">${c.estado}</span></td>
-          <td><button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center" onclick="verDetalle('${c.id}')">${icon('eye')}</button></td>
-        </tr>
-      `;
-
-      function applyFilters(data) {
-        return data.filter(c => {
-          const estado = document.getElementById('filter-estado-caja')?.value || '';
-          const cajero = document.getElementById('filter-cajero')?.value || '';
-          const from   = document.getElementById('filter-from-caja')?.value || '';
-          const to     = document.getElementById('filter-to-caja')?.value || '';
-          if (estado && c.estado !== estado) return false;
-          if (cajero && c.usuario_nombre !== cajero) return false;
-          if (from && c.apertura) {
-            if (new Date(c.apertura) < new Date(from)) return false;
-          }
-          if (to && c.apertura) {
-            const toDate = new Date(to);
-            toDate.setHours(23, 59, 59);
-            if (new Date(c.apertura) > toDate) return false;
-          }
-          return true;
-        });
-      }
-
-      const filtered = applyFilters(allHistorial);
-
-      if (histPaginator) {
-        histPaginator.setData(filtered);
-      } else {
-        histPaginator = initTablePagination('pagination-hist', 'historial-table', filtered, 10, renderRow);
-      }
+      renderHistorial();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -952,14 +1085,15 @@
     if (!monto || parseFloat(monto) <= 0) return toast('Ingresa un monto válido', 'warning');
     if (!concepto) return toast('El concepto es requerido', 'warning');
     try {
-      await api.post(`/caja/${cajaActual.id}/movimientos`, { tipo, monto, concepto, metodo_pago });
+      const nuevoMov = await api.post(`/caja/${cajaActual.id}/movimientos`, { tipo, monto, concepto, metodo_pago });
       gymCache.invalidate('caja');
+      if (nuevoMov) allMovimientos.unshift(nuevoMov);
       toast(`${tipo === 'ingreso' ? 'Ingreso' : 'Egreso'} registrado ✅`);
       document.getElementById('mov-monto').value    = '';
       document.getElementById('mov-concepto').value = '';
       document.getElementById('mov-metodo').value   = 'efectivo';
       loadEstado();
-      loadMovimientos();
+      refreshMovimientosTable();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -969,7 +1103,7 @@
     const metodo_pago = document.getElementById('rutina-metodo').value;
     if (!monto || parseFloat(monto) <= 0) return toast('Ingresa un monto válido', 'warning');
     try {
-      await api.post(`/caja/${cajaActual.id}/movimientos`, {
+      const nuevoMov = await api.post(`/caja/${cajaActual.id}/movimientos`, {
         tipo: 'ingreso',
         monto,
         concepto: 'Rutina (cliente ocasional)',
@@ -977,10 +1111,46 @@
         es_rutina: true,
       });
       gymCache.invalidate('caja');
+      if (nuevoMov) allMovimientos.unshift(nuevoMov);
       toast(`Rutina registrada — S/ ${parseFloat(monto).toFixed(2)} por ${metodo_pago} ✅`);
       loadEstado();
-      loadMovimientos();
+      refreshMovimientosTable();
     } catch (err) { toast(err.message, 'error'); }
+  }
+
+  function renderMovimientoRow(m) {
+    const metodoBadge = {
+      efectivo:      '<span class="badge" style="background:#28a74522;color:#28a745">💵 Efectivo</span>',
+      yape:          '<span class="badge" style="background:#7b2ff722;color:#7b2ff7">💜 Yape</span>',
+      plin:          '<span class="badge" style="background:#00b4d822;color:#00b4d8">🔵 Plin</span>',
+      transferencia: '<span class="badge" style="background:#fd7e1422;color:#fd7e14">🏦 Transf.</span>',
+    };
+    return `
+      <tr>
+        <td>
+          <span class="badge ${m.tipo === 'ingreso' ? 'badge-success' : 'badge-danger'}">${m.tipo === 'ingreso' ? '▲ Ingreso' : '▼ Egreso'}</span>
+          ${m.es_rutina ? '<span class="badge" style="background:#fff3cd;color:#856404;margin-left:4px;font-size:10px">⚡ Rutina</span>' : ''}
+        </td>
+        <td>${m.concepto}</td>
+        <td>${metodoBadge[m.metodo_pago] || m.metodo_pago || '-'}</td>
+        <td style="font-weight:700;color:${m.tipo === 'ingreso' ? 'var(--success)' : 'var(--danger)'}">
+          ${m.tipo === 'ingreso' ? '+' : '-'}S/ ${parseFloat(m.monto).toFixed(2)}
+        </td>
+        <td style="font-size:12px">${fmtDateTime(m.fecha)}</td>
+        <td style="font-size:12px">${m.usuario_nombre || '-'}</td>
+        <td>
+          <button class="btn btn-sm btn-danger" style="display:inline-flex;align-items:center;gap:4px" onclick="eliminarMovimiento('${m.id}')">${icon('trash')}</button>
+        </td>
+      </tr>
+    `;
+  }
+
+  function refreshMovimientosTable() {
+    if (movimientosPaginator) {
+      movimientosPaginator.setData(allMovimientos);
+    } else {
+      movimientosPaginator = initTablePagination('pagination-movimientos', 'movimientos-table', allMovimientos, 10, renderMovimientoRow);
+    }
   }
 
   async function loadMovimientos() {
@@ -988,38 +1158,7 @@
     try {
       const movs = await api.get(`/caja/${cajaActual.id}/movimientos`);
       allMovimientos = movs;
-
-      const metodoBadge = {
-        efectivo:      '<span class="badge" style="background:#28a74522;color:#28a745">💵 Efectivo</span>',
-        yape:          '<span class="badge" style="background:#7b2ff722;color:#7b2ff7">💜 Yape</span>',
-        plin:          '<span class="badge" style="background:#00b4d822;color:#00b4d8">🔵 Plin</span>',
-        transferencia: '<span class="badge" style="background:#fd7e1422;color:#fd7e14">🏦 Transf.</span>',
-      };
-
-      const renderRow = (m) => `
-        <tr>
-          <td>
-            <span class="badge ${m.tipo === 'ingreso' ? 'badge-success' : 'badge-danger'}">${m.tipo === 'ingreso' ? '▲ Ingreso' : '▼ Egreso'}</span>
-            ${m.es_rutina ? '<span class="badge" style="background:#fff3cd;color:#856404;margin-left:4px;font-size:10px">⚡ Rutina</span>' : ''}
-          </td>
-          <td>${m.concepto}</td>
-          <td>${metodoBadge[m.metodo_pago] || m.metodo_pago || '-'}</td>
-          <td style="font-weight:700;color:${m.tipo === 'ingreso' ? 'var(--success)' : 'var(--danger)'}">
-            ${m.tipo === 'ingreso' ? '+' : '-'}S/ ${parseFloat(m.monto).toFixed(2)}
-          </td>
-          <td style="font-size:12px">${fmtDateTime(m.fecha)}</td>
-          <td style="font-size:12px">${m.usuario_nombre || '-'}</td>
-          <td>
-            <button class="btn btn-sm btn-danger" style="display:inline-flex;align-items:center;gap:4px" onclick="eliminarMovimiento('${m.id}')">${icon('trash')}</button>
-          </td>
-        </tr>
-      `;
-
-      if (movimientosPaginator) {
-        movimientosPaginator.setData(allMovimientos);
-      } else {
-        movimientosPaginator = initTablePagination('pagination-movimientos', 'movimientos-table', allMovimientos, 10, renderRow);
-      }
+      refreshMovimientosTable();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -1034,9 +1173,10 @@
     try {
       await api.delete(`/caja/${cajaActual.id}/movimientos/${movId}`);
       gymCache.invalidate('caja');
+      allMovimientos = allMovimientos.filter(m => m.id !== movId && m._id !== movId);
       toast('Movimiento eliminado', 'warning');
       loadEstado();
-      loadMovimientos();
+      refreshMovimientosTable();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -1068,6 +1208,12 @@
     if (hHistorial) hHistorial.innerHTML = icon('calendar') + ' Historial de Cajas';
 
     loadEstado();
+
+    window.addEventListener('gym-cache-invalidated', (e) => {
+      if (e.detail?.namespace === 'caja' && _pageActive()) {
+        refreshCardSolo();
+      }
+    });
   })();
   
   // Exponer funciones al scope global para que los onclick del HTML funcionen
@@ -1086,6 +1232,7 @@
   window.eliminarMovimiento  = eliminarMovimiento;
   window.onVProductChange    = onVProductChange;
   window.updateVTotal        = updateVTotal;
+  window.seleccionarVentaRapida = seleccionarVentaRapida;
   window.prepararModalAbrir  = prepararModalAbrir;
   window.validarMontoAbrir   = validarMontoAbrir;
   window.prepararModalCerrar = prepararModalCerrar;
@@ -1095,7 +1242,7 @@
   // ── Event listeners filtros historial ──────────────────────────────────────
   ['filter-estado-caja','filter-cajero','filter-from-caja','filter-to-caja'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener(el.tagName === 'INPUT' ? 'change' : 'change', () => loadHistorial());
+    if (el) el.addEventListener(el.tagName === 'INPUT' ? 'change' : 'change', () => renderHistorial());
   });
 </script>
 </body>

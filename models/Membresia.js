@@ -6,6 +6,7 @@ const membresiaSchema = new mongoose.Schema({
   fecha_inicio: { type: Date, required: true },
   fecha_fin:    { type: Date, required: true },
   estado:       { type: String, enum: ['activo', 'vencido', 'cancelado', 'pendiente'], default: 'activo' },
+  monto_total:  { type: Number, default: null },
 }, { timestamps: { createdAt: 'created_at' } });
 
 // Índices para consultas frecuentes

@@ -121,6 +121,12 @@ function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 // Format date
 function fmtDate(d) {
   if (!d) return '-';
+  const str = String(d);
+  // Si es formato YYYY-MM-DD, parsear sin zona horaria
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const [y, m, day] = str.split('-');
+    return `${day}/${m}/${y}`;
+  }
   return new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 

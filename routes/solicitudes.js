@@ -189,7 +189,8 @@ router.put(
     try {
       const update = { estado, atendido_por: req.user.id };
       if (notas !== undefined) update.notas = notas;
-      const sol = await Solicitud.findByIdAndUpdate(req.params.id, update, { new: true })
+      await Solicitud.findByIdAndUpdate(req.params.id, update, { new: true });
+      const sol = await Solicitud.findById(req.params.id)
         .populate('plan_id', 'nombre precio')
         .populate('atendido_por', 'nombre')
         .populate('cliente_id', 'nombre');

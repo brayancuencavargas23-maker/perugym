@@ -120,79 +120,87 @@
   let allClientes = [];
   let tablePaginator = null;
 
-  async function loadClientes() {
+  function _pageActive() {
+    return !!document.getElementById('clientes-table');
+  }
+
+  function renderRow(c) {
+    const days = daysUntil(c.fecha_fin);
+    const expClass = days !== null && days <= 7 ? 'badge-warning' : days !== null && days < 0 ? 'badge-danger' : 'badge-info';
+    const estadoMem = c.membresia_estado
+      ? `<span class="badge ${c.membresia_estado === 'activo' ? 'badge-success' : 'badge-danger'}">${c.membresia_estado}</span>`
+      : '<span style="color:var(--text-light)">Sin membresía</span>';
+    return `<tr>
+      <td data-label="Cliente">
+        <div class="member-cell">
+          ${c.foto_url
+            ? `<img src="${c.foto_url}" class="member-avatar" alt="${c.nombre}">`
+            : `<div class="member-avatar" style="display:flex;align-items:center;justify-content:center">${avatarInitials(c.nombre)}</div>`}
+          <div>
+            <div style="font-weight:600">${[c.apellido_paterno, c.apellido_materno, c.nombre].filter(Boolean).join(' ') || c.nombre}</div>
+            <div style="font-size:12px;color:var(--text-light)">${c.email || c.telefono || ''}</div>
+          </div>
+        </div>
+      </td>
+      <td data-label="DNI">${c.dni || '-'}</td>
+      <td data-label="Membresía">${estadoMem}<div style="font-size:11px;color:var(--text-light)">${c.plan_nombre || ''}</div></td>
+      <td data-label="Vencimiento">${c.fecha_fin ? `<span class="badge ${expClass}">${fmtDate(c.fecha_fin)}</span>` : '-'}</td>
+      <td data-label="Estado"><span class="badge ${c.activo ? 'badge-success' : 'badge-danger'}">${c.activo ? 'Activo' : 'Inactivo'}</span></td>
+      <td data-label="Acciones">
+        <button class="btn btn-sm btn-outline" title="Editar" onclick="editCliente('${c.id}')">${icon('edit')}</button>
+        <button class="btn btn-sm btn-outline" title="Asignar membresía" onclick="irAMembresia('${c.id}')">${icon('membresias')}</button>
+        <button class="btn btn-sm btn-danger" title="Eliminar" onclick="withLoading(this, () => deleteCliente('${c.id}', '${c.nombre.replace(/'/g, "\\'")}'), 'Eliminando...')">${icon('trash')}</button>
+      </td>
+    </tr>`;
+  }
+
+  function getFilteredClientes() {
     const searchEl = document.getElementById('search');
     const activoEl = document.getElementById('filter-activo');
     const memEl = document.getElementById('filter-membresia');
     const venceEl = document.getElementById('filter-vence');
-    if (!searchEl || !activoEl) return;
+    if (!searchEl || !activoEl) return [];
     const search = searchEl.value.toLowerCase();
     const activo = activoEl.value;
     const membresia = memEl ? memEl.value : '';
     const vence = venceEl ? venceEl.value : '';
+
+    return allClientes.filter(c => {
+      if (search) {
+        const fullName = [c.nombre, c.apellido_paterno, c.apellido_materno, c.dni, c.email].filter(Boolean).join(' ').toLowerCase();
+        if (!fullName.includes(search)) return false;
+      }
+      if (activo === 'true' && !c.activo) return false;
+      if (activo === 'false' && c.activo) return false;
+      if (membresia === 'con' && !c.membresia_estado) return false;
+      if (membresia === 'sin' && c.membresia_estado) return false;
+      if (membresia === 'activo' && c.membresia_estado !== 'activo') return false;
+      if (membresia === 'vencida' && c.membresia_estado !== 'vencido') return false;
+      if (vence && c.fecha_fin) {
+        const d = daysUntil(c.fecha_fin);
+        if (d === null || d < 0 || d > parseInt(vence)) return false;
+      }
+      if (vence && !c.fecha_fin) return false;
+      return true;
+    });
+  }
+
+  function refreshTable() {
+    if (!_pageActive()) return;
+    const filtered = getFilteredClientes();
+    if (tablePaginator) {
+      tablePaginator.setData(filtered);
+    } else {
+      tablePaginator = initTablePagination('pagination', 'clientes-table', filtered, 10, renderRow);
+    }
+  }
+
+  async function loadClientes() {
     showTableSkeleton('clientes-table', 6);
     try {
       const data = await api.get('/clientes?limit=500');
       allClientes = data.data;
-
-      const renderRow = (c) => {
-        const days = daysUntil(c.fecha_fin);
-        const expClass = days !== null && days <= 7 ? 'badge-warning' : days !== null && days < 0 ? 'badge-danger' : 'badge-info';
-        const estadoMem = c.membresia_estado
-          ? `<span class="badge ${c.membresia_estado === 'activo' ? 'badge-success' : 'badge-danger'}">${c.membresia_estado}</span>`
-          : '<span style="color:var(--text-light)">Sin membresía</span>';
-        return `<tr>
-          <td data-label="Cliente">
-            <div class="member-cell">
-              ${c.foto_url
-                ? `<img src="${c.foto_url}" class="member-avatar" alt="${c.nombre}">`
-                : `<div class="member-avatar" style="display:flex;align-items:center;justify-content:center">${avatarInitials(c.nombre)}</div>`}
-              <div>
-                <div style="font-weight:600">${[c.apellido_paterno, c.apellido_materno, c.nombre].filter(Boolean).join(' ') || c.nombre}</div>
-                <div style="font-size:12px;color:var(--text-light)">${c.email || c.telefono || ''}</div>
-              </div>
-            </div>
-          </td>
-          <td data-label="DNI">${c.dni || '-'}</td>
-          <td data-label="Membresía">${estadoMem}<div style="font-size:11px;color:var(--text-light)">${c.plan_nombre || ''}</div></td>
-          <td data-label="Vencimiento">${c.fecha_fin ? `<span class="badge ${expClass}">${fmtDate(c.fecha_fin)}</span>` : '-'}</td>
-          <td data-label="Estado"><span class="badge ${c.activo ? 'badge-success' : 'badge-danger'}">${c.activo ? 'Activo' : 'Inactivo'}</span></td>
-          <td data-label="Acciones">
-            <button class="btn btn-sm btn-outline" title="Editar" onclick="editCliente('${c.id}')">${icon('edit')}</button>
-            <button class="btn btn-sm btn-outline" title="Asignar membresía" onclick="irAMembresia('${c.id}')">${icon('membresias')}</button>
-            <button class="btn btn-sm btn-danger" title="Eliminar" onclick="withLoading(this, () => deleteCliente('${c.id}', '${c.nombre.replace(/'/g, "\\'")}'), 'Eliminando...')">${icon('trash')}</button>
-          </td>
-        </tr>`;
-      };
-
-      function applyFilters(data) {
-        return data.filter(c => {
-          if (search) {
-            const fullName = [c.nombre, c.apellido_paterno, c.apellido_materno, c.dni, c.email].filter(Boolean).join(' ').toLowerCase();
-            if (!fullName.includes(search)) return false;
-          }
-          if (activo === 'true' && !c.activo) return false;
-          if (activo === 'false' && c.activo) return false;
-          if (membresia === 'con' && !c.membresia_estado) return false;
-          if (membresia === 'sin' && c.membresia_estado) return false;
-          if (membresia === 'activo' && c.membresia_estado !== 'activo') return false;
-          if (membresia === 'vencida' && c.membresia_estado !== 'vencido') return false;
-          if (vence && c.fecha_fin) {
-            const d = daysUntil(c.fecha_fin);
-            if (d === null || d < 0 || d > parseInt(vence)) return false;
-          }
-          if (vence && !c.fecha_fin) return false;
-          return true;
-        });
-      }
-
-      const filtered = applyFilters(allClientes);
-
-      if (tablePaginator) {
-        tablePaginator.setData(filtered);
-      } else {
-        tablePaginator = initTablePagination('pagination', 'clientes-table', filtered, 10, renderRow);
-      }
+      refreshTable();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -244,16 +252,17 @@
       const data = await res.json().catch(() => null);
 
       if (id && data) {
-        // PUT: patch quirúrgico — no borra el caché de toda la lista
         gymCache.patchItem('clientes', id, () => data);
+        const idx = allClientes.findIndex(c => c.id === id || c._id === id);
+        if (idx !== -1) allClientes[idx] = { ...allClientes[idx], ...data };
       } else {
-        // POST: nuevo cliente — invalidar para que aparezca en la lista
         gymCache.invalidate('clientes');
+        if (data) allClientes.unshift(data);
       }
 
       toast(id ? 'Cliente actualizado' : 'Cliente creado');
       closeModal('modal-overlay');
-      loadClientes();
+      refreshTable();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -313,8 +322,9 @@
       await api.delete(`/clientes/${id}`, {
         remove: { ns: 'clientes', id },
       });
+      allClientes = allClientes.filter(c => c.id !== id && c._id !== id);
       toast('Cliente eliminado');
-      loadClientes();
+      refreshTable();
     } catch (err) { toast(err.message, 'error'); }
   }
 

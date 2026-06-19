@@ -33,6 +33,7 @@ const GymRouter = (() => {
 
   let _currentPage  = null;
   let _isNavigating = false;
+  const _htmlCache  = {};
 
   // ── Parsear HTML completo → partes relevantes ──────────────────────────────
   function _parse(html) {
@@ -229,16 +230,39 @@ const GymRouter = (() => {
       // 4. Limpiar página anterior
       _cleanup();
 
-      // 5. Skeleton
-      _skeleton();
+      const cached = _htmlCache[page];
+      let restoring = false;
+      let styles, content, modals, external, inlines;
 
-      // 6. Fetch HTML
-      const res = await fetch(route, { headers: { 'X-SPA-Request': '1' } });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const html = await res.text();
+      if (cached) {
+        // Restaurar desde caché — sin skeleton, sin fetch, sin parse
+        styles   = cached.styles;
+        content  = cached.content;
+        modals   = cached.modals;
+        external = cached.external;
+        inlines  = cached.inlines;
+        restoring = true;
+        console.log(`[Router] ⚡ Restaurando ${page} desde caché`);
+      } else {
+        // 5. Skeleton (solo primera visita)
+        _skeleton();
 
-      // 7. Parsear
-      const { styles, content, modals, external, inlines } = _parse(html);
+        // 6. Fetch HTML
+        const res = await fetch(route, { headers: { 'X-SPA-Request': '1' } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const html = await res.text();
+
+        // 7. Parsear
+        const parsed = _parse(html);
+        styles   = parsed.styles;
+        content  = parsed.content;
+        modals   = parsed.modals;
+        external = parsed.external;
+        inlines  = parsed.inlines;
+
+        // Guardar en caché para futuras visitas
+        _htmlCache[page] = { styles, content, modals, external, inlines };
+      }
 
       // 8. Estilos de página
       let stEl = document.getElementById('_spa_styles');
@@ -278,6 +302,8 @@ const GymRouter = (() => {
       }
 
       // 12. Script inline: preparar y ejecutar
+      // Marcar restauración para que las páginas puedan optimizar su init
+      if (restoring) window.__spaRestoring = true;
       const { code } = _prepareScript(inlines);
 
       if (code) {
@@ -300,6 +326,9 @@ const GymRouter = (() => {
       } else {
         console.warn('[Router] ⚠️ No hay código para ejecutar');
       }
+
+      // Limpiar flag de restauración
+      window.__spaRestoring = false;
 
       // 13. Actualizar estado
       _currentPage = page;

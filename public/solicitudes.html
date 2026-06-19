@@ -219,16 +219,14 @@
   let allSolicitudes = [];
   let tablePaginator = null;
 
-  // Guard: devuelve true si la página de solicitudes sigue activa en el DOM.
   function _pageActive() {
     return !!document.getElementById('solicitudes-table');
   }
 
-  // ── Verificar caja ──────────────────────────────────────────────────────────
   async function checkCaja() {
     try { cajaActual = await api.get('/caja/estado'); } catch { cajaActual = null; }
   }
-  // ── Cargar resumen de estados ───────────────────────────────────────────────
+
   async function loadStats(force = false) {
     try {
       const stats = await api.get('/solicitudes/stats', force);
@@ -241,7 +239,6 @@
       if (cntContactado) cntContactado.textContent = stats.contactado;
       if (cntConvertido) cntConvertido.textContent = stats.convertido;
       if (cntDescartado) cntDescartado.textContent = stats.descartado;
-      // Actualizar badge del sidebar
       const badge = document.getElementById('nav-badge-solicitudes');
       if (badge) {
         badge.textContent = stats.pendiente;
@@ -250,9 +247,42 @@
     } catch {}
   }
 
-  // ── Cargar tabla ────────────────────────────────────────────────────────────
-  async function loadSolicitudes(force = false) {
-    if (!_pageActive()) return;
+  function renderRow(s) {
+    const estadoClass = {
+      pendiente:  'estado-badge-pendiente',
+      contactado: 'estado-badge-contactado',
+      convertido: 'estado-badge-convertido',
+      descartado: 'estado-badge-descartado',
+    }[s.estado] || '';
+
+    const whatsappUrl = `https://wa.me/51${s.telefono.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola ${s.nombre}, vi tu interés en el plan ${s.plan_nombre || ''}. ¿Cuándo puedes venir al gym?`)}`;
+
+    const acciones = s.estado !== 'convertido' && s.estado !== 'descartado'
+      ? `<button class="btn btn-sm btn-outline" title="Ver / Editar" onclick="abrirDetalle('${s.id}')">${icon('eye')}</button>
+         <a class="btn btn-sm btn-outline" href="${whatsappUrl}" target="_blank" title="WhatsApp" style="display:inline-flex;align-items:center">
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+         </a>
+         <button class="btn btn-sm btn-success" title="Convertir a cliente" onclick="abrirConvertir('${s.id}','${s.nombre.replace(/'/g,"\\'")}','${s.plan_nombre || ''}',${s.plan_precio || 0},'${s.telefono}','${s.email || ''}','${s.dni || ''}','${(s.apellido_paterno||'').replace(/'/g,"\\'")}','${(s.apellido_materno||'').replace(/'/g,"\\'")}')">
+           ${icon('check')}</button>`
+      : s.estado === 'convertido'
+        ? `<a href="/clientes.html" class="btn btn-sm btn-outline" title="Ver clientes" style="display:inline-flex;align-items:center">${icon('clientes')}</a>`
+        : `<button class="btn btn-sm btn-outline" title="Ver detalle" onclick="abrirDetalle('${s.id}')">${icon('eye')}</button>`;
+
+    return `<tr>
+      <td data-label="Fecha" style="font-size:12px;white-space:nowrap">${fmtDateTime(s.created_at)}</td>
+      <td data-label="Nombre"><strong>${s.nombre}</strong></td>
+      <td data-label="Teléfono">${s.telefono}</td>
+      <td data-label="Plan">
+        <strong>${s.plan_nombre || '-'}</strong>
+        ${s.plan_precio ? `<div style="font-size:11px;color:var(--text-light)">${fmtMoney(s.plan_precio)}/mes</div>` : ''}
+      </td>
+      <td data-label="Estado"><span class="estado-badge ${estadoClass}">${s.estado}</span></td>
+      <td data-label="Notas" style="font-size:12px;color:var(--text-light);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.notas || ''}">${s.notas || '-'}</td>
+      <td data-label="Acciones" style="display:flex;gap:4px;flex-wrap:wrap">${acciones}</td>
+    </tr>`;
+  }
+
+  function getFilteredSolicitudes() {
     const estadoEl = document.getElementById('filter-estado');
     const planEl = document.getElementById('filter-plan-sol');
     const desdeEl = document.getElementById('filter-sol-desde');
@@ -263,13 +293,44 @@
     const desde = desdeEl ? desdeEl.value : '';
     const hasta = hastaEl ? hastaEl.value : '';
     const sinContacto = sinContactoEl ? sinContactoEl.value : '';
+
+    return allSolicitudes.filter(s => {
+      if (estado && s.estado !== estado) return false;
+      if (plan && s.plan_nombre !== plan) return false;
+      if (desde && s.created_at) {
+        if (new Date(s.created_at) < new Date(desde)) return false;
+      }
+      if (hasta && s.created_at) {
+        const hastaDate = new Date(hasta);
+        hastaDate.setHours(23, 59, 59);
+        if (new Date(s.created_at) > hastaDate) return false;
+      }
+      if (sinContacto && s.created_at) {
+        const dias = daysUntil(s.created_at);
+        if (dias === null || Math.abs(dias) < parseInt(sinContacto)) return false;
+      }
+      return true;
+    });
+  }
+
+  function refreshTable() {
+    if (!_pageActive()) return;
+    const filtered = getFilteredSolicitudes();
+    if (tablePaginator) {
+      tablePaginator.setData(filtered);
+    } else {
+      tablePaginator = initTablePagination('pagination', 'solicitudes-table', filtered, 10, renderRow);
+    }
+  }
+
+  async function loadSolicitudes(force = false) {
+    if (!_pageActive()) return;
     showTableSkeleton('solicitudes-table', 7);
     try {
       const data = await api.get('/solicitudes?limit=500', force);
       if (!_pageActive()) return;
       allSolicitudes = data.data;
 
-      // Poblar select de planes
       const filterPlanSol = document.getElementById('filter-plan-sol');
       if (filterPlanSol && filterPlanSol.options.length <= 1) {
         const planes = [...new Set(allSolicitudes.map(s => s.plan_nombre).filter(Boolean))];
@@ -277,75 +338,12 @@
           planes.map(p => `<option value="${p}">${p}</option>`).join('');
       }
 
-      const renderRow = (s) => {
-        const estadoClass = {
-          pendiente:  'estado-badge-pendiente',
-          contactado: 'estado-badge-contactado',
-          convertido: 'estado-badge-convertido',
-          descartado: 'estado-badge-descartado',
-        }[s.estado] || '';
-
-        const whatsappUrl = `https://wa.me/51${s.telefono.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola ${s.nombre}, vi tu interés en el plan ${s.plan_nombre || ''}. ¿Cuándo puedes venir al gym?`)}`;
-
-        const acciones = s.estado !== 'convertido' && s.estado !== 'descartado'
-          ? `<button class="btn btn-sm btn-outline" title="Ver / Editar" onclick="abrirDetalle('${s.id}')">${icon('eye')}</button>
-             <a class="btn btn-sm btn-outline" href="${whatsappUrl}" target="_blank" title="WhatsApp" style="display:inline-flex;align-items:center">
-               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-             </a>
-             <button class="btn btn-sm btn-success" title="Convertir a cliente" onclick="abrirConvertir('${s.id}','${s.nombre.replace(/'/g,"\\'")}','${s.plan_nombre || ''}',${s.plan_precio || 0},'${s.telefono}','${s.email || ''}','${s.dni || ''}','${(s.apellido_paterno||'').replace(/'/g,"\\'")}','${(s.apellido_materno||'').replace(/'/g,"\\'")}')">
-               ${icon('check')}</button>`
-          : s.estado === 'convertido'
-            ? `<a href="/clientes.html" class="btn btn-sm btn-outline" title="Ver clientes" style="display:inline-flex;align-items:center">${icon('clientes')}</a>`
-            : `<button class="btn btn-sm btn-outline" title="Ver detalle" onclick="abrirDetalle('${s.id}')">${icon('eye')}</button>`;
-
-        return `<tr>
-          <td data-label="Fecha" style="font-size:12px;white-space:nowrap">${fmtDateTime(s.created_at)}</td>
-          <td data-label="Nombre"><strong>${s.nombre}</strong></td>
-          <td data-label="Teléfono">${s.telefono}</td>
-          <td data-label="Plan">
-            <strong>${s.plan_nombre || '-'}</strong>
-            ${s.plan_precio ? `<div style="font-size:11px;color:var(--text-light)">${fmtMoney(s.plan_precio)}/mes</div>` : ''}
-          </td>
-          <td data-label="Estado"><span class="estado-badge ${estadoClass}">${s.estado}</span></td>
-          <td data-label="Notas" style="font-size:12px;color:var(--text-light);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.notas || ''}">${s.notas || '-'}</td>
-          <td data-label="Acciones" style="display:flex;gap:4px;flex-wrap:wrap">${acciones}</td>
-        </tr>`;
-      };
-
-      function applyFilters(data) {
-        return data.filter(s => {
-          if (estado && s.estado !== estado) return false;
-          if (plan && s.plan_nombre !== plan) return false;
-          if (desde && s.created_at) {
-            if (new Date(s.created_at) < new Date(desde)) return false;
-          }
-          if (hasta && s.created_at) {
-            const hastaDate = new Date(hasta);
-            hastaDate.setHours(23, 59, 59);
-            if (new Date(s.created_at) > hastaDate) return false;
-          }
-          if (sinContacto && s.created_at) {
-            const dias = daysUntil(s.created_at);
-            if (dias === null || Math.abs(dias) < parseInt(sinContacto)) return false;
-          }
-          return true;
-        });
-      }
-
-      const filtered = applyFilters(allSolicitudes);
-
-      if (tablePaginator) {
-        tablePaginator.setData(filtered);
-      } else {
-        tablePaginator = initTablePagination('pagination', 'solicitudes-table', filtered, 10, renderRow);
-      }
+      refreshTable();
     } catch (err) { toast(err.message, 'error'); }
   }
 
-  // ── Modal detalle / cambio de estado ───────────────────────────────────────
   async function abrirDetalle(id) {
     try {
-      // Buscar en los datos ya cargados para evitar un fetch extra
       const s = allSolicitudes.find(x => x.id === id || x._id === id);
       if (!s) return toast('Solicitud no encontrada', 'error');
 
@@ -370,17 +368,17 @@
     const notas = document.getElementById('det-notas').value;
     try {
       await api.put(`/solicitudes/${id}/estado`, { estado, notas });
+      const idx = allSolicitudes.findIndex(s => s.id === id || s._id === id);
+      if (idx !== -1) allSolicitudes[idx] = { ...allSolicitudes[idx], estado, notas };
       toast('Solicitud actualizada');
       closeModal('modal-detalle');
-      loadSolicitudes(true);
+      refreshTable();
       loadStats(true);
     } catch (err) { toast(err.message, 'error'); }
   }
 
-  // ── Modal convertir ─────────────────────────────────────────────────────────
   function abrirConvertir(id, nombre, planNombre, planPrecio, telefono, email, dni, apellidoPaterno, apellidoMaterno) {
     document.getElementById('conv-id').value = id;
-    // Precargar datos de la solicitud (pueden venir de RENIEC si el cliente ingresó DNI en la landing)
     document.getElementById('conv-dni').value              = dni || '';
     document.getElementById('conv-nombre').value           = nombre || '';
     document.getElementById('conv-apellido-paterno').value = apellidoPaterno || '';
@@ -409,14 +407,12 @@
       btnConv.disabled = false;
     }
 
-    // Asignar evento al botón buscar DNI
     const btnBuscarDni = document.getElementById('btn-conv-buscar-dni');
     if (btnBuscarDni) btnBuscarDni.onclick = buscarDniConvertir;
 
     openModal('modal-convertir');
   }
 
-  // ── Buscar DNI en el modal de conversión ────────────────────────────────────
   async function buscarDniConvertir() {
     const dni       = document.getElementById('conv-dni').value.trim();
     const statusEl  = document.getElementById('conv-reniec-status');
@@ -462,27 +458,26 @@
         notas_membresia:  document.getElementById('conv-notas').value || null,
         caja_id:          cajaActual.id,
       }, false, { invalidate: ['solicitudes', 'clientes', 'membresias', 'pagos'] });
+      const idx = allSolicitudes.findIndex(s => s.id === id || s._id === id);
+      if (idx !== -1) allSolicitudes[idx] = { ...allSolicitudes[idx], estado: 'convertido' };
       toast('¡Cliente creado con membresía y pago registrados!', 'success');
       closeModal('modal-convertir');
-      loadSolicitudes(true);
+      refreshTable();
       loadStats(true);
     } catch (err) { toast(err.message, 'error'); }
   }
 
-  // Exponer al scope global para los onclick inline generados en template strings
   window.abrirDetalle       = abrirDetalle;
   window.abrirConvertir     = abrirConvertir;
   window.guardarEstado      = guardarEstado;
   window.confirmarConversion = confirmarConversion;
   window.buscarDniConvertir = buscarDniConvertir;
 
-  // ── Polling: detectar nuevas solicitudes en segundo plano ──────────────────
   let _lastPendingCount = null;
   let _pollingTimer = null;
 
   async function pollNuevasSolicitudes() {
     try {
-      // Solo el poll fuerza fetch real para detectar cambios
       const stats = await api.get('/solicitudes/stats', true);
       const nuevasCantidad = stats.pendiente;
 
@@ -495,9 +490,7 @@
       }
 
       _lastPendingCount = nuevasCantidad;
-    } catch {
-      // Silencioso
-    }
+    } catch {}
   }
 
   function startPolling(intervalMs = 45000) {
@@ -509,23 +502,21 @@
     if (_pollingTimer) { clearInterval(_pollingTimer); _pollingTimer = null; }
   }
 
-  // Pausar polling cuando la pestaña no está visible (ahorra requests)
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) stopPolling();
     else startPolling();
   }, { signal: window.__spaPageAbort?.signal });
 
-  // ── Eventos ─────────────────────────────────────────────────────────────────
   const _elFilterEstado = document.getElementById('filter-estado');
-  if (_elFilterEstado) _elFilterEstado.onchange = () => loadSolicitudes();
+  if (_elFilterEstado) _elFilterEstado.onchange = () => refreshTable();
   const _elFilterPlanSol = document.getElementById('filter-plan-sol');
-  if (_elFilterPlanSol) _elFilterPlanSol.onchange = () => loadSolicitudes();
+  if (_elFilterPlanSol) _elFilterPlanSol.onchange = () => refreshTable();
   const _elFilterSolDesde = document.getElementById('filter-sol-desde');
-  if (_elFilterSolDesde) _elFilterSolDesde.onchange = () => loadSolicitudes();
+  if (_elFilterSolDesde) _elFilterSolDesde.onchange = () => refreshTable();
   const _elFilterSolHasta = document.getElementById('filter-sol-hasta');
-  if (_elFilterSolHasta) _elFilterSolHasta.onchange = () => loadSolicitudes();
+  if (_elFilterSolHasta) _elFilterSolHasta.onchange = () => refreshTable();
   const _elFilterSinContacto = document.getElementById('filter-sin-contacto');
-  if (_elFilterSinContacto) _elFilterSinContacto.onchange = () => loadSolicitudes();
+  if (_elFilterSinContacto) _elFilterSinContacto.onchange = () => refreshTable();
   const _elBtnRefresh = document.getElementById('btn-refresh');
   if (_elBtnRefresh) _elBtnRefresh.onclick = () => {
     gymCache.invalidate('solicitudes');
@@ -533,7 +524,6 @@
     loadSolicitudes(true);
   };
 
-  // ── Init ────────────────────────────────────────────────────────────────────
   (async function _initSolicitudes() {
     initLayout('solicitudes', 'Solicitudes');
     const elRefresh = document.getElementById('icon-refresh-sol');
@@ -546,7 +536,6 @@
       await loadStats();
       await loadSolicitudes();
       
-      // Guardar conteo inicial y arrancar polling
       try {
         const stats = await api.get('/solicitudes/stats', true);
         _lastPendingCount = stats.pendiente;
@@ -558,7 +547,6 @@
     }
   })();
 
-  // Exponer funciones al scope global para que los onclick funcionen en el SPA
   window.abrirDetalle        = abrirDetalle;
   window.guardarEstado       = guardarEstado;
   window.abrirConvertir      = abrirConvertir;

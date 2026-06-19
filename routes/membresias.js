@@ -56,14 +56,32 @@ router.get('/', async (req, res) => {
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
 
-    const data = mems.map(m => ({
-      ...m.toObject(),
-      id: m._id,
-      cliente_nombre: [m.cliente_id?.nombre, m.cliente_id?.apellido_paterno, m.cliente_id?.apellido_materno].filter(Boolean).join(' ') || null,
-      foto_url: m.cliente_id?.foto_url,
-      plan_nombre: m.plan_id?.nombre,
-      precio: m.plan_id?.precio,
-    }));
+    const membresiaIds = mems.map(m => m._id);
+    const pagosAgrupados = await Pago.aggregate([
+      { $match: { membresia_id: { $in: membresiaIds }, estado: 'pagado' } },
+      { $group: {
+        _id: '$membresia_id',
+        total_pagado: { $sum: '$monto' },
+        cantidad_abonos: { $sum: 1 }
+      }}
+    ]);
+    const pagosMap = {};
+    pagosAgrupados.forEach(p => { pagosMap[p._id.toString()] = p; });
+
+    const data = mems.map(m => {
+      const pagoInfo = pagosMap[m._id.toString()] || { total_pagado: 0, cantidad_abonos: 0 };
+      return {
+        ...m.toObject(),
+        id: m._id,
+        cliente_nombre: [m.cliente_id?.nombre, m.cliente_id?.apellido_paterno, m.cliente_id?.apellido_materno].filter(Boolean).join(' ') || null,
+        foto_url: m.cliente_id?.foto_url,
+        plan_nombre: m.plan_id?.nombre,
+        precio: m.monto_total || m.plan_id?.precio,
+        precio_original: m.plan_id?.precio,
+        total_pagado: pagoInfo.total_pagado,
+        cantidad_abonos: pagoInfo.cantidad_abonos,
+      };
+    });
 
     res.json({ data, total, page: parseInt(page), pages: Math.ceil(total / limit) });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -79,49 +97,57 @@ router.post(
     body('metodo_pago').optional().isIn(['efectivo', 'yape', 'plin', 'transferencia']).withMessage('Método de pago inválido.'),
     body('estado_pago').optional().isIn(['pagado', 'pendiente']).withMessage('Estado de pago inválido.'),
     body('descuento').optional().isFloat({ min: 0 }).withMessage('El descuento debe ser un número positivo.'),
+    body('monto').optional().isFloat({ min: 0.01 }).withMessage('El monto debe ser mayor a 0.'),
     validators.fecha('fecha_inicio'),
     handleValidationErrors
   ],
   asyncHandler(async (req, res) => {
-    const { cliente_id, plan_id, fecha_inicio, fecha_fin, metodo_pago, estado_pago = 'pagado', notas, descuento = 0 } = req.body;
+    const { cliente_id, plan_id, fecha_inicio, fecha_fin, metodo_pago, estado_pago = 'pagado', notas, descuento = 0, monto } = req.body;
     const caja_id = req.cajaActual._id;
 
     await MembresiaService.autoVencer();
 
     const result = await TransactionManager.execute(async (session) => {
-      // Create membership using service
+      const plan = await Plan.findById(plan_id).session(session);
+      if (!plan) throw new Error('Plan no encontrado');
+
+      const descuentoAplicado = Math.min(parseFloat(descuento) || 0, plan.precio);
+      const montoPlan = Math.max(plan.precio - descuentoAplicado, 0);
+      const montoIngresado = monto ? parseFloat(monto) : montoPlan;
+      const esAbono = montoIngresado < montoPlan;
+
+      const membresiaEstado = esAbono ? 'activo' : (estado_pago === 'pagado' ? 'activo' : 'pendiente');
+
       const membresia = await MembresiaService.crear(
-        { cliente_id, plan_id, fecha_inicio, fecha_fin, estado_pago },
+        { cliente_id, plan_id, fecha_inicio, fecha_fin, estado_pago: membresiaEstado === 'activo' ? 'pagado' : 'pendiente', monto_total: montoPlan },
         session
       );
 
-      // Get plan for payment amount
-      const plan = await Plan.findById(plan_id).session(session);
-
-      // Apply discount: monto cannot go below 0
-      const descuentoAplicado = Math.min(parseFloat(descuento) || 0, plan.precio);
-      const montoFinal = Math.max(plan.precio - descuentoAplicado, 0);
-
-      // Build notes including discount info if applicable
       const notasConDescuento = descuentoAplicado > 0
         ? [notas, `Descuento aplicado: S/ ${descuentoAplicado.toFixed(2)} (precio original: S/ ${plan.precio.toFixed(2)})`].filter(Boolean).join(' | ')
         : notas || null;
 
-      // Create payment
+      const notasAbono = esAbono
+        ? [notasConDescuento, `Abono 1 de ${montoPlan.toFixed(2)}`].filter(Boolean).join(' | ')
+        : notasConDescuento;
+
       const [pago] = await Pago.create(
         [{
           cliente_id,
           membresia_id: membresia._id,
           caja_id,
-          monto: montoFinal,
+          monto: montoIngresado,
           metodo_pago: metodo_pago || 'efectivo',
-          estado: estado_pago,
-          notas: notasConDescuento
+          estado: esAbono ? 'pagado' : estado_pago,
+          notas: notasAbono,
+          es_abono: esAbono,
+          numero_abono: esAbono ? 1 : null,
+          total_esperado: esAbono ? montoPlan : null
         }],
         { session }
       );
 
-      return { membresia, pago };
+      return { membresia, pago, es_abono: esAbono, total_plan: montoPlan };
     });
 
     res.status(201).json(result);
@@ -146,22 +172,22 @@ router.post(
     const caja_id = req.cajaActual._id;
 
     const result = await TransactionManager.execute(async (session) => {
-      // Change plan using service
-      const nueva = await MembresiaService.cambiarPlan(
-        req.params.id,
-        { plan_id, fecha_inicio, estado_pago },
-        session
-      );
-
-      // Get plan for payment amount
+      // Get plan for discount calculation
       const plan = await Plan.findById(plan_id).session(session);
-
-      // Get client ID from new membership
-      const mem = await Membresia.findById(nueva._id).session(session);
 
       // Apply discount
       const descuentoAplicado = Math.min(parseFloat(descuento) || 0, plan.precio);
       const montoFinal = Math.max(plan.precio - descuentoAplicado, 0);
+
+      // Change plan using service
+      const nueva = await MembresiaService.cambiarPlan(
+        req.params.id,
+        { plan_id, fecha_inicio, estado_pago, monto_total: montoFinal },
+        session
+      );
+
+      // Get client ID from new membership
+      const mem = await Membresia.findById(nueva._id).session(session);
 
       const notasConDescuento = descuentoAplicado > 0
         ? [notas, `Descuento aplicado: S/ ${descuentoAplicado.toFixed(2)} (precio original: S/ ${plan.precio.toFixed(2)})`].filter(Boolean).join(' | ')
@@ -206,11 +232,21 @@ router.post(
     await MembresiaService.autoVencer();
 
     const result = await TransactionManager.execute(async (session) => {
+      // Get current membership to know the plan price
+      const memActual = await Membresia.findById(req.params.id)
+        .populate('plan_id')
+        .session(session);
+
+      // Apply discount
+      const descuentoAplicado = Math.min(parseFloat(descuento) || 0, memActual.plan_id.precio);
+      const montoFinal = Math.max(memActual.plan_id.precio - descuentoAplicado, 0);
+
       // Renew membership using service
       const nueva = await MembresiaService.renovar(
         req.params.id,
         estado_pago,
-        session
+        session,
+        montoFinal
       );
 
       // Get plan for payment amount
@@ -218,12 +254,8 @@ router.post(
         .populate('plan_id')
         .session(session);
 
-      // Apply discount
-      const descuentoAplicado = Math.min(parseFloat(descuento) || 0, mem.plan_id.precio);
-      const montoFinal = Math.max(mem.plan_id.precio - descuentoAplicado, 0);
-
       const notasConDescuento = descuentoAplicado > 0
-        ? [notas, `Descuento aplicado: S/ ${descuentoAplicado.toFixed(2)} (precio original: S/ ${mem.plan_id.precio.toFixed(2)})`].filter(Boolean).join(' | ')
+        ? [notas, `Descuento aplicado: S/ ${descuentoAplicado.toFixed(2)} (precio original: S/ ${memActual.plan_id.precio.toFixed(2)})`].filter(Boolean).join(' | ')
         : notas || null;
 
       // Create payment
@@ -259,7 +291,8 @@ router.put('/:id', [
     const update = {};
     if (estado) update.estado = estado;
     if (fecha_fin) update.fecha_fin = fecha_fin;
-    const mem = await Membresia.findByIdAndUpdate(req.params.id, update, { new: true })
+    await Membresia.findByIdAndUpdate(req.params.id, update, { new: true });
+    const mem = await Membresia.findById(req.params.id)
       .populate('cliente_id', 'nombre apellido_paterno apellido_materno foto_url')
       .populate('plan_id', 'nombre precio');
     if (!mem) return res.status(404).json({ error: 'Membresía no encontrada.' });

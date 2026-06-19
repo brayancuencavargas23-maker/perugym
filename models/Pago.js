@@ -9,6 +9,9 @@ const pagoSchema = new mongoose.Schema({
   estado:       { type: String, enum: ['pagado', 'pendiente'], default: 'pagado' },
   fecha_pago:   { type: Date, default: Date.now },
   notas:        { type: String, default: null },
+  es_abono:     { type: Boolean, default: false },
+  numero_abono: { type: Number, default: null },
+  total_esperado: { type: Number, default: null },
 });
 
 // Índices para reportes y filtros frecuentes

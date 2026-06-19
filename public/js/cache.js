@@ -106,6 +106,7 @@ const gymCache = (() => {
       if (namespace(key) === ns) { delete store[key]; changed = true; }
     }
     if (changed) save(store);
+    window.dispatchEvent(new CustomEvent('gym-cache-invalidated', { detail: { namespace: ns } }));
   }
 
   /** Invalida múltiples namespaces a la vez. */
@@ -116,6 +117,9 @@ const gymCache = (() => {
       if (namespaces.includes(namespace(key))) { delete store[key]; changed = true; }
     }
     if (changed) save(store);
+    namespaces.forEach(ns => {
+      window.dispatchEvent(new CustomEvent('gym-cache-invalidated', { detail: { namespace: ns } }));
+    });
   }
 
   /** Borra todo el caché (al cerrar sesión). */

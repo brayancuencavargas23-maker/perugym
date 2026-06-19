@@ -130,7 +130,7 @@
 
         </div>
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="loadAsistencia(1)" style="display:inline-flex;align-items:center;gap:6px" id="btn-filter-asis"></button>
+          <button class="btn btn-primary" onclick="refreshTable()" style="display:inline-flex;align-items:center;gap:6px" id="btn-filter-asis"></button>
           <button class="btn btn-outline" onclick="clearFilters()" style="display:inline-flex;align-items:center;gap:6px" id="btn-clear-asis"></button>
           <button class="btn btn-outline" onclick="exportarCSV()" style="display:inline-flex;align-items:center;gap:6px;margin-left:auto" id="btn-export-asis"></button>
         </div>
@@ -164,12 +164,10 @@
   let allAsistencia = [];
   let tablePaginator = null;
 
-  // Guard: devuelve true si la página de asistencia sigue activa en el DOM.
   function _pageActive() {
     return !!document.getElementById('asistencia-table');
   }
 
-  // Al cambiar fecha exacta, limpiar rango y viceversa
   document.getElementById('filter-date').addEventListener('change', function() {
     if (this.value) {
       document.getElementById('filter-from').value = '';
@@ -209,21 +207,17 @@
   async function loadClientes() {
     const data = await api.get('/clientes?activo=true&limit=500');
     if (!_pageActive()) return;
-    // Guardar lista para el buscador de check-in
     window._clientesCheckin = data.data;
 
-    // Construir nombre completo: "Nombre Apellido Paterno Apellido Materno"
     function nombreCompleto(c) {
       return [c.nombre, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' ');
     }
 
-    // Poblar el select del filtro de tabla
     const opts = '<option value="">Todos</option>' +
       data.data.map(c => '<option value="' + (c._id || c.id) + '">' + nombreCompleto(c) + '</option>').join('');
     const filterCliente = document.getElementById('filter-cliente');
     if (filterCliente) filterCliente.innerHTML = opts;
 
-    // Inicializar buscador de check-in
     initCheckinSearch(data.data);
   }
 
@@ -288,6 +282,94 @@
     document.getElementById('checkin-dropdown').style.display = 'none';
   };
 
+  function renderRow(a) {
+    const durMin = a.salida
+      ? Math.round((new Date(a.salida) - new Date(a.entrada)) / 60000)
+      : null;
+    const duration = durMin !== null
+      ? durMin + ' min'
+      : '<span class="badge badge-info">En curso</span>';
+    const avatar = a.foto_url
+      ? '<img src="' + a.foto_url + '" class="member-avatar" alt="">'
+      : '<div class="member-avatar" style="display:flex;align-items:center;justify-content:center">' + avatarInitials(a.cliente_nombre) + '</div>';
+    return '<tr>' +
+      '<td data-label="Cliente"><div class="member-cell">' + avatar + '<span>' + (a.cliente_nombre || '-') + '</span></div></td>' +
+      '<td data-label="Fecha">' + fmtDate(a.fecha) + '</td>' +
+      '<td data-label="Entrada">' + fmtDateTime(a.entrada) + '</td>' +
+      '<td data-label="Salida">' + (a.salida ? fmtDateTime(a.salida) : '-') + '</td>' +
+      '<td data-label="Duración">' + duration + '</td>' +
+      '<td data-label="Acciones">' + (!a.salida ? '<button class="btn btn-sm btn-warning" style="display:inline-flex;align-items:center;gap:4px" onclick="withLoading(this, () => checkoutById(\'' + a.id + '\'), \'Registrando...\')">' + icon('checkout') + ' Checkout</button>' : '') + '</td>' +
+      '</tr>';
+  }
+
+  function getFilteredAsistencia() {
+    const nombre = document.getElementById('filter-nombre')?.value.trim().toLowerCase() || '';
+    const clienteId = document.getElementById('filter-cliente')?.value || '';
+    const estado = document.getElementById('filter-estado')?.value || '';
+    const fecha = document.getElementById('filter-date')?.value || '';
+    const from = document.getElementById('filter-from')?.value || '';
+    const to = document.getElementById('filter-to')?.value || '';
+    const durMin = parseInt(document.getElementById('filter-dur-min')?.value) || 0;
+    const durMax = parseInt(document.getElementById('filter-dur-max')?.value) || Infinity;
+    const diaSemana = document.getElementById('filter-dia-semana')?.value || '';
+    const horaDesde = document.getElementById('filter-hora-desde')?.value || '';
+    const horaHasta = document.getElementById('filter-hora-hasta')?.value || '';
+
+    return allAsistencia.filter(a => {
+      if (nombre) {
+        const name = (a.cliente_nombre || '').toLowerCase();
+        if (!name.includes(nombre)) return false;
+      }
+      if (clienteId && a.cliente_id !== clienteId) return false;
+      if (estado === 'en_curso' && a.salida) return false;
+      if (estado === 'completado' && !a.salida) return false;
+      if (fecha && a.fecha) {
+        const aDate = new Date(a.fecha).toISOString().split('T')[0];
+        if (aDate !== fecha) return false;
+      }
+      if (from && a.fecha) {
+        if (new Date(a.fecha) < new Date(from)) return false;
+      }
+      if (to && a.fecha) {
+        const toDate = new Date(to);
+        toDate.setHours(23, 59, 59);
+        if (new Date(a.fecha) > toDate) return false;
+      }
+      if (durMin || durMax !== Infinity) {
+        const dur = a.salida ? Math.round((new Date(a.salida) - new Date(a.entrada)) / 60000) : null;
+        if (dur === null) return false;
+        if (dur < durMin || dur > durMax) return false;
+      }
+      if (diaSemana !== '' && a.fecha) {
+        const d = new Date(a.fecha).getDay();
+        if (d !== parseInt(diaSemana)) return false;
+      }
+      if (horaDesde && a.entrada) {
+        const h = new Date(a.entrada).toTimeString().slice(0, 5);
+        if (h < horaDesde) return false;
+      }
+      if (horaHasta && a.entrada) {
+        const h = new Date(a.entrada).toTimeString().slice(0, 5);
+        if (h > horaHasta) return false;
+      }
+      return true;
+    });
+  }
+
+  function refreshTable() {
+    if (!_pageActive()) return;
+    const filtered = getFilteredAsistencia();
+    const resultInfo = document.getElementById('result-info');
+    if (resultInfo) {
+      resultInfo.textContent = filtered.length + ' registro' + (filtered.length !== 1 ? 's' : '') + ' encontrado' + (filtered.length !== 1 ? 's' : '');
+    }
+    if (tablePaginator) {
+      tablePaginator.setData(filtered);
+    } else {
+      tablePaginator = initTablePagination('pagination', 'asistencia-table', filtered, 10, renderRow);
+    }
+  }
+
   async function loadAsistencia() {
     if (!_pageActive()) return;
     showTableSkeleton('asistencia-table', 6);
@@ -296,7 +378,6 @@
       if (!_pageActive()) return;
       allAsistencia = data.data;
 
-      // Actualizar stats
       if (data.stats) {
         const statTotal = document.getElementById('stat-total');
         const statEnCurso = document.getElementById('stat-encurso');
@@ -307,93 +388,7 @@
         if (statPromedio) statPromedio.textContent = data.stats.promedio_min ? data.stats.promedio_min + ' min' : '-';
       }
 
-      const renderRow = (a) => {
-        const durMin = a.salida
-          ? Math.round((new Date(a.salida) - new Date(a.entrada)) / 60000)
-          : null;
-        const duration = durMin !== null
-          ? durMin + ' min'
-          : '<span class="badge badge-info">En curso</span>';
-        const avatar = a.foto_url
-          ? '<img src="' + a.foto_url + '" class="member-avatar" alt="">'
-          : '<div class="member-avatar" style="display:flex;align-items:center;justify-content:center">' + avatarInitials(a.cliente_nombre) + '</div>';
-        return '<tr>' +
-          '<td data-label="Cliente"><div class="member-cell">' + avatar + '<span>' + (a.cliente_nombre || '-') + '</span></div></td>' +
-          '<td data-label="Fecha">' + fmtDate(a.fecha) + '</td>' +
-          '<td data-label="Entrada">' + fmtDateTime(a.entrada) + '</td>' +
-          '<td data-label="Salida">' + (a.salida ? fmtDateTime(a.salida) : '-') + '</td>' +
-          '<td data-label="Duración">' + duration + '</td>' +
-          '<td data-label="Acciones">' + (!a.salida ? '<button class="btn btn-sm btn-warning" style="display:inline-flex;align-items:center;gap:4px" onclick="withLoading(this, () => checkoutById(\'' + a.id + '\'), \'Registrando...\')">' + icon('checkout') + ' Checkout</button>' : '') + '</td>' +
-          '</tr>';
-      };
-
-      function applyFilters(data) {
-        const nombre = document.getElementById('filter-nombre')?.value.trim().toLowerCase() || '';
-        const clienteId = document.getElementById('filter-cliente')?.value || '';
-        const estado = document.getElementById('filter-estado')?.value || '';
-        const fecha = document.getElementById('filter-date')?.value || '';
-        const from = document.getElementById('filter-from')?.value || '';
-        const to = document.getElementById('filter-to')?.value || '';
-        const durMin = parseInt(document.getElementById('filter-dur-min')?.value) || 0;
-        const durMax = parseInt(document.getElementById('filter-dur-max')?.value) || Infinity;
-        const diaSemana = document.getElementById('filter-dia-semana')?.value || '';
-        const horaDesde = document.getElementById('filter-hora-desde')?.value || '';
-        const horaHasta = document.getElementById('filter-hora-hasta')?.value || '';
-
-        return data.filter(a => {
-          if (nombre) {
-            const name = (a.cliente_nombre || '').toLowerCase();
-            if (!name.includes(nombre)) return false;
-          }
-          if (clienteId && a.cliente_id !== clienteId) return false;
-          if (estado === 'en_curso' && a.salida) return false;
-          if (estado === 'completado' && !a.salida) return false;
-          if (fecha && a.fecha) {
-            const aDate = new Date(a.fecha).toISOString().split('T')[0];
-            if (aDate !== fecha) return false;
-          }
-          if (from && a.fecha) {
-            if (new Date(a.fecha) < new Date(from)) return false;
-          }
-          if (to && a.fecha) {
-            const toDate = new Date(to);
-            toDate.setHours(23, 59, 59);
-            if (new Date(a.fecha) > toDate) return false;
-          }
-          if (durMin || durMax !== Infinity) {
-            const dur = a.salida ? Math.round((new Date(a.salida) - new Date(a.entrada)) / 60000) : null;
-            if (dur === null) return false;
-            if (dur < durMin || dur > durMax) return false;
-          }
-          if (diaSemana !== '' && a.fecha) {
-            const d = new Date(a.fecha).getDay();
-            if (d !== parseInt(diaSemana)) return false;
-          }
-          if (horaDesde && a.entrada) {
-            const h = new Date(a.entrada).toTimeString().slice(0, 5);
-            if (h < horaDesde) return false;
-          }
-          if (horaHasta && a.entrada) {
-            const h = new Date(a.entrada).toTimeString().slice(0, 5);
-            if (h > horaHasta) return false;
-          }
-          return true;
-        });
-      }
-
-      const filtered = applyFilters(allAsistencia);
-
-      // Info de resultados
-      const resultInfo = document.getElementById('result-info');
-      if (resultInfo) {
-        resultInfo.textContent = filtered.length + ' registro' + (filtered.length !== 1 ? 's' : '') + ' encontrado' + (filtered.length !== 1 ? 's' : '');
-      }
-
-      if (tablePaginator) {
-        tablePaginator.setData(filtered);
-      } else {
-        tablePaginator = initTablePagination('pagination', 'asistencia-table', filtered, 10, renderRow);
-      }
+      refreshTable();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -415,7 +410,6 @@
   function exportarCSV() {
     const qs = buildQS(null, null).replace('?', '');
     const token = api.getToken();
-    // Descarga directa con token en header no es posible via <a>, usamos fetch
     fetch('/api/asistencia/export?' + qs, { headers: { Authorization: 'Bearer ' + token } })
       .then(function(res) {
         if (!res.ok) throw new Error('Error al exportar');
@@ -437,13 +431,17 @@
     if (!cliente_id) return toast('Selecciona un cliente', 'warning');
     try {
       const nueva = await api.post('/asistencia/checkin', { cliente_id: cliente_id });
-      if (nueva) gymCache.prependItem('asistencia', nueva);
+      if (!_pageActive()) return;
+      if (nueva) {
+        allAsistencia.unshift(nueva);
+      }
       toast('Check-in registrado');
-      // Limpiar buscador
-      document.getElementById('checkin-search').value = '';
-      document.getElementById('checkin-cliente').value = '';
+      const searchEl = document.getElementById('checkin-search');
+      const clientEl = document.getElementById('checkin-cliente');
+      if (searchEl) searchEl.value = '';
+      if (clientEl) clientEl.value = '';
       gymCache.invalidateMany(['asistencia', 'dashboard']);
-      loadAsistencia();
+      refreshTable();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -452,29 +450,37 @@
     if (!cliente_id) return toast('Selecciona un cliente', 'warning');
     try {
       const updated = await api.put('/asistencia/checkout/cliente/' + cliente_id, {});
-      if (updated) gymCache.patchItem('asistencia', updated.id || updated._id, () => updated);
+      if (!_pageActive()) return;
+      if (updated) {
+        const idx = allAsistencia.findIndex(a => a.id === updated.id || a._id === updated._id);
+        if (idx !== -1) allAsistencia[idx] = { ...allAsistencia[idx], ...updated };
+      }
       toast('Check-out registrado');
-      // Limpiar buscador
-      document.getElementById('checkin-search').value = '';
-      document.getElementById('checkin-cliente').value = '';
+      const searchEl = document.getElementById('checkin-search');
+      const clientEl = document.getElementById('checkin-cliente');
+      if (searchEl) searchEl.value = '';
+      if (clientEl) clientEl.value = '';
       gymCache.invalidateMany(['asistencia', 'dashboard']);
-      loadAsistencia();
+      refreshTable();
     } catch (err) { toast(err.message, 'error'); }
   }
 
   async function checkoutById(id) {
     try {
-      await api.put('/asistencia/checkout/' + id, {}, {
-        patch: { ns: 'asistencia', id },
-      });
+      const updated = await api.put('/asistencia/checkout/' + id, {});
+      if (!_pageActive()) return;
+      if (updated) {
+        const idx = allAsistencia.findIndex(a => a.id === id || a._id === id);
+        if (idx !== -1) allAsistencia[idx] = { ...allAsistencia[idx], ...updated };
+      }
       toast('Check-out registrado');
       gymCache.invalidateMany(['asistencia', 'dashboard']);
-      loadAsistencia();
+      refreshTable();
     } catch (err) { toast(err.message, 'error'); }
   }
 
   loadClientes();
-  loadAsistencia(1);
+  loadAsistencia();
 
   // ── Inicialización de iconos ────────────────────────────────────────────────
   (function _initPage() {
@@ -506,7 +512,7 @@
    'filter-dur-min','filter-dur-max','filter-dia-semana','filter-hora-desde','filter-hora-hasta'
   ].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => loadAsistencia());
+    if (el) el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => refreshTable());
   });
 </script>
 </body>

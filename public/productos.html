@@ -126,12 +126,88 @@
   let allProducts = [];
   let tablePaginator = null;
 
-  // Guard: devuelve true si la página de productos sigue activa en el DOM.
   function _pageActive() {
     return !!document.getElementById('products-table');
   }
 
-  // ── PRODUCTOS ──
+  function renderRow(p) {
+    return `
+      <tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:10px">
+            ${p.foto_url
+              ? `<img src="${p.foto_url}" class="product-img" alt="">`
+              : `<div class="product-img-placeholder">📦</div>`}
+            <div>
+              <div style="font-weight:600">${p.nombre}</div>
+              <div style="font-size:11px;color:var(--text-light)">${p.descripcion || ''}</div>
+            </div>
+          </div>
+        </td>
+        <td>${p.categoria ? `<span class="badge badge-info">${p.categoria}</span>` : '-'}</td>
+        <td style="font-weight:600">S/ ${parseFloat(p.precio_venta).toFixed(2)}</td>
+        <td class="${p.stock <= 5 ? 'stock-low' : 'stock-ok'}">${p.stock} ${p.stock <= 5 ? '⚠️' : ''}</td>
+        <td><span class="badge ${p.activo ? 'badge-success' : 'badge-danger'}">${p.activo ? 'Activo' : 'Inactivo'}</span></td>
+        <td>
+          ${user.role === 'admin' ? `<button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center" onclick="editProduct('${p._id || p.id}')">${icon('edit')}</button>` : ''}
+          ${user.role === 'admin' ? `<button class="btn btn-sm btn-danger" style="display:inline-flex;align-items:center" onclick="withLoading(this, () => deleteProduct('${p._id || p.id}', '${p.nombre.replace(/'/g, "\\'")}'), 'Eliminando...')">${icon('trash')}</button>` : ''}
+        </td>
+      </tr>
+    `;
+  }
+
+  function getFilteredProducts() {
+    const searchEl   = document.getElementById('search-prod');
+    const categoryEl = document.getElementById('filter-cat');
+    const activeEl   = document.getElementById('filter-active-prod');
+    const stockEl    = document.getElementById('filter-stock');
+    const precioMinEl = document.getElementById('filter-precio-min');
+    const precioMaxEl = document.getElementById('filter-precio-max');
+    if (!searchEl || !categoryEl) return [];
+    const search   = searchEl.value.toLowerCase();
+    const category = categoryEl.value;
+    const active   = activeEl ? activeEl.value : '';
+    const stock    = stockEl ? stockEl.value : '';
+    const precioMin = precioMinEl ? parseFloat(precioMinEl.value) || 0 : 0;
+    const precioMax = precioMaxEl ? parseFloat(precioMaxEl.value) || Infinity : Infinity;
+
+    return allProducts.filter(p => {
+      if (search) {
+        const name = (p.nombre || '').toLowerCase();
+        const desc = (p.descripcion || '').toLowerCase();
+        if (!name.includes(search) && !desc.includes(search)) return false;
+      }
+      if (category && p.categoria !== category) return false;
+      if (active === 'true' && !p.activo) return false;
+      if (active === 'false' && p.activo) return false;
+      if (stock === 'bajo' && (p.stock > 5 || p.stock === 0)) return false;
+      if (stock === 'agotado' && p.stock !== 0) return false;
+      if (stock === 'ok' && p.stock <= 5) return false;
+      if (p.precio_venta < precioMin || p.precio_venta > precioMax) return false;
+      return true;
+    });
+  }
+
+  function refreshTable() {
+    if (!_pageActive()) return;
+    const filtered = getFilteredProducts();
+    if (tablePaginator) {
+      tablePaginator.setData(filtered);
+    } else {
+      tablePaginator = initTablePagination('pagination-prod', 'products-table', filtered, 10, renderRow);
+    }
+  }
+
+  async function loadProducts() {
+    showTableSkeleton('products-table', 6);
+    try {
+      const data = await api.get('/productos?limit=500');
+      if (!_pageActive()) return;
+      allProducts = data.data;
+      refreshTable();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
   async function loadCategories() {
     const cats = await api.get('/productos/categorias');
     if (!_pageActive()) return;
@@ -141,78 +217,6 @@
       if (sel) sel.innerHTML += `<option value="${c}">${c}</option>`;
       if (dl)  dl.innerHTML  += `<option value="${c}">`;
     });
-  }
-
-  async function loadProducts() {
-    const searchEl   = document.getElementById('search-prod');
-    const categoryEl = document.getElementById('filter-cat');
-    const activeEl   = document.getElementById('filter-active-prod');
-    const stockEl    = document.getElementById('filter-stock');
-    const precioMinEl = document.getElementById('filter-precio-min');
-    const precioMaxEl = document.getElementById('filter-precio-max');
-    if (!searchEl || !categoryEl) return;
-    const search   = searchEl.value.toLowerCase();
-    const category = categoryEl.value;
-    const active   = activeEl ? activeEl.value : '';
-    const stock    = stockEl ? stockEl.value : '';
-    const precioMin = precioMinEl ? parseFloat(precioMinEl.value) || 0 : 0;
-    const precioMax = precioMaxEl ? parseFloat(precioMaxEl.value) || Infinity : Infinity;
-    showTableSkeleton('products-table', 6);
-    try {
-      const data = await api.get('/productos?limit=500');
-      if (!_pageActive()) return;
-      allProducts = data.data;
-
-      const renderRow = (p) => `
-        <tr>
-          <td>
-            <div style="display:flex;align-items:center;gap:10px">
-              ${p.foto_url
-                ? `<img src="${p.foto_url}" class="product-img" alt="">`
-                : `<div class="product-img-placeholder">📦</div>`}
-              <div>
-                <div style="font-weight:600">${p.nombre}</div>
-                <div style="font-size:11px;color:var(--text-light)">${p.descripcion || ''}</div>
-              </div>
-            </div>
-          </td>
-          <td>${p.categoria ? `<span class="badge badge-info">${p.categoria}</span>` : '-'}</td>
-          <td style="font-weight:600">S/ ${parseFloat(p.precio_venta).toFixed(2)}</td>
-          <td class="${p.stock <= 5 ? 'stock-low' : 'stock-ok'}">${p.stock} ${p.stock <= 5 ? '⚠️' : ''}</td>
-          <td><span class="badge ${p.activo ? 'badge-success' : 'badge-danger'}">${p.activo ? 'Activo' : 'Inactivo'}</span></td>
-          <td>
-            ${user.role === 'admin' ? `<button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center" onclick="editProduct('${p._id || p.id}')">${icon('edit')}</button>` : ''}
-            ${user.role === 'admin' ? `<button class="btn btn-sm btn-danger" style="display:inline-flex;align-items:center" onclick="withLoading(this, () => deleteProduct('${p._id || p.id}', '${p.nombre.replace(/'/g, "\\'")}'), 'Eliminando...')">${icon('trash')}</button>` : ''}
-          </td>
-        </tr>
-      `;
-
-      function applyFilters(data) {
-        return data.filter(p => {
-          if (search) {
-            const name = (p.nombre || '').toLowerCase();
-            const desc = (p.descripcion || '').toLowerCase();
-            if (!name.includes(search) && !desc.includes(search)) return false;
-          }
-          if (category && p.categoria !== category) return false;
-          if (active === 'true' && !p.activo) return false;
-          if (active === 'false' && p.activo) return false;
-          if (stock === 'bajo' && (p.stock > 5 || p.stock === 0)) return false;
-          if (stock === 'agotado' && p.stock !== 0) return false;
-          if (stock === 'ok' && p.stock <= 5) return false;
-          if (p.precio_venta < precioMin || p.precio_venta > precioMax) return false;
-          return true;
-        });
-      }
-
-      const filtered = applyFilters(allProducts);
-
-      if (tablePaginator) {
-        tablePaginator.setData(filtered);
-      } else {
-        tablePaginator = initTablePagination('pagination-prod', 'products-table', filtered, 10, renderRow);
-      }
-    } catch (err) { toast(err.message, 'error'); }
   }
 
   document.getElementById('btn-new-prod') && (document.getElementById('btn-new-prod').onclick = () => {
@@ -243,8 +247,7 @@
   });
 
   async function editProduct(id) {
-    const data = await api.get(`/productos?page=1&limit=500`);
-    const p = data.data.find(x => x._id === id || x.id === id);
+    const p = allProducts.find(x => x._id === id || x.id === id);
     if (!p) return;
     document.getElementById('prod-id').value = p._id || p.id;
     document.getElementById('prod-name').value = p.nombre;
@@ -282,16 +285,17 @@
       const data = await res.json().catch(() => null);
 
       if (id && data) {
-        // PUT: actualizar solo ese ítem en caché (no borrar toda la lista)
         gymCache.patchItem('productos', id, () => data);
+        const idx = allProducts.findIndex(p => p._id === id || p.id === id);
+        if (idx !== -1) allProducts[idx] = { ...allProducts[idx], ...data };
       } else {
-        // POST: nuevo producto — invalidar para que aparezca en la lista
         gymCache.invalidate('productos');
+        if (data) allProducts.unshift(data);
       }
 
       toast(id ? 'Producto actualizado' : 'Producto creado');
       closeModal('modal-product');
-      loadProducts();
+      refreshTable();
       loadCategories();
     } catch (err) { toast(err.message, 'error'); }
   }
@@ -306,19 +310,20 @@
     if (!ok) return;
     try {
       await api.delete(`/productos/${id}`, { remove: { ns: 'productos', id } });
+      allProducts = allProducts.filter(p => p._id !== id && p.id !== id);
       toast('Producto eliminado');
-      loadProducts();
+      refreshTable();
     } catch (err) { toast(err.message, 'error'); }
   }
 
   // Búsqueda con debounce
   let searchTimer;
-  document.getElementById('search-prod') && (document.getElementById('search-prod').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => loadProducts(), 400); });
-  document.getElementById('filter-cat') && (document.getElementById('filter-cat').onchange = () => loadProducts());
-  document.getElementById('filter-active-prod') && (document.getElementById('filter-active-prod').onchange = () => loadProducts());
-  document.getElementById('filter-stock') && (document.getElementById('filter-stock').onchange = () => loadProducts());
-  document.getElementById('filter-precio-min') && (document.getElementById('filter-precio-min').oninput = () => loadProducts());
-  document.getElementById('filter-precio-max') && (document.getElementById('filter-precio-max').oninput = () => loadProducts());
+  document.getElementById('search-prod') && (document.getElementById('search-prod').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => refreshTable(), 400); });
+  document.getElementById('filter-cat') && (document.getElementById('filter-cat').onchange = () => refreshTable());
+  document.getElementById('filter-active-prod') && (document.getElementById('filter-active-prod').onchange = () => refreshTable());
+  document.getElementById('filter-stock') && (document.getElementById('filter-stock').onchange = () => refreshTable());
+  document.getElementById('filter-precio-min') && (document.getElementById('filter-precio-min').oninput = () => refreshTable());
+  document.getElementById('filter-precio-max') && (document.getElementById('filter-precio-max').oninput = () => refreshTable());
 
   loadCategories();
   loadProducts();

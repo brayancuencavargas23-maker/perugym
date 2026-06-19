@@ -126,30 +126,38 @@
     return !!document.getElementById('users-table');
   }
 
+  let allUsers = [];
+
   async function loadUsers() {
     if (!_pageActive()) return;
     showTableSkeleton('users-table', 5);
     try {
       const users = await api.get('/auth/users');
       if (!_pageActive()) return;
-      document.getElementById('users-table').innerHTML = users.map(u => `
-        <tr>
-          <td><div style="display:flex;align-items:center;gap:8px">
-            <div style="width:32px;height:32px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:bold">${avatarInitials(u.name)}</div>
-            ${u.name}
-          </div></td>
-          <td>${u.email}</td>
-          <td><span class="badge badge-info">${u.role}</span></td>
-          <td><span class="badge ${u.active ? 'badge-success' : 'badge-danger'}">${u.active ? 'Activo' : 'Inactivo'}</span></td>
-          <td>
-            <button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center" onclick="editUser('${u.id}')">${icon('edit')}</button>
-            <button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center;gap:4px" onclick="openPassword('${u.id}', '${u.name}')" title="Cambiar contraseña">${icon('lock')}</button>
-            ${u.role !== 'admin' ? `<button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center;gap:4px" onclick="openPermisos('${u.id}', '${u.name}', ${JSON.stringify(u.permisos || []).replace(/"/g, '&quot;')})">${icon('key')} Permisos</button>` : ''}
-            <button class="btn btn-sm btn-danger" style="display:inline-flex;align-items:center" onclick="withLoading(this, () => deleteUser('${u.id}', '${u.name}'), 'Eliminando...')">${icon('trash')}</button>
-          </td>
-        </tr>
-      `).join('');
+      allUsers = users;
+      renderUsersTable();
     } catch (err) { toast(err.message, 'error'); }
+  }
+
+  function renderUsersTable() {
+    if (!_pageActive()) return;
+    document.getElementById('users-table').innerHTML = allUsers.map(u => `
+      <tr>
+        <td><div style="display:flex;align-items:center;gap:8px">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:bold">${avatarInitials(u.name)}</div>
+          ${u.name}
+        </div></td>
+        <td>${u.email}</td>
+        <td><span class="badge badge-info">${u.role}</span></td>
+        <td><span class="badge ${u.active ? 'badge-success' : 'badge-danger'}">${u.active ? 'Activo' : 'Inactivo'}</span></td>
+        <td>
+          <button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center" onclick="editUser('${u.id}')">${icon('edit')}</button>
+          <button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center;gap:4px" onclick="openPassword('${u.id}', '${u.name}')" title="Cambiar contraseña">${icon('lock')}</button>
+          ${u.role !== 'admin' ? `<button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center;gap:4px" onclick="openPermisos('${u.id}', '${u.name}', ${JSON.stringify(u.permisos || []).replace(/"/g, '&quot;')})">${icon('key')} Permisos</button>` : ''}
+          <button class="btn btn-sm btn-danger" style="display:inline-flex;align-items:center" onclick="withLoading(this, () => deleteUser('${u.id}', '${u.name}'), 'Eliminando...')">${icon('trash')}</button>
+        </td>
+      </tr>
+    `).join('');
   }
 
   document.getElementById('btn-new') && (document.getElementById('btn-new').onclick = () => {
@@ -192,18 +200,24 @@
     if (!body.name || !body.email) return toast('Nombre y email son requeridos', 'warning');
 
     if (!id) {
-      // Nuevo usuario: requiere contraseña
       const pass = document.getElementById('u-password').value;
       if (!pass) return toast('La contraseña es requerida', 'warning');
       body.password = pass;
     }
 
     try {
-      if (id) await api.put(`/auth/users/${id}`, body, { invalidate: ['auth'] });
-      else await api.post('/auth/users', body, false, { invalidate: ['auth'] });
+      let result;
+      if (id) {
+        result = await api.put(`/auth/users/${id}`, body, { invalidate: ['auth'] });
+        const idx = allUsers.findIndex(u => u.id === id);
+        if (idx !== -1) allUsers[idx] = { ...allUsers[idx], ...body };
+      } else {
+        result = await api.post('/auth/users', body, false, { invalidate: ['auth'] });
+        if (result) allUsers.unshift(result);
+      }
       toast(id ? 'Usuario actualizado' : 'Usuario creado');
       closeModal('modal-overlay');
-      loadUsers();
+      renderUsersTable();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -253,8 +267,9 @@
     if (!ok) return;
     try {
       await api.delete(`/auth/users/${id}`, { remove: { ns: 'auth', id } });
+      allUsers = allUsers.filter(u => u.id !== id);
       toast('Usuario eliminado');
-      loadUsers();
+      renderUsersTable();
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -289,9 +304,11 @@
     const permisos = Array.from(checks).filter(c => c.checked).map(c => c.value);
     try {
       await api.put(`/auth/users/${id}/permisos`, { permisos }, { invalidate: ['auth'] });
+      const idx = allUsers.findIndex(u => u.id === id);
+      if (idx !== -1) allUsers[idx].permisos = permisos;
       toast('Permisos actualizados');
       closeModal('modal-permisos');
-      loadUsers();
+      renderUsersTable();
     } catch (err) { toast(err.message, 'error'); }
   }
 
