@@ -774,7 +774,12 @@
 
   // --- Redirigir a gestión de pagos filtrado por membresía ---
   function irAPagosMembresia(memId) {
-    window.location.href = `/pagos.html?membresia_id=${memId}`;
+    sessionStorage.setItem('_spa_param_membresia_id', memId);
+    if (window.GymRouter) {
+      GymRouter.navigate('pagos');
+    } else {
+      window.location.href = '/pagos.html?membresia_id=' + memId;
+    }
   }
 
   // --- Calcular y mostrar monto final con descuento ---

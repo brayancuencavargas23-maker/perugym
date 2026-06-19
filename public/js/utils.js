@@ -115,8 +115,16 @@ function showCardsSkeleton(containerId, count = 6) {
 }
 
 
-function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+function openModal(id) {
+  const el = document.getElementById(id);
+  if (!el) { console.warn('[openModal] Elemento no encontrado:', id); return; }
+  el.classList.remove('hidden');
+}
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (!el) { console.warn('[closeModal] Elemento no encontrado:', id); return; }
+  el.classList.add('hidden');
+}
 
 // Format date
 function fmtDate(d) {

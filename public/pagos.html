@@ -574,7 +574,12 @@
 
     // Leer parámetro URL para filtro por membresía
     const params = new URLSearchParams(window.location.search);
-    const memIdFiltro = params.get('membresia_id');
+    let memIdFiltro = params.get('membresia_id');
+    // También buscar en sessionStorage (navegación SPA desde membresías)
+    if (!memIdFiltro) {
+      memIdFiltro = sessionStorage.getItem('_spa_param_membresia_id');
+      if (memIdFiltro) sessionStorage.removeItem('_spa_param_membresia_id');
+    }
     if (memIdFiltro) {
       document.getElementById('filter-membresia-id').value = memIdFiltro;
     }
