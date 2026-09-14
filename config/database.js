@@ -131,6 +131,12 @@ async function connectLocal() {
           return c;
         });
       }
+      const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+      for (const [k, v] of Object.entries(cleaned)) {
+        if (typeof v === 'string' && ISO_DATE_RE.test(v)) {
+          try { cleaned[k] = new Date(v); } catch { /* keep as string */ }
+        }
+      }
       return cleaned;
     });
 

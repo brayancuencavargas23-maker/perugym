@@ -82,6 +82,7 @@
       <div class="tabs-main">
         <button class="tab-main active" id="tab-main-caja" onclick="switchMainTab('caja')">💰 Caja</button>
         <button class="tab-main" id="tab-main-historial" onclick="switchMainTab('historial')">📋 Historial de Caja</button>
+        <button class="tab-main" id="tab-main-reportes" onclick="switchMainTab('reportes')">📊 Reportes</button>
       </div>
 
       <!-- ═══ Sección: Caja ═══ -->
@@ -318,6 +319,50 @@
         </div>
       </div><!-- /main-section-historial -->
 
+      <!-- ═══ Sección: Reportes ═══ -->
+      <div id="main-section-reportes" class="hidden">
+        <h3 style="font-size:15px;margin-bottom:20px;margin-top:8px;display:flex;align-items:center;gap:6px">
+          📊 Reportes de Caja
+        </h3>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px">
+
+          <!-- Card: Ingresos de Caja Categorizado por Cajero -->
+          <div class="card" style="border-top:3px solid #7B2D2D">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span style="font-size:20px">💰</span>
+              <h3 style="font-size:15px;margin:0;font-weight:700">Ingresos de Caja (Categorizado)</h3>
+            </div>
+            <p style="font-size:12px;color:var(--text-light);margin-bottom:16px;line-height:1.5">
+              Excel detallado organizado <strong>por cajero</strong>: membresías, rutinas, bebidas,
+              snacks, otros productos e ingresos manuales. Incluye hoja resumen con totales y porcentajes.
+            </p>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+              <div class="form-group" style="margin-bottom:0">
+                <label style="font-size:12px;font-weight:600">Fecha</label>
+                <input type="date" id="rep-ing-fecha" class="form-control" style="font-size:13px">
+              </div>
+              <div class="form-group" style="margin-bottom:0">
+                <label style="font-size:12px;font-weight:600">Hasta (opcional)</label>
+                <input type="date" id="rep-ing-fecha-to" class="form-control" style="font-size:13px">
+              </div>
+            </div>
+
+            <div style="background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--text-light)">
+              💡 Si no seleccionas fecha, descarga el día de hoy. El Excel incluirá una hoja
+              por cada cajero que trabajó en el período.
+            </div>
+
+            <button class="btn btn-success w-full" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700"
+              onclick="descargarIngresosCaja()">
+              <span id="icon-rep-excel-caja"></span> Descargar Excel por Cajero
+            </button>
+          </div>
+
+        </div>
+      </div><!-- /main-section-reportes -->
+
     </div>
   </div>
 </div>
@@ -480,8 +525,10 @@
   function switchMainTab(tab) {
     document.getElementById('main-section-caja').classList.toggle('hidden', tab !== 'caja');
     document.getElementById('main-section-historial').classList.toggle('hidden', tab !== 'historial');
+    document.getElementById('main-section-reportes').classList.toggle('hidden', tab !== 'reportes');
     document.getElementById('tab-main-caja').classList.toggle('active', tab === 'caja');
     document.getElementById('tab-main-historial').classList.toggle('active', tab === 'historial');
+    document.getElementById('tab-main-reportes').classList.toggle('active', tab === 'reportes');
     if (tab === 'historial' && !historialLoaded) {
       historialLoaded = true;
       loadHistorial();
@@ -1187,6 +1234,17 @@
       .catch(err => toast(err.message, 'error'));
   }
 
+  function descargarIngresosCaja() {
+    // Fecha default = hoy en formato YYYY-MM-DD (Lima)
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' }); // 'en-CA' da YYYY-MM-DD
+    const from = document.getElementById('rep-ing-fecha').value || hoy;
+    const to   = document.getElementById('rep-ing-fecha-to').value || from;
+    const qs   = `?from=${from}&to=${to}`;
+    api.download(`/reports/ingresos-caja/excel${qs}`, `ingresos-caja-${from}-${to}.xlsx`)
+      .then(() => toast('Descarga iniciada'))
+      .catch(err => toast(err.message, 'error'));
+  }
+
   // ── Inicialización ──────────────────────────────────────────────────────────
   (function _initPage() {
     initLayout('caja', 'Caja');
@@ -1199,6 +1257,7 @@
       'icon-tab-export':        icon('excel'),
       'icon-confirm-venta':     icon('check'),
       'icon-confirm-mov':       icon('check'),
+      'icon-rep-excel-caja':    icon('excel'),
     };
     Object.entries(icons).forEach(([id, html]) => {
       const el = document.getElementById(id);
@@ -1219,6 +1278,7 @@
   // Exponer funciones al scope global para que los onclick del HTML funcionen
   // cuando la página se carga dentro del SPA (el router envuelve el script en un IIFE)
   window.switchMainTab        = switchMainTab;
+  window.descargarIngresosCaja = descargarIngresosCaja;
   window.abrirCaja           = abrirCaja;
   window.cerrarCaja          = cerrarCaja;
   window.switchTab           = switchTab;
