@@ -92,6 +92,8 @@
     .notif-dot.alta{background:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,0.15)}
     .notif-dot.media{background:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,0.15)}
     .notif-dot.baja{background:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,0.15)}
+    .notif-clickable{cursor:pointer}
+    .notif-clickable:hover{background:var(--bg);border-color:var(--border)}
 
     /* ═══════════════ INGRESOS HOY ═══════════════ */
     .ingresos-total{font-size:32px;font-weight:800;color:var(--text);margin-bottom:4px;letter-spacing:-1px;background:linear-gradient(135deg,#10b981,#34d399);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
@@ -201,15 +203,15 @@
 
       <div class="flex-between" style="margin-bottom:20px">
         <div class="dash-actions">
-          <button class="dash-action-btn primary" onclick="window.location.href='/clientes.html?nuevo=1'">
+          <button class="dash-action-btn primary" onclick="sessionStorage.setItem('_spa_open_nuevo','1'); GymRouter.navigate('clientes')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
             Nuevo Socio
           </button>
-          <button class="dash-action-btn" onclick="window.location.href='/asistencia.html'">
+          <button class="dash-action-btn" onclick="GymRouter.navigate('asistencia')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             Agendar Clase
           </button>
-          <button class="dash-action-btn" onclick="window.location.href='/pagos.html?nuevo=1'">
+          <button class="dash-action-btn" onclick="sessionStorage.setItem('_spa_open_nuevo','1'); GymRouter.navigate('pagos')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
             Generar Cobro
           </button>
@@ -358,6 +360,18 @@
   let _notifExpanded = false;
   let _plansCache = null;
 
+  document.getElementById('notif-content')?.addEventListener('click', e => {
+    const item = e.target.closest('.notif-clickable');
+    if (!item) return;
+    const raw = item.dataset.producto;
+    if (!raw) return;
+    try {
+      const producto = JSON.parse(decodeURIComponent(raw));
+      sessionStorage.setItem('_spa_edit_producto', JSON.stringify(producto));
+      window.location.href = '/productos.html';
+    } catch {}
+  });
+
   const _tooltipDefaults = { backgroundColor: '#1c2333', titleFont: { size: 12, weight: '700' }, bodyFont: { size: 11 }, padding: 8, cornerRadius: 6 };
 
   function _pageActive() { return !!document.getElementById('stat-members'); }
@@ -427,8 +441,11 @@
     _notifData = data;
     if (!data.items || data.items.length === 0) { container.innerHTML = '<p style="color:var(--text-light);font-size:13px;text-align:center;padding:16px 0">Sin notificaciones</p>'; if (toggleBtn) toggleBtn.style.display = 'none'; return; }
     const shown = _notifExpanded ? data.items : data.items.slice(0, 6);
-    container.innerHTML = shown.map(n => {
-      return '<div class="notif-item">' +
+    container.innerHTML = shown.map((n, i) => {
+      const isStock = n.tipo === 'stock_bajo' && n.producto;
+      const dataAttr = isStock ? ' data-producto="' + encodeURIComponent(JSON.stringify(n.producto)) + '"' : '';
+      const cls = isStock ? ' notif-clickable' : '';
+      return '<div class="notif-item' + cls + '"' + dataAttr + '>' +
         '<div class="notif-dot ' + (n.prioridad || 'media') + '"></div>' +
         '<div style="flex:1;min-width:0"><div style="font-weight:600;color:var(--text)">' + n.titulo + '</div><div style="font-size:11px;color:var(--text-light)">' + (n.detalle || '') + '</div></div>' +
       '</div>';

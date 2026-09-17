@@ -20,7 +20,13 @@ const api = {
       const res = await fetch(API_BASE + path, opts);
       
       if (res.status === 401) {
-        // Token inválido o expirado → forzar logout
+        // Si es el endpoint de login, el 401 significa credenciales incorrectas,
+        // no sesión expirada — dejar que el catch normal maneje el error
+        if (path === '/auth/login') {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Usuario o contraseña incorrectos');
+        }
+        // Cualquier otro 401 → token inválido o expirado → forzar logout
         console.error('[API] ❌ 401 Unauthorized - Cerrando sesión');
         gymCache.clear();
         localStorage.removeItem('gym_token');

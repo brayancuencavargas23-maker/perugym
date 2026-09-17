@@ -664,6 +664,9 @@
 
     loadPagos();
     checkCaja();
+
+    // Si viene desde el atajo rápido del dashboard (SPA), limpiar flag
+    sessionStorage.removeItem('_spa_open_nuevo');
   })();
 
   // Exponer funciones al scope global para que los onclick funcionen en el SPA

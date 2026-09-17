@@ -403,6 +403,20 @@ function attachTopbarListeners() {
     });
     themeBtn._themeListener = true;
   }
+
+  // ── Cerrar panel de notificaciones al hacer clic fuera ───────────────────────
+  if (!document._panelOutsideListener) {
+    document.addEventListener('click', e => {
+      const panel    = document.getElementById('right-panel');
+      const notifBtn = document.getElementById('topbar-notif-btn');
+      if (panel && panel.classList.contains('open')) {
+        if (!panel.contains(e.target) && !notifBtn?.contains(e.target)) {
+          closeRightPanel();
+        }
+      }
+    });
+    document._panelOutsideListener = true;
+  }
 }
 
 function _closeUserDropdown() {
@@ -512,7 +526,9 @@ async function loadPanelData() {
             const sev = p.stock === 0 ? 'danger' : p.stock <= 3 ? 'danger' : 'warning';
             const label = p.stock === 0 ? 'Sin stock' : p.stock + ' u.';
             const prodIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>';
-            return _panelItem(prodIcon, sev, p.nombre, 'S/.' + (p.precio_venta || 0).toFixed(2) + ' — ' + (p.categoria || ''), label, sev, '/productos.html');
+            const pid = p._id || p.id || '';
+            // Pasar objeto completo para que productos.html abra el modal sin esperar loadProducts
+            return _panelItemSPA(prodIcon, sev, p.nombre, 'S/.' + (p.precio_venta || 0).toFixed(2) + ' — ' + (p.categoria || ''), label, sev, 'productos', pid ? '_spa_edit_producto' : null, pid ? p : null);
           }).join('')
     );
 
@@ -526,9 +542,8 @@ async function loadPanelData() {
         : vencen.map(m => {
             const days = _daysUntil(m.fecha_fin);
             const sev  = days <= 1 ? 'danger' : days <= 3 ? 'warning' : 'info';
-            const link = m.id ? '/membresias.html?renovar=' + m.id : '/membresias.html';
             const memIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>';
-            return _panelItem(memIcon, sev, m.nombre || 'Sin nombre', m.plan_nombre || 'Sin plan', days === 0 ? 'Hoy' : days + 'd', sev, link);
+            return _panelItemSPA(memIcon, sev, m.nombre || 'Sin nombre', m.plan_nombre || 'Sin plan', days === 0 ? 'Hoy' : days + 'd', sev, 'membresias', m.id ? '_spa_renovar' : null, m.id || '');
           }).join('')
     );
 
@@ -570,6 +585,41 @@ function _panelItem(emoji, iconClass, title, subtitle, badgeText, badgeClass, li
       <span class="panel-item-badge ${badgeClass}">${badgeText}</span>
     </${tag}>`;
 }
+
+// Igual que _panelItem pero navega via SPA (GymRouter) en lugar de href duro.
+// spaPage: clave del router (ej. 'productos', 'membresias')
+// storageKey: clave de sessionStorage donde guardar el valor (o null si no aplica)
+// storageVal: valor a guardar — puede ser string o cualquier objeto serializable
+function _panelItemSPA(emoji, iconClass, title, subtitle, badgeText, badgeClass, spaPage, storageKey, storageVal) {
+  // Registrar el valor en el store en memoria para evitar problemas de escaping en el onclick inline
+  const storeRef = storageKey && storageVal != null ? _panelStore.set(storageKey, storageVal) && storageKey : null;
+  const onclick = `event.preventDefault();${storeRef ? `_panelStore.flush('${storeRef}');` : ''}closeRightPanel();if(window.GymRouter)GymRouter.navigate('${spaPage}');`;
+  const itemStyle = `display:flex;align-items:flex-start;gap:12px;padding:12px;border-radius:12px;transition:background 0.2s;margin-bottom:6px;border:1px solid transparent;cursor:pointer`;
+  const hoverStyle = `onmouseover="this.style.background='var(--bg)';this.style.borderColor='var(--border)'" onmouseout="this.style.background='';this.style.borderColor='transparent'"`;
+  return `
+    <div style="${itemStyle}" onclick="${onclick}" role="button" tabindex="0" ${hoverStyle}>
+      <div class="panel-item-icon ${iconClass}">${emoji}</div>
+      <div class="panel-item-text">
+        <strong>${title}</strong>
+        <span>${subtitle}</span>
+      </div>
+      <span class="panel-item-badge ${badgeClass}">${badgeText}</span>
+    </div>`;
+}
+
+// Store en memoria: guarda valores arbitrarios y los escribe en sessionStorage al hacer flush
+const _panelStore = {
+  _data: {},
+  set(key, val) { this._data[key] = val; return this; },
+  flush(key) {
+    if (this._data[key] != null) {
+      sessionStorage.setItem(key, typeof this._data[key] === 'object'
+        ? JSON.stringify(this._data[key])
+        : String(this._data[key]));
+      delete this._data[key];
+    }
+  },
+};
 
 function _timeAgo(date) {
   if (!date) return '';

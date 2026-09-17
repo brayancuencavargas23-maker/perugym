@@ -136,7 +136,7 @@ router.get('/notifications', async (req, res) => {
     const in7 = new Date(today); in7.setDate(in7.getDate() + 7);
     const in3 = new Date(today); in3.setDate(in3.getDate() + 3);
 
-    const [vencenHoy, vencen3d, pagosPendientes, stockBajo] = await Promise.all([
+    const [vencenHoy, vencen3d, pagosPendientes, productosStockBajo] = await Promise.all([
       Membresia.find({ estado: 'activo', fecha_fin: { $gte: today, $lt: tomorrow } })
         .populate('cliente_id', 'nombre apellido_paterno')
         .populate('plan_id', 'nombre'),
@@ -144,7 +144,9 @@ router.get('/notifications', async (req, res) => {
         .populate('cliente_id', 'nombre apellido_paterno')
         .populate('plan_id', 'nombre'),
       Pago.countDocuments({ estado: 'pendiente' }),
-      Producto.countDocuments({ activo: true, stock: { $lte: 5 } }),
+      Producto.find({ activo: true, stock: { $lte: 5 } })
+        .select('nombre stock precio_venta categoria')
+        .sort({ stock: 1 }),
     ]);
 
     const notifications = [];
@@ -158,7 +160,9 @@ router.get('/notifications', async (req, res) => {
       notifications.push({ tipo: 'vencimiento_proximo', titulo: `${name} — vence en ${days}d`, detalle: m.plan_id?.nombre || '', prioridad: 'media' });
     });
     if (pagosPendientes > 0) notifications.push({ tipo: 'pagos_pendientes', titulo: `${pagosPendientes} pagos pendientes`, detalle: 'Requieren atención', prioridad: 'media' });
-    if (stockBajo > 0) notifications.push({ tipo: 'stock_bajo', titulo: `${stockBajo} productos con stock bajo`, detalle: 'Revisar inventario', prioridad: 'baja' });
+    productosStockBajo.forEach(p => {
+      notifications.push({ tipo: 'stock_bajo', titulo: p.nombre, detalle: `Stock: ${p.stock} — S/.${(p.precio_venta || 0).toFixed(2)}`, prioridad: 'baja', producto: { _id: p._id, nombre: p.nombre, stock: p.stock, precio_venta: p.precio_venta, categoria: p.categoria } });
+    });
 
     notifications.sort((a, b) => {
       const order = { alta: 0, media: 1, baja: 2 };

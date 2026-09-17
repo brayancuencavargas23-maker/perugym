@@ -501,6 +501,11 @@
         // Limpiar la URL para que no se repita al recargar
         window.history.replaceState({}, '', window.location.pathname);
       }
+      // Si viene desde el atajo rápido del dashboard (SPA), abrir modal de nuevo cliente
+      if (sessionStorage.getItem('_spa_open_nuevo') === '1') {
+        sessionStorage.removeItem('_spa_open_nuevo');
+        document.getElementById('btn-new')?.click();
+      }
     });
   })();
 

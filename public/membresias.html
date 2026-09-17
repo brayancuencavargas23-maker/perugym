@@ -1244,6 +1244,11 @@
         clienteId = sessionStorage.getItem('_spa_param_cliente_id');
         if (clienteId) sessionStorage.removeItem('_spa_param_cliente_id');
       }
+      // Leer renovarId desde sessionStorage si no vino por URL (navegación SPA)
+      if (!renovarId && window.__SPA_SHELL__) {
+        renovarId = sessionStorage.getItem('_spa_renovar');
+        if (renovarId) sessionStorage.removeItem('_spa_renovar');
+      }
       if (clienteId) {
         const elCliente = document.getElementById('mem-cliente');
         if (elCliente) elCliente.value = clienteId;

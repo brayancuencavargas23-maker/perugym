@@ -160,6 +160,24 @@
   let allProducts = [];
   let tablePaginator = null;
 
+  // ── Apertura inmediata de modal desde panel de notificaciones ───────────────
+  // Se lee ANTES de cualquier async para abrir el modal en el mismo frame
+  // en que el script se ejecuta (los modales ya están en el DOM en este punto).
+  (function _checkPanelEdit() {
+    const raw = sessionStorage.getItem('_spa_edit_producto');
+    if (!raw) return;
+    sessionStorage.removeItem('_spa_edit_producto');
+    try {
+      const p = JSON.parse(raw);
+      if (!p || !( p._id || p.id)) return;
+      // Pre-poblar allProducts para que editProduct lo encuentre
+      allProducts = [p];
+      // Abrir modal en el siguiente frame (el DOM del modal ya existe pero
+      // requestAnimationFrame garantiza que el browser terminó el layout)
+      requestAnimationFrame(() => editProduct(p._id || p.id));
+    } catch { /* JSON inválido, ignorar */ }
+  })();
+
   function _pageActive() {
     return !!document.getElementById('products-table');
   }
