@@ -42,29 +42,53 @@
         <div class="summary-item desc"><div class="summary-num" id="cnt-descartado">-</div><div class="summary-lbl">⚫ Descartados</div></div>
       </div>
 
-      <!-- Barra de filtros -->
-      <div class="search-bar">
-        <select id="filter-estado" class="form-control" style="width:180px">
-          <option value="">Todos los estados</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="contactado">Contactado</option>
-          <option value="convertido">Convertido</option>
-          <option value="descartado">Descartado</option>
-        </select>
-        <select id="filter-plan-sol" class="form-control" style="width:160px">
-          <option value="">Todos los planes</option>
-        </select>
-        <input type="date" id="filter-sol-desde" class="form-control" style="width:150px" title="Fecha desde">
-        <input type="date" id="filter-sol-hasta" class="form-control" style="width:150px" title="Fecha hasta">
-        <select id="filter-sin-contacto" class="form-control" style="width:170px">
-          <option value="">Seguimiento</option>
-          <option value="3">Sin contacto 3+ días</option>
-          <option value="7">Sin contacto 7+ días</option>
-          <option value="15">Sin contacto 15+ días</option>
-        </select>
-        <button class="btn btn-outline" id="btn-refresh" style="display:inline-flex;align-items:center;gap:6px">
-          <span id="icon-refresh-sol"></span> Actualizar
-        </button>
+      <!-- Filtros -->
+      <div class="card" style="margin-bottom:16px;padding:16px">
+        <!-- Fila 1: Estado + Plan -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+          <div class="form-group" style="margin:0;flex:1;min-width:160px">
+            <label style="font-size:12px">Estado</label>
+            <select id="filter-estado" class="form-control">
+              <option value="">Todos los estados</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="contactado">Contactado</option>
+              <option value="convertido">Convertido</option>
+              <option value="descartado">Descartado</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
+            <label style="font-size:12px">Plan</label>
+            <select id="filter-plan-sol" class="form-control">
+              <option value="">Todos los planes</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Fila 2: Fechas + Seguimiento -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
+            <label style="font-size:12px">Fecha desde</label>
+            <input type="date" id="filter-sol-desde" class="form-control">
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
+            <label style="font-size:12px">Fecha hasta</label>
+            <input type="date" id="filter-sol-hasta" class="form-control">
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:160px">
+            <label style="font-size:12px">Seguimiento</label>
+            <select id="filter-sin-contacto" class="form-control">
+              <option value="">Todos</option>
+              <option value="3">Sin contacto 3+ días</option>
+              <option value="7">Sin contacto 7+ días</option>
+              <option value="15">Sin contacto 15+ días</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Fila 3: Botones -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-outline" id="btn-refresh" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-refresh-sol"></span> Actualizar</button>
+        </div>
       </div>
 
       <!-- Tabla -->

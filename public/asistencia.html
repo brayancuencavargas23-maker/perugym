@@ -14,6 +14,11 @@
   <style>
     .checkin-opt:hover { background: var(--bg); }
     .checkin-opt:last-child { border-bottom: none !important; }
+    .advanced-toggle { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; border:1.5px dashed var(--border); background:transparent; cursor:pointer; font-size:13px; font-weight:600; color:var(--text-light); transition:all .2s; }
+    .advanced-toggle:hover { border-color:var(--primary); color:var(--primary); background:rgba(var(--primary-rgb),0.04); }
+    .advanced-toggle.active { border-color:var(--primary); color:var(--primary); background:rgba(var(--primary-rgb),0.08); }
+    .advanced-filters { display:none; margin-top:16px; padding-top:16px; border-top:1px solid var(--border); }
+    .advanced-filters.show { display:block; }
   </style>
 </head>
 <body>
@@ -56,57 +61,69 @@
 
       <!-- Filtros -->
       <div class="card" style="margin-bottom:16px;padding:16px">
-        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+        <!-- Fila 1: Buscar cliente -->
+        <div style="margin-bottom:12px">
+          <input type="text" id="filter-nombre" class="form-control" style="width:100%;max-width:400px" placeholder="Buscar cliente...">
+        </div>
 
-          <div class="form-group" style="margin:0;min-width:180px;flex:1">
-            <label style="font-size:12px">Buscar cliente</label>
-            <input type="text" id="filter-nombre" class="form-control" placeholder="Nombre del cliente...">
-          </div>
-
-          <div class="form-group" style="margin:0;min-width:160px">
-            <label style="font-size:12px">Cliente específico</label>
-            <select id="filter-cliente" class="form-control">
-              <option value="">Todos</option>
-            </select>
-          </div>
-
-          <div class="form-group" style="margin:0">
+        <!-- Fila 2: Estado + Fechas -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
             <label style="font-size:12px">Estado</label>
-            <select id="filter-estado" class="form-control" style="width:140px">
+            <select id="filter-estado" class="form-control">
               <option value="">Todos</option>
               <option value="en_curso">En curso</option>
               <option value="completado">Completado</option>
             </select>
           </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
+            <label style="font-size:12px">Fecha desde</label>
+            <input type="date" id="filter-from" class="form-control">
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
+            <label style="font-size:12px">Fecha hasta</label>
+            <input type="date" id="filter-to" class="form-control">
+          </div>
+        </div>
 
-          <div class="form-group" style="margin:0">
+        <!-- Fila 3: Botones -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-primary" onclick="refreshTable()" style="display:inline-flex;align-items:center;gap:6px" id="btn-filter-asis"></button>
+          <button class="btn btn-outline" onclick="clearFilters()" style="display:inline-flex;align-items:center;gap:6px" id="btn-clear-asis"></button>
+          <button class="btn btn-success" onclick="exportarCSV()" style="display:inline-flex;align-items:center;gap:6px;margin-left:auto" id="btn-export-asis"></button>
+          <button class="advanced-toggle" id="btn-toggle-advanced" onclick="toggleAdvancedFilters()">
+            <span>⚙️</span> Filtros avanzados
+          </button>
+        </div>
+      </div>
+
+      <!-- Filtros avanzados (colapsables) -->
+      <div class="advanced-filters" id="advanced-filters" style="padding:16px;background:var(--card-bg);border-radius:var(--radius);margin-bottom:16px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--text-light)">Filtros avanzados</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
+            <label style="font-size:12px">Cliente específico</label>
+            <select id="filter-cliente" class="form-control">
+              <option value="">Todos</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
             <label style="font-size:12px">Fecha exacta</label>
-            <input type="date" id="filter-date" class="form-control" style="width:160px">
+            <input type="date" id="filter-date" class="form-control">
           </div>
-
-          <div class="form-group" style="margin:0">
-            <label style="font-size:12px">Desde</label>
-            <input type="date" id="filter-from" class="form-control" style="width:150px">
-          </div>
-
-          <div class="form-group" style="margin:0">
-            <label style="font-size:12px">Hasta</label>
-            <input type="date" id="filter-to" class="form-control" style="width:150px">
-          </div>
-
-          <div class="form-group" style="margin:0">
+          <div class="form-group" style="margin:0;flex:1;min-width:120px">
             <label style="font-size:12px">Duración mín (min)</label>
-            <input type="number" id="filter-dur-min" class="form-control" style="width:120px" placeholder="0" min="0">
+            <input type="number" id="filter-dur-min" class="form-control" placeholder="0" min="0">
           </div>
-
-          <div class="form-group" style="margin:0">
+          <div class="form-group" style="margin:0;flex:1;min-width:120px">
             <label style="font-size:12px">Duración máx (min)</label>
-            <input type="number" id="filter-dur-max" class="form-control" style="width:120px" placeholder="∞" min="0">
+            <input type="number" id="filter-dur-max" class="form-control" placeholder="∞" min="0">
           </div>
-
-          <div class="form-group" style="margin:0">
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-top:12px">
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
             <label style="font-size:12px">Día semana</label>
-            <select id="filter-dia-semana" class="form-control" style="width:140px">
+            <select id="filter-dia-semana" class="form-control">
               <option value="">Todos</option>
               <option value="1">Lunes</option>
               <option value="2">Martes</option>
@@ -117,22 +134,14 @@
               <option value="0">Domingo</option>
             </select>
           </div>
-
-          <div class="form-group" style="margin:0">
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
             <label style="font-size:12px">Hora entrada desde</label>
-            <input type="time" id="filter-hora-desde" class="form-control" style="width:130px">
+            <input type="time" id="filter-hora-desde" class="form-control">
           </div>
-
-          <div class="form-group" style="margin:0">
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
             <label style="font-size:12px">Hora entrada hasta</label>
-            <input type="time" id="filter-hora-hasta" class="form-control" style="width:130px">
+            <input type="time" id="filter-hora-hasta" class="form-control">
           </div>
-
-        </div>
-        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="refreshTable()" style="display:inline-flex;align-items:center;gap:6px" id="btn-filter-asis"></button>
-          <button class="btn btn-outline" onclick="clearFilters()" style="display:inline-flex;align-items:center;gap:6px" id="btn-clear-asis"></button>
-          <button class="btn btn-outline" onclick="exportarCSV()" style="display:inline-flex;align-items:center;gap:6px;margin-left:auto" id="btn-export-asis"></button>
         </div>
       </div>
 
@@ -166,6 +175,14 @@
 
   function _pageActive() {
     return !!document.getElementById('asistencia-table');
+  }
+
+  // ── Toggle filtros avanzados ─────────────────────────────────────────────
+  function toggleAdvancedFilters() {
+    const advanced = document.getElementById('advanced-filters');
+    const btn = document.getElementById('btn-toggle-advanced');
+    advanced.classList.toggle('show');
+    btn.classList.toggle('active');
   }
 
   document.getElementById('filter-date').addEventListener('change', function() {
@@ -230,9 +247,14 @@
       return [c.nombre, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' ');
     }
 
-    function renderDropdown(lista) {
+    function renderDropdown(lista, query) {
       if (!lista.length) {
-        dropdown.innerHTML = '<div style="padding:10px 14px;color:var(--text-light);font-size:13px">Sin resultados</div>';
+        const esDNI = /^\d{8}$/.test(query);
+        dropdown.innerHTML = `<div style="padding:10px 14px;color:var(--text-light);font-size:13px">
+          Sin resultados
+          ${esDNI ? `<div style="margin-top:8px"><button class="btn btn-primary btn-sm" style="font-size:12px;display:inline-flex;align-items:center;gap:4px"
+            onclick="window.location.href='/clientes.html?dni=${query}'">Registrar cliente con DNI ${query}</button></div>` : ''}
+        </div>`;
         dropdown.style.display = 'block';
         return;
       }
@@ -255,7 +277,7 @@
         nombreCompleto(c).toLowerCase().includes(q) ||
         (c.dni && c.dni.includes(q))
       );
-      renderDropdown(filtered);
+      renderDropdown(filtered, this.value.trim());
     });
 
     input.addEventListener('focus', function() {
@@ -265,7 +287,7 @@
           nombreCompleto(c).toLowerCase().includes(q) ||
           (c.dni && c.dni.includes(q))
         );
-        renderDropdown(filtered);
+        renderDropdown(filtered, this.value.trim());
       }
     });
 
@@ -500,12 +522,13 @@
   })();
 
   // Exponer funciones al scope global para que los onclick funcionen en el SPA
-  window.doCheckin      = doCheckin;
-  window.doCheckout     = doCheckout;
-  window.checkoutById   = checkoutById;
-  window.loadAsistencia = loadAsistencia;
-  window.clearFilters   = clearFilters;
-  window.exportarCSV    = exportarCSV;
+  window.doCheckin            = doCheckin;
+  window.doCheckout           = doCheckout;
+  window.checkoutById         = checkoutById;
+  window.loadAsistencia       = loadAsistencia;
+  window.clearFilters         = clearFilters;
+  window.toggleAdvancedFilters = toggleAdvancedFilters;
+  window.exportarCSV          = exportarCSV;
 
   // ── Event listeners filtros ────────────────────────────────────────────────
   ['filter-nombre','filter-cliente','filter-estado','filter-date','filter-from','filter-to',

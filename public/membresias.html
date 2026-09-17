@@ -24,30 +24,67 @@
         <span>No hay caja abierta. Los botones de pago están deshabilitados. <a href="/caja.html" style="font-weight:700;color:var(--danger)">Abrir caja →</a></span>
       </div>
 
-      <div class="search-bar">
-        <input type="text" id="search-nombre" class="form-control" placeholder="Buscar por cliente..." style="width:200px">
-        <select id="filter-estado" class="form-control" style="width:160px">
-          <option value="">Todos los estados</option>
-          <option value="activo">Activo</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="vencido">Vencido</option>
-          <option value="cancelado">Cancelado</option>
-        </select>
-        <select id="filter-plan" class="form-control" style="width:160px">
-          <option value="">Todos los planes</option>
-        </select>
-        <select id="filter-vence-mes" class="form-control" style="width:150px">
-          <option value="">Vencimiento</option>
-          <option value="7">Vence en 7 días</option>
-          <option value="15">Vence en 15 días</option>
-          <option value="30">Vence en 30 días</option>
-          <option value="mes">Vence este mes</option>
-        </select>
-        <input type="date" id="filter-inicio-desde" class="form-control" style="width:150px" title="Inicio desde">
-        <input type="date" id="filter-inicio-hasta" class="form-control" style="width:150px" title="Inicio hasta">
-        <button class="btn btn-outline" id="btn-vencen" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-warning-mem"></span> Vencen pronto</button>
-        <button class="btn btn-success" id="btn-exportar-mem" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-excel-mem"></span> Exportar Excel</button>
-        <button class="btn btn-primary" id="btn-new" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-plus-mem"></span> Nueva Membresía</button>
+      <!-- Filtros -->
+      <div class="card" style="margin-bottom:16px;padding:16px">
+        <!-- Fila 1: Buscar membresía -->
+        <div style="margin-bottom:12px">
+          <div style="position:relative;max-width:400px;width:100%">
+            <span class="search-icon" id="search-icon-el" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-light)"></span>
+            <input type="text" id="search-nombre" class="form-control" style="padding-left:36px" placeholder="Buscar por cliente...">
+          </div>
+        </div>
+
+        <!-- Fila 2: Estado + Plan + Vencimiento + Fechas -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+          <div class="form-group" style="margin:0;flex:1;min-width:140px">
+            <label style="font-size:12px">Estado</label>
+            <select id="filter-estado" class="form-control">
+              <option value="">Todos los estados</option>
+              <option value="activo">Activo</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="vencido">Vencido</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
+            <label style="font-size:12px">Plan</label>
+            <select id="filter-plan" class="form-control">
+              <option value="">Todos los planes</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:140px">
+            <label style="font-size:12px">Vencimiento</label>
+            <select id="filter-vence-mes" class="form-control">
+              <option value="">Vencimiento</option>
+              <option value="7">Vence en 7 días</option>
+              <option value="15">Vence en 15 días</option>
+              <option value="30">Vence en 30 días</option>
+              <option value="mes">Vence este mes</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Fila 3: Fechas inicio (avanzado) -->
+        <div id="advanced-filters" style="display:none;margin-bottom:12px">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+            <div class="form-group" style="margin:0;flex:1;min-width:150px">
+              <label style="font-size:12px">Inicio desde</label>
+              <input type="date" id="filter-inicio-desde" class="form-control">
+            </div>
+            <div class="form-group" style="margin:0;flex:1;min-width:150px">
+              <label style="font-size:12px">Inicio hasta</label>
+              <input type="date" id="filter-inicio-hasta" class="form-control">
+            </div>
+          </div>
+        </div>
+
+        <!-- Fila 4: Botones -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-primary" id="btn-new" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-plus-mem"></span> Nueva Membresía</button>
+          <button class="btn btn-success" id="btn-exportar-mem" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-excel-mem"></span> Exportar Excel</button>
+          <button class="btn btn-outline" id="btn-vencen" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-warning-mem"></span> Vencen pronto</button>
+          <button class="btn btn-outline" onclick="document.getElementById('advanced-filters').style.display = document.getElementById('advanced-filters').style.display === 'none' ? 'block' : 'none'" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-filter-mem"></span> Filtros avanzados</button>
+        </div>
       </div>
       <div class="card">
         <div class="table-wrapper">
@@ -677,6 +714,14 @@
       <td data-label="Pago">${pagoBadge}</td>
       <td data-label="Acciones" style="display:flex;gap:4px;flex-wrap:wrap">
         <button class="btn btn-sm btn-outline" title="Ver pagos en gestión de pagos" onclick="irAPagosMembresia('${m.id}')">${icon('money')}</button>
+        ${m.cliente_telefono ? (() => {
+          const tel = m.cliente_telefono.replace(/\D/g, '');
+          const mensaje = m.estado === 'vencido'
+            ? `Hola ${m.cliente_nombre} 👋, esperamos que te encuentres muy bien 😊. Te escribimos para recordarte que tu membresía *${m.plan_nombre}* venció el ${fmtDate(m.fecha_fin)}. Si deseas renovarla y seguir disfrutando de todos los beneficios del gym 💪, con gusto te atendemos. ¡Te esperamos! 🏋️‍♂️`
+            : `Hola ${m.cliente_nombre} 👋, esperamos que te encuentres muy bien 😊. Te escribimos para recordarte que tu membresía *${m.plan_nombre}* está por vencer el ${fmtDate(m.fecha_fin)} ⏳. Si deseas renovarla y seguir disfrutando de todos los beneficios del gym 💪, con gusto te atendemos. ¡No dejes pasar el tiempo! 🏋️‍♂️`;
+          const url = `https://wa.me/51${tel}?text=${encodeURIComponent(mensaje)}`;
+          return `<a class="btn btn-sm btn-outline" href="${url}" target="_blank" title="WhatsApp" style="display:inline-flex;align-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></a>`;
+        })() : ''}
         ${esActivo ? `<button class="btn btn-sm btn-outline" title="Cambiar plan" ${disabledAttr} onclick="abrirCambioPlan('${m.id}','${m.plan_nombre}','${m.cliente_nombre}')">${icon('refresh')}</button>` : ''}
         ${puedeRenovar ? `<button class="btn btn-sm btn-outline" title="Renovar" ${disabledAttr} onclick="abrirRenovar('${m.id}','${m.plan_nombre}','${m.cliente_nombre}',${m.precio})">${icon('renew')}</button>` : ''}
         ${m.estado !== 'cancelado' ? `<button class="btn btn-sm btn-outline" title="Editar" onclick="abrirEditar('${m.id}','${m.estado}','${m.fecha_fin?.split('T')[0]}')">${icon('edit')}</button>` : ''}
@@ -738,7 +783,9 @@
   async function loadMembresias() {
     showTableSkeleton('membresias-table', 7);
     try {
-      const data = await api.get('/membresias?limit=500');
+      let url = '/membresias?limit=500';
+      if (vencenFilter) url += '&vencen_pronto=true';
+      const data = await api.get(url);
       if (!_pageActive()) return;
       allMembresias = data.data;
       refreshTable();
@@ -1037,9 +1084,13 @@
     const elWarning = document.getElementById('icon-warning-mem');
     const elPlus    = document.getElementById('icon-plus-mem');
     const elExcel   = document.getElementById('icon-excel-mem');
+    const elFilter  = document.getElementById('icon-filter-mem');
     if (elWarning) elWarning.innerHTML = icon('warning');
     if (elPlus)    elPlus.innerHTML    = icon('plus');
     if (elExcel)   elExcel.innerHTML   = icon('excel');
+    if (elFilter)  elFilter.innerHTML  = icon('filter');
+    const elSearch = document.getElementById('search-icon-el');
+    if (elSearch)  elSearch.innerHTML  = icon('search');
 
     // Selects con onchange (antes inline)
     const elMemCliente = document.getElementById('mem-cliente');
@@ -1188,6 +1239,7 @@
       }
       const params = new URLSearchParams(window.location.search);
       let clienteId = params.get('cliente_id');
+      let renovarId = params.get('renovar');
       if (!clienteId && window.__SPA_SHELL__) {
         clienteId = sessionStorage.getItem('_spa_param_cliente_id');
         if (clienteId) sessionStorage.removeItem('_spa_param_cliente_id');
@@ -1197,6 +1249,16 @@
         if (elCliente) elCliente.value = clienteId;
         onClienteChange();
         openModal('modal-nueva');
+      }
+      if (renovarId) {
+        setTimeout(() => {
+          const btn = document.querySelector(`[data-renovar="${renovarId}"]`);
+          if (btn) btn.click();
+          else {
+            const allBtns = document.querySelectorAll('.btn-renovar');
+            allBtns.forEach(b => { if (b.dataset.memId === renovarId) b.click(); });
+          }
+        }, 500);
       }
     });
 

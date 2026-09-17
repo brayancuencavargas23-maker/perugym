@@ -479,16 +479,20 @@ function initHamburger() {
 // Usage: confirmDialog({ message, title, confirmText, type }).then(ok => { if (ok) ... })
 function confirmDialog({ message, title = '¿Confirmar acción?', confirmText = 'Confirmar', type = 'danger' } = {}) {
   return new Promise(resolve => {
-    // Remove any existing confirm dialog
     const existing = document.getElementById('_confirm-overlay');
     if (existing) existing.remove();
 
     const colorMap = { danger: 'var(--danger)', warning: '#856404', primary: 'var(--primary)', success: 'var(--success)' };
     const bgMap    = { danger: 'rgba(220,53,69,0.08)', warning: 'rgba(255,193,7,0.08)', primary: 'rgba(108,99,255,0.08)', success: 'rgba(40,167,69,0.08)' };
-    const iconMap  = { danger: '🗑️', warning: '⚠️', primary: '❓', success: '✅' };
-    const color    = colorMap[type] || colorMap.danger;
-    const bg       = bgMap[type]    || bgMap.danger;
-    const ico      = iconMap[type]  || iconMap.danger;
+    const svgIcons = {
+      danger:  '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>',
+      warning: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+      primary: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+      success: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    };
+    const color = colorMap[type] || colorMap.danger;
+    const bg    = bgMap[type]    || bgMap.danger;
+    const ico   = svgIcons[type] || svgIcons.danger;
 
     const overlay = document.createElement('div');
     overlay.id = '_confirm-overlay';
@@ -512,7 +516,7 @@ function confirmDialog({ message, title = '¿Confirmar acción?', confirmText = 
           <div style="
             width:56px;height:56px;border-radius:50%;background:${bg};
             display:flex;align-items:center;justify-content:center;
-            font-size:26px;margin:0 auto 16px;
+            margin:0 auto 16px;color:${color};
           ">${ico}</div>
           <h3 style="font-size:17px;font-weight:700;margin-bottom:8px;color:#1a1a2e">${title}</h3>
           <p style="font-size:14px;color:#666;line-height:1.5">${message}</p>

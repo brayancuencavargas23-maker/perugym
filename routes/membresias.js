@@ -50,7 +50,7 @@ router.get('/', async (req, res) => {
 
     const total = await Membresia.countDocuments(filter);
     const mems = await Membresia.find(filter)
-      .populate('cliente_id', 'nombre apellido_paterno apellido_materno foto_url')
+      .populate('cliente_id', 'nombre apellido_paterno apellido_materno foto_url telefono')
       .populate('plan_id', 'nombre precio')
       .sort({ fecha_fin: -1 })
       .skip((page - 1) * limit)
@@ -74,6 +74,7 @@ router.get('/', async (req, res) => {
         ...m.toObject(),
         id: m._id,
         cliente_nombre: [m.cliente_id?.nombre, m.cliente_id?.apellido_paterno, m.cliente_id?.apellido_materno].filter(Boolean).join(' ') || null,
+        cliente_telefono: m.cliente_id?.telefono || null,
         foto_url: m.cliente_id?.foto_url,
         plan_nombre: m.plan_id?.nombre,
         precio: m.monto_total || m.plan_id?.precio,
@@ -293,7 +294,7 @@ router.put('/:id', [
     if (fecha_fin) update.fecha_fin = fecha_fin;
     await Membresia.findByIdAndUpdate(req.params.id, update, { new: true });
     const mem = await Membresia.findById(req.params.id)
-      .populate('cliente_id', 'nombre apellido_paterno apellido_materno foto_url')
+      .populate('cliente_id', 'nombre apellido_paterno apellido_materno foto_url telefono')
       .populate('plan_id', 'nombre precio');
     if (!mem) return res.status(404).json({ error: 'Membresía no encontrada.' });
     // Devolver con el mismo shape que GET /membresias para que el patch del caché funcione
@@ -301,6 +302,7 @@ router.put('/:id', [
       ...mem.toObject(),
       id: mem._id,
       cliente_nombre: [mem.cliente_id?.nombre, mem.cliente_id?.apellido_paterno, mem.cliente_id?.apellido_materno].filter(Boolean).join(' ') || null,
+      cliente_telefono: mem.cliente_id?.telefono || null,
       foto_url: mem.cliente_id?.foto_url,
       plan_nombre: mem.plan_id?.nombre,
       precio: mem.plan_id?.precio,

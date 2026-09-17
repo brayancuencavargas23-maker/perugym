@@ -18,31 +18,52 @@
   <div class="main-content">
     <div class="topbar" id="topbar"></div>
     <div class="page-content">
-      <div class="search-bar">
-        <div class="search-input-wrap">
-          <span class="search-icon" id="search-icon-el"></span>
-          <input type="text" id="search" class="form-control" placeholder="Buscar por nombre, DNI o email...">
+      <!-- Filtros -->
+      <div class="card" style="margin-bottom:16px;padding:16px">
+        <!-- Fila 1: Buscar cliente -->
+        <div style="margin-bottom:12px">
+          <div style="position:relative;max-width:400px;width:100%">
+            <span class="search-icon" id="search-icon-el" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-light)"></span>
+            <input type="text" id="search" class="form-control" style="padding-left:36px" placeholder="Buscar por nombre, DNI o email...">
+          </div>
         </div>
-        <select id="filter-activo" class="form-control" style="width:140px">
-          <option value="">Todos</option>
-          <option value="true">Activos</option>
-          <option value="false">Inactivos</option>
-        </select>
-        <select id="filter-membresia" class="form-control" style="width:160px">
-          <option value="">Membresía</option>
-          <option value="con">Con membresía</option>
-          <option value="sin">Sin membresía</option>
-          <option value="activo">Membresía activa</option>
-          <option value="vencida">Membresía vencida</option>
-        </select>
-        <select id="filter-vence" class="form-control" style="width:170px">
-          <option value="">Vence pronto</option>
-          <option value="7">Vence en 7 días</option>
-          <option value="15">Vence en 15 días</option>
-          <option value="30">Vence en 30 días</option>
-        </select>
-        <button class="btn btn-primary" id="btn-new" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-new-cliente"></span> Nuevo Cliente</button>
-        <button class="btn btn-success" id="btn-exportar-cl" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-excel-cl"></span> Exportar Excel</button>
+
+        <!-- Fila 2: Estado + Membresía + Vencimiento -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+          <div class="form-group" style="margin:0;flex:1;min-width:140px">
+            <label style="font-size:12px">Estado</label>
+            <select id="filter-activo" class="form-control">
+              <option value="">Todos</option>
+              <option value="true">Activos</option>
+              <option value="false">Inactivos</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:160px">
+            <label style="font-size:12px">Membresía</label>
+            <select id="filter-membresia" class="form-control">
+              <option value="">Membresía</option>
+              <option value="con">Con membresía</option>
+              <option value="sin">Sin membresía</option>
+              <option value="activo">Membresía activa</option>
+              <option value="vencida">Membresía vencida</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
+            <label style="font-size:12px">Vence pronto</label>
+            <select id="filter-vence" class="form-control">
+              <option value="">Vence pronto</option>
+              <option value="7">Vence en 7 días</option>
+              <option value="15">Vence en 15 días</option>
+              <option value="30">Vence en 30 días</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Fila 3: Botones -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-primary" id="btn-new" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-new-cliente"></span> Nuevo Cliente</button>
+          <button class="btn btn-success" id="btn-exportar-cl" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-excel-cl"></span> Exportar Excel</button>
+        </div>
       </div>
       <div class="card">
         <div class="table-wrapper">
@@ -185,15 +206,54 @@
     });
   }
 
+  function showNoResultsMessage() {
+    const tbody = document.getElementById('clientes-table');
+    const searchVal = (document.getElementById('search')?.value || '').trim();
+    const esDNI = /^\d{8}$/.test(searchVal);
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px 16px">
+      <div style="color:var(--text-light);margin-bottom:8px">No se encontraron clientes</div>
+      ${esDNI ? `<button class="btn btn-primary btn-sm" onclick="abrirModalConDNI('${searchVal}')" style="display:inline-flex;align-items:center;gap:6px">
+        ${icon('plus')} Registrar cliente con DNI ${searchVal}
+      </button>` : ''}
+    </td></tr>`;
+    const pag = document.getElementById('pagination');
+    if (pag) pag.innerHTML = '';
+  }
+
   function refreshTable() {
     if (!_pageActive()) return;
     const filtered = getFilteredClientes();
+    if (!filtered.length) {
+      if (tablePaginator) tablePaginator.setData([]);
+      showNoResultsMessage();
+      return;
+    }
     if (tablePaginator) {
       tablePaginator.setData(filtered);
     } else {
       tablePaginator = initTablePagination('pagination', 'clientes-table', filtered, 10, renderRow);
     }
   }
+
+  window.abrirModalConDNI = function(dni) {
+    document.getElementById('cliente-form').reset();
+    document.getElementById('cliente-id').value = '';
+    document.getElementById('modal-title').textContent = 'Nuevo Cliente';
+    document.getElementById('activo-group').classList.add('hidden');
+    document.getElementById('foto-preview').classList.add('hidden');
+    document.getElementById('foto-placeholder').style.display = '';
+    document.getElementById('reniec-status').textContent = '';
+    document.getElementById('c-dni').value = dni;
+    const icoCam = document.getElementById('icon-camera-cl');
+    const icoClose = document.getElementById('icon-close-cl');
+    const icoReniec = document.getElementById('icon-reniec');
+    const fotoPlaceholder = document.getElementById('foto-placeholder');
+    if (icoCam && !icoCam.innerHTML) icoCam.innerHTML = icon('camera');
+    if (icoClose && !icoClose.innerHTML) icoClose.innerHTML = icon('close');
+    if (icoReniec) icoReniec.innerHTML = icon('search');
+    if (fotoPlaceholder && !fotoPlaceholder.innerHTML) fotoPlaceholder.innerHTML = icon('user');
+    openModal('modal-overlay');
+  };
 
   async function loadClientes() {
     showTableSkeleton('clientes-table', 6);
@@ -385,6 +445,11 @@
         document.getElementById('foto-preview').classList.add('hidden');
         document.getElementById('foto-placeholder').style.display = '';
         document.getElementById('reniec-status').textContent = '';
+        // Prellenar DNI si el campo de búsqueda tiene 8 dígitos
+        const searchVal = (document.getElementById('search')?.value || '').trim();
+        if (/^\d{8}$/.test(searchVal)) {
+          document.getElementById('c-dni').value = searchVal;
+        }
         const icoCam = document.getElementById('icon-camera-cl');
         const icoClose = document.getElementById('icon-close-cl');
         const icoReniec = document.getElementById('icon-reniec');
@@ -427,6 +492,15 @@
     loadClientes().catch(err => {
       console.error('[Clientes] ❌ Error en carga inicial:', err);
       toast('Error al cargar clientes: ' + err.message, 'error');
+    }).finally(() => {
+      // Si viene ?dni=... desde la página de asistencia, abrir modal directamente
+      const params = new URLSearchParams(window.location.search);
+      const dniParam = params.get('dni');
+      if (dniParam && /^\d{8}$/.test(dniParam)) {
+        abrirModalConDNI(dniParam);
+        // Limpiar la URL para que no se repita al recargar
+        window.history.replaceState({}, '', window.location.pathname);
+      }
     });
   })();
 

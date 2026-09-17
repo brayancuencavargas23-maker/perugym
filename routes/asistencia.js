@@ -293,4 +293,15 @@ router.put('/checkout/cliente/:cliente_id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── GET /api/asistencia/aforo ────────────────────────────────────────────────
+// Retorna la cantidad de personas actualmente en el gym (sin salida registrada).
+router.get('/aforo', async (req, res) => {
+  try {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    const actuales = await Asistencia.countDocuments({ fecha: { $gte: today, $lt: tomorrow }, salida: null });
+    res.json({ actuales, capacidad: 20 });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 module.exports = router;

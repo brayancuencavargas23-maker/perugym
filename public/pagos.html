@@ -11,6 +11,13 @@
   <link rel="stylesheet" href="/css/styles-responsive.css">
   <!-- SPA redirect: si se accede directamente, redirigir al shell -->
   <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
+  <style>
+    .advanced-toggle { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; border:1.5px dashed var(--border); background:transparent; cursor:pointer; font-size:13px; font-weight:600; color:var(--text-light); transition:all .2s; }
+    .advanced-toggle:hover { border-color:var(--primary); color:var(--primary); background:rgba(var(--primary-rgb),0.04); }
+    .advanced-toggle.active { border-color:var(--primary); color:var(--primary); background:rgba(var(--primary-rgb),0.08); }
+    .advanced-filters { display:none; margin-top:16px; padding-top:16px; border-top:1px solid var(--border); }
+    .advanced-filters.show { display:block; }
+  </style>
 </head>
 <body>
 <div class="app-layout">
@@ -23,35 +30,85 @@
         <span style="font-size:18px">🔒</span>
         <span>No hay caja abierta. No se pueden confirmar pagos. <a href="/caja.html" style="font-weight:700;color:var(--danger)">Abrir caja →</a></span>
       </div>
-      <div class="search-bar">
-        <input type="text" id="filter-cliente" class="form-control" style="width:180px" placeholder="Buscar cliente...">
+      <!-- Filtros -->
+      <div class="card" style="margin-bottom:16px;padding:16px">
+        <!-- Fila 1: Buscar cliente -->
+        <div style="margin-bottom:12px">
+          <input type="text" id="filter-cliente" class="form-control" style="width:100%;max-width:400px" placeholder="Buscar cliente...">
+        </div>
+
+        <!-- Fila 2: Estado + Método -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
+            <label style="font-size:12px">Estado</label>
+            <select id="filter-estado" class="form-control">
+              <option value="">Todos</option>
+              <option value="pagado">Pagado</option>
+              <option value="pendiente">Pendiente</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
+            <label style="font-size:12px">Método de pago</label>
+            <select id="filter-metodo" class="form-control">
+              <option value="">Todos los métodos</option>
+              <option value="efectivo">Efectivo</option>
+              <option value="yape">Yape</option>
+              <option value="plin">Plin</option>
+              <option value="transferencia">Transferencia</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Fila 3: Fechas -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
+            <label style="font-size:12px">Fecha desde</label>
+            <input type="date" id="filter-from" class="form-control">
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
+            <label style="font-size:12px">Fecha hasta</label>
+            <input type="date" id="filter-to" class="form-control">
+          </div>
+        </div>
+
+        <!-- Fila 4: Botones -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-primary" onclick="loadPagos()" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-filter-pag"></span> Filtrar</button>
+          <button class="btn btn-success" onclick="exportarPagos()" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-excel-pag"></span> Exportar Excel</button>
+          <button class="advanced-toggle" id="btn-toggle-advanced" onclick="toggleAdvancedFilters()" style="margin-left:auto">
+            <span>⚙️</span> Filtros avanzados
+          </button>
+        </div>
+      </div>
+
+      <!-- Filtros avanzados (colapsables) -->
+      <div class="advanced-filters" id="advanced-filters" style="padding:16px;background:var(--card-bg);border-radius:var(--radius);margin-bottom:16px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--text-light)">Filtros avanzados</div>
         <input type="hidden" id="filter-membresia-id">
-        <select id="filter-estado" class="form-control" style="width:150px">
-          <option value="">Todos</option>
-          <option value="pagado">Pagado</option>
-          <option value="pendiente">Pendiente</option>
-        </select>
-        <select id="filter-metodo" class="form-control" style="width:160px">
-          <option value="">Todos los métodos</option>
-          <option value="efectivo">Efectivo</option>
-          <option value="yape">Yape</option>
-          <option value="plin">Plin</option>
-          <option value="transferencia">Transferencia</option>
-        </select>
-        <select id="filter-tipo" class="form-control" style="width:160px">
-          <option value="">Todos los tipos</option>
-          <option value="completo">Pagos completos</option>
-          <option value="abono">Abonos parciales</option>
-        </select>
-        <select id="filter-plan-pag" class="form-control" style="width:160px">
-          <option value="">Todos los planes</option>
-        </select>
-        <input type="number" id="filter-monto-min" class="form-control" style="width:120px" placeholder="Monto mín" min="0" step="0.01">
-        <input type="number" id="filter-monto-max" class="form-control" style="width:120px" placeholder="Monto máx" min="0" step="0.01">
-        <input type="date" id="filter-from" class="form-control" style="width:160px">
-        <input type="date" id="filter-to" class="form-control" style="width:160px">
-        <button class="btn btn-outline" onclick="loadPagos()" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-filter-pag"></span> Filtrar</button>
-        <button class="btn btn-success" onclick="exportarPagos()" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-excel-pag"></span> Exportar Excel</button>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
+            <label style="font-size:12px">Tipo de pago</label>
+            <select id="filter-tipo" class="form-control">
+              <option value="">Todos los tipos</option>
+              <option value="completo">Pagos completos</option>
+              <option value="abono">Abonos parciales</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
+            <label style="font-size:12px">Plan</label>
+            <select id="filter-plan-pag" class="form-control">
+              <option value="">Todos los planes</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:120px">
+            <label style="font-size:12px">Monto mínimo</label>
+            <input type="number" id="filter-monto-min" class="form-control" placeholder="S/ 0" min="0" step="0.01">
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:120px">
+            <label style="font-size:12px">Monto máximo</label>
+            <input type="number" id="filter-monto-max" class="form-control" placeholder="S/ ∞" min="0" step="0.01">
+          </div>
+        </div>
       </div>
       <div class="card">
         <div class="table-wrapper">
@@ -178,6 +235,14 @@
     return !!document.getElementById('pagos-table');
   }
 
+  // ── Toggle filtros avanzados ─────────────────────────────────────────────
+  function toggleAdvancedFilters() {
+    const advanced = document.getElementById('advanced-filters');
+    const btn = document.getElementById('btn-toggle-advanced');
+    advanced.classList.toggle('show');
+    btn.classList.toggle('active');
+  }
+
   async function checkCaja() {
     try { cajaActual = await api.get('/caja/estado'); } catch (e) { cajaActual = null; }
     if (!_pageActive()) return;
@@ -258,6 +323,10 @@
           ultimo_pago: null,
           ultimo_metodo: null,
           tiene_pendiente: false,
+          estado: 'pendiente',
+          metodo_pago: null,
+          es_abono: false,
+          monto: 0,
           pagos_ids: []
         };
       }
@@ -265,6 +334,9 @@
       if (p.cliente_nombre && !g.cliente_nombre) g.cliente_nombre = p.cliente_nombre;
       if (p.plan_nombre && !g.plan_nombre) g.plan_nombre = p.plan_nombre;
       g.pagos_ids.push(p.id);
+      g.monto += p.monto || 0;
+      if (p.es_abono) g.es_abono = true;
+      if (p.metodo_pago && !g.metodo_pago) g.metodo_pago = p.metodo_pago;
       if (p.estado === 'pagado') {
         g.total_pagado += p.monto;
         if (p.es_abono) g.abonos++;
@@ -274,6 +346,11 @@
         }
       }
       if (p.estado === 'pendiente') g.tiene_pendiente = true;
+      if (g.total_pagado > 0 && g.total_pagado >= g.total_esperado) {
+        g.estado = 'pagado';
+      } else if (g.tiene_pendiente) {
+        g.estado = 'pendiente';
+      }
     });
 
     const groupedArr = Object.values(grouped);
@@ -297,18 +374,18 @@
       }
       if (memIdFiltro && p.membresia_id?._id !== memIdFiltro) return false;
       if (estado && p.estado !== estado) return false;
-      if (metodo && p.metodo_pago !== metodo) return false;
+      if (metodo && p.ultimo_metodo !== metodo) return false;
       if (plan && p.plan_nombre !== plan) return false;
       if (tipo === 'completo' && p.es_abono) return false;
       if (tipo === 'abono' && !p.es_abono) return false;
-      if (p.monto < min || p.monto > max) return false;
-      if (from && p.fecha_pago) {
-        if (new Date(p.fecha_pago) < new Date(from)) return false;
+      if (p.total_pagado < min || p.total_pagado > max) return false;
+      if (from && p.ultimo_pago) {
+        if (new Date(p.ultimo_pago) < new Date(from)) return false;
       }
-      if (to && p.fecha_pago) {
+      if (to && p.ultimo_pago) {
         const toDate = new Date(to);
         toDate.setHours(23, 59, 59);
-        if (new Date(p.fecha_pago) > toDate) return false;
+        if (new Date(p.ultimo_pago) > toDate) return false;
       }
       return true;
     });
@@ -593,6 +670,7 @@
   window.loadPagos         = loadPagos;
   window.refreshTable      = refreshTable;
   window.exportarPagos     = exportarPagos;
+  window.toggleAdvancedFilters = toggleAdvancedFilters;
   window.abrirConfirmar    = abrirConfirmar;
   window.confirmarPago     = confirmarPago;
   window.deletePago        = deletePago;

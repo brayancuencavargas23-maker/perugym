@@ -18,7 +18,7 @@ app.use(helmet({
       scriptSrcAttr: ["'unsafe-inline'"],                // onclick/onchange/etc. en atributos HTML
       styleSrc:      ["'self'", "'unsafe-inline'"],
       imgSrc:        ["'self'", "data:", "https://res.cloudinary.com", "blob:"],
-      connectSrc:    ["'self'"],
+      connectSrc:    ["'self'", "https://cdn.jsdelivr.net"],
       fontSrc:       ["'self'", "data:"],
     },
   },

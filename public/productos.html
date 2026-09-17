@@ -28,30 +28,64 @@
 
       <!-- ── PRODUCTOS ── -->
       <div id="section-products">
-        <div class="search-bar">
-          <div class="search-input-wrap">
-            <span class="search-icon" id="icon-search-prod"></span>
-            <input type="text" id="search-prod" class="form-control" placeholder="Buscar producto...">
+      <!-- Filtros -->
+      <div class="card" style="margin-bottom:16px;padding:16px">
+        <!-- Fila 1: Buscar producto -->
+        <div style="margin-bottom:12px">
+          <div style="position:relative;max-width:400px;width:100%">
+            <span class="search-icon" id="icon-search-prod" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-light)"></span>
+            <input type="text" id="search-prod" class="form-control" style="padding-left:36px" placeholder="Buscar producto...">
           </div>
-          <select id="filter-cat" class="form-control" style="width:160px">
-            <option value="">Todas las categorías</option>
-          </select>
-          <select id="filter-active-prod" class="form-control" style="width:130px">
-            <option value="">Todos</option>
-            <option value="true">Activos</option>
-            <option value="false">Inactivos</option>
-          </select>
-          <select id="filter-stock" class="form-control" style="width:150px">
-            <option value="">Stock</option>
-            <option value="bajo">Stock bajo (≤5)</option>
-            <option value="agotado">Agotado (0)</option>
-            <option value="ok">Stock OK (>5)</option>
-          </select>
-          <input type="number" id="filter-precio-min" class="form-control" style="width:120px" placeholder="Precio mín" min="0" step="0.01">
-          <input type="number" id="filter-precio-max" class="form-control" style="width:120px" placeholder="Precio máx" min="0" step="0.01">
+        </div>
+
+        <!-- Fila 2: Categoría + Estado + Stock -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+          <div class="form-group" style="margin:0;flex:1;min-width:150px">
+            <label style="font-size:12px">Categoría</label>
+            <select id="filter-cat" class="form-control">
+              <option value="">Todas las categorías</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:130px">
+            <label style="font-size:12px">Estado</label>
+            <select id="filter-active-prod" class="form-control">
+              <option value="">Todos</option>
+              <option value="true">Activos</option>
+              <option value="false">Inactivos</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:140px">
+            <label style="font-size:12px">Stock</label>
+            <select id="filter-stock" class="form-control">
+              <option value="">Todos</option>
+              <option value="bajo">Stock bajo (≤5)</option>
+              <option value="agotado">Agotado (0)</option>
+              <option value="ok">Stock OK (>5)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Fila 3: Precio mín/máx (avanzado) -->
+        <div id="advanced-filters" style="display:none;margin-bottom:12px">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+            <div class="form-group" style="margin:0;flex:1;min-width:120px">
+              <label style="font-size:12px">Precio mínimo</label>
+              <input type="number" id="filter-precio-min" class="form-control" placeholder="S/ 0" min="0" step="0.01">
+            </div>
+            <div class="form-group" style="margin:0;flex:1;min-width:120px">
+              <label style="font-size:12px">Precio máximo</label>
+              <input type="number" id="filter-precio-max" class="form-control" placeholder="S/ 999" min="0" step="0.01">
+            </div>
+          </div>
+        </div>
+
+        <!-- Fila 4: Botones -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <button class="btn btn-primary" id="btn-new-prod" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-plus-prod"></span> Nuevo Producto</button>
           <button class="btn btn-success" onclick="exportarStock()" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-excel-stock"></span> Exportar Stock</button>
+          <button class="btn btn-outline" onclick="document.getElementById('advanced-filters').style.display = document.getElementById('advanced-filters').style.display === 'none' ? 'block' : 'none'" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-filter-prod"></span> Filtros avanzados</button>
         </div>
+      </div>
         <div class="card">
           <div class="table-wrapper">
             <table>
@@ -340,6 +374,7 @@
       'icon-plus-prod':         icon('plus'),
       'icon-camera-prod':       icon('camera'),
       'icon-excel-stock':       icon('excel'),
+      'icon-filter-prod':       icon('filter'),
     };
     Object.entries(iconMap).forEach(([id, html]) => {
       const el = document.getElementById(id);
