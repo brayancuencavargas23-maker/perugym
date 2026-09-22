@@ -95,6 +95,7 @@ app.use('/api/dashboard',    require('./routes/dashboard'));
 app.use('/api/reports',      require('./routes/reports'));
 app.use('/api/landing',      require('./routes/landing'));
 app.use('/api/solicitudes',  require('./routes/solicitudes'));
+app.use('/api/agente',       require('./routes/agente'));
 
 // SPA fallback
 app.get('*', (req, res) => {

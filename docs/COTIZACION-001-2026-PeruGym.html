@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cotización #001-2026 — PeruGym</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: #1a1a2e;
+      background: #f5f5f5;
+    }
+
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      background: #fff;
+      padding: 32px 40px 40px 40px;
+      position: relative;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 3px solid #e63946;
+      padding-bottom: 18px;
+      margin-bottom: 28px;
+    }
+
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #e63946, #c1121f);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: white;
+    }
+
+    .logo-text {
+      line-height: 1.2;
+    }
+
+    .logo-text strong {
+      font-size: 20px;
+      font-weight: 700;
+      color: #e63946;
+      letter-spacing: 1px;
+    }
+
+    .logo-text span {
+      display: block;
+      font-size: 11px;
+      color: #666;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+    }
+
+    .doc-title {
+      text-align: right;
+    }
+
+    .doc-title h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #1a1a2e;
+      letter-spacing: -0.5px;
+    }
+
+    .doc-title .fecha {
+      font-size: 12px;
+      color: #888;
+      margin-top: 4px;
+    }
+
+    /* ── BANNER ── */
+    .banner {
+      background: linear-gradient(135deg, #1a1a2e, #2d2d5e);
+      color: white;
+      text-align: center;
+      padding: 20px 30px;
+      border-radius: 10px;
+      margin-bottom: 28px;
+    }
+
+    .banner h2 {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      line-height: 1.5;
+    }
+
+    /* ── SECCIONES ── */
+    .section {
+      margin-bottom: 26px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #e63946;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-left: 4px solid #e63946;
+      padding-left: 10px;
+      margin-bottom: 12px;
+    }
+
+    .section-subtitle {
+      font-size: 11px;
+      font-weight: 700;
+      color: #1a1a2e;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin: 14px 0 8px 0;
+    }
+
+    p, li {
+      font-size: 12.5px;
+      line-height: 1.7;
+      color: #333;
+    }
+
+    ul {
+      padding-left: 18px;
+      margin: 6px 0;
+    }
+
+    ul li {
+      margin-bottom: 3px;
+    }
+
+    /* ── TABLAS ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 16px 0;
+      font-size: 12px;
+    }
+
+    thead th {
+      background: #1a1a2e;
+      color: white;
+      padding: 10px 12px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+    }
+
+    thead th:first-child { border-radius: 6px 0 0 0; }
+    thead th:last-child  { border-radius: 0 6px 0 0; }
+
+    tbody tr:nth-child(even) { background: #f8f9ff; }
+    tbody tr:nth-child(odd)  { background: #fff; }
+
+    tbody td {
+      padding: 9px 12px;
+      border-bottom: 1px solid #eee;
+      vertical-align: top;
+      line-height: 1.6;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+
+    .num-col {
+      width: 36px;
+      text-align: center;
+      font-weight: 600;
+      color: #e63946;
+    }
+
+    .mod-col { width: 170px; font-weight: 600; color: #1a1a2e; }
+
+    /* ── TABLA PRECIOS ── */
+    .price-table thead th { background: #e63946; }
+
+    .price-table .total-row td {
+      font-weight: 700;
+      background: #1a1a2e !important;
+      color: white;
+      font-size: 13px;
+    }
+
+    /* ── TABLA INFRA ── */
+    .infra-table .cost-col { width: 120px; text-align: right; font-weight: 600; color: #2a7d4f; }
+    .infra-table .note-col { font-size: 11px; color: #666; }
+
+    /* ── BADGES ── */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+    .badge-red   { background: #fee2e2; color: #c1121f; }
+    .badge-blue  { background: #dbeafe; color: #1d4ed8; }
+    .badge-green { background: #d1fae5; color: #065f46; }
+    .badge-gray  { background: #f3f4f6; color: #374151; }
+
+    /* ── PAGO ── */
+    .pago-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 12px 0;
+    }
+
+    .pago-card {
+      border: 2px solid #eee;
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .pago-card .pct {
+      font-size: 28px;
+      font-weight: 700;
+      color: #e63946;
+      line-height: 1;
+    }
+
+    .pago-card .label {
+      font-size: 11px;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    .pago-card .entregable {
+      font-size: 11px;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin-top: 6px;
+    }
+
+    .pago-card .plazo {
+      font-size: 10px;
+      color: #999;
+      margin-top: 2px;
+    }
+
+    /* ── EQUIPO ── */
+    .equipo-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin: 10px 0;
+    }
+
+    .equipo-card {
+      border: 1px solid #eee;
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .equipo-card .rol {
+      font-weight: 700;
+      font-size: 12px;
+      color: #1a1a2e;
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .equipo-card .rol::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: #e63946;
+      border-radius: 50%;
+    }
+
+    .equipo-card ul {
+      padding-left: 14px;
+    }
+
+    .equipo-card li {
+      font-size: 11px;
+      color: #555;
+      margin-bottom: 2px;
+    }
+
+    /* ── CLAUSULAS ── */
+    .clausula {
+      margin-bottom: 14px;
+    }
+
+    .clausula h4 {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── STACK TÉCNICO ── */
+    .stack-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin: 10px 0;
+    }
+
+    .stack-card {
+      background: #f8f9ff;
+      border-radius: 8px;
+      padding: 11px;
+      border-left: 3px solid #e63946;
+    }
+
+    .stack-card .stack-label {
+      font-size: 10px;
+      color: #888;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stack-card .stack-val {
+      font-size: 12px;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-top: 3px;
+    }
+
+    /* ── TOTAL BOX ── */
+    .total-box {
+      background: linear-gradient(135deg, #1a1a2e, #2d2d5e);
+      color: white;
+      border-radius: 10px;
+      padding: 20px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 14px 0;
+    }
+
+    .total-box .concept {
+      font-size: 12px;
+      font-weight: 500;
+      max-width: 380px;
+      line-height: 1.5;
+    }
+
+    .total-box .monto {
+      text-align: right;
+    }
+
+    .total-box .monto .valor {
+      font-size: 26px;
+      font-weight: 700;
+      color: #ffd166;
+      line-height: 1;
+    }
+
+    .total-box .monto .igv-note {
+      font-size: 10px;
+      color: #aaa;
+      margin-top: 3px;
+    }
+
+    /* ── VALIDEZ ── */
+    .validez-box {
+      background: #fff8f0;
+      border: 1px solid #ffd166;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 12px;
+      color: #7c5b1a;
+      font-weight: 500;
+    }
+
+    /* ── FOOTER ── */
+    .footer {
+      border-top: 2px solid #eee;
+      padding-top: 14px;
+      margin-top: 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .footer .contact {
+      font-size: 11px;
+      color: #888;
+      line-height: 1.7;
+    }
+
+    .footer .contact strong { color: #1a1a2e; }
+
+    .footer .firm-area {
+      text-align: center;
+    }
+
+    .footer .firm-area .line {
+      width: 180px;
+      border-top: 1px solid #ccc;
+      margin: 0 auto 4px auto;
+    }
+
+    .footer .firm-area p {
+      font-size: 10.5px;
+      color: #666;
+    }
+
+    /* ── PRINT ── */
+    @media print {
+      body { background: white; }
+      .page { margin: 0; padding: 20px 28px; }
+    }
+
+    @page {
+      size: A4;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- ══════════════════════════════════ HEADER ══════════════════════════════════ -->
+  <div class="header">
+    <div class="logo-area">
+      <div class="logo-text">
+        <strong>DCPROYECTOS</strong>
+      </div>
+    </div>
+    <div class="doc-title">
+      <h1>COTIZACIÓN #001-2026</h1>
+      <div class="fecha">FECHA: 01/09/2026</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════ BANNER ══════════════════════════════════ -->
+  <div class="banner">
+    <h2>"CONTRATACIÓN DEL SERVICIO DE DESARROLLO, IMPLEMENTACIÓN Y DESPLIEGUE<br>
+    DEL SISTEMA WEB DE GESTIÓN INTEGRAL PARA GIMNASIO — PERUGYM"</h2>
+  </div>
+
+  <!-- ══════════════════════════════════ 1. OBJETO ══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">1. Objeto de la Contratación</div>
+
+    <div class="section-subtitle">1.1. Objetivo General</div>
+    <p>Contratar el servicio de desarrollo, implementación y puesta en producción de <strong>PeruGym</strong>, un sistema web completo para la gestión integral de gimnasios, que permite administrar miembros, membresías, pagos, asistencia, productos, caja, entrenadores, clases grupales y reportes desde un panel de administración centralizado con landing page pública.</p>
+
+    <div class="section-subtitle">1.2. Objetivos Específicos</div>
+    <ul>
+      <li>Centralizar la gestión operativa del gimnasio en una única plataforma web.</li>
+      <li>Automatizar el control de membresías y alertas de vencimiento.</li>
+      <li>Implementar un módulo de caja con apertura, cierre y registro de ventas en tiempo real.</li>
+      <li>Proveer una landing page pública con planes dinámicos editables desde el panel.</li>
+      <li>Generar reportes exportables en Excel y PDF (pagos, miembros, asistencia).</li>
+      <li>Soportar múltiples roles de usuario con permisos diferenciados.</li>
+      <li>Garantizar despliegue en la nube con alta disponibilidad y diseño responsive.</li>
+    </ul>
+  </div>
+
+  <!-- ══════════════════════════════════ 2. DESCRIPCIÓN ══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">2. Descripción y Alcance del Servicio</div>
+
+    <div class="section-subtitle">2.1. Descripción del Servicio</div>
+    <p>El servicio comprende el diseño, desarrollo e implementación de un sistema web para gimnasios que incluye:</p>
+    <ul>
+      <li>Panel de administración privado multiusuario con control de roles</li>
+      <li>Gestión completa de miembros y membresías</li>
+      <li>Control de caja y ventas de productos</li>
+      <li>Registro de asistencia con check-in y check-out</li>
+      <li>Módulo de reportes con exportación Excel/PDF</li>
+      <li>Landing page pública editable desde el panel</li>
+      <li>Integración con API RENIEC para validación de DNI</li>
+    </ul>
+    <p style="margin-top:8px;">El sistema es multiusuario con los siguientes actores: <strong>Administrador, Recepcionista, Entrenador</strong>.</p>
+
+    <div class="section-subtitle">2.2. Alcance del Servicio — Módulos</div>
+
+    <table>
+      <thead>
+        <tr>
+          <th class="num-col">N°</th>
+          <th class="mod-col">Módulo</th>
+          <th>Detalle</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="num-col">1</td>
+          <td class="mod-col">Gestión de Miembros</td>
+          <td>
+            Registro y edición de miembros · Foto de perfil (Cloudinary o local) ·
+            Filtros por estado, plan y vencimiento · Búsqueda por nombre/email ·
+            Paginación · Integración con API RENIEC (DNI)
+          </td>
+        </tr>
+        <tr>
+          <td class="num-col">2</td>
+          <td class="mod-col">Planes y Membresías</td>
+          <td>
+            CRUD de planes · Precio, duración en días, beneficios ·
+            Toggle "Mostrar en landing" y "Más Popular" ·
+            Alertas automáticas de membresías por vencer (≤ 7 días)
+          </td>
+        </tr>
+        <tr>
+          <td class="num-col">3</td>
+          <td class="mod-col">Gestión de Pagos</td>
+          <td>
+            Registro de pagos por miembro · Autocompletado del monto según plan ·
+            Filtros por estado (pagado/pendiente) y rango de fechas · Historial paginado
+          </td>
+        </tr>
+        <tr>
+          <td class="num-col">4</td>
+          <td class="mod-col">Control de Asistencia</td>
+          <td>
+            Check-in rápido por miembro · Check-out individual o por miembro ·
+            Cálculo automático de duración de visita · Filtros por fecha/rango
+          </td>
+        </tr>
+        <tr>
+          <td class="num-col">5</td>
+          <td class="mod-col">Módulo de Caja</td>
+          <td>
+            Apertura y cierre de turno · Registro de ventas en tiempo real ·
+            Métodos de pago: efectivo, Yape, Plin, transferencia ·
+            Ingresos/egresos manuales · Historial de cajas · Descuento automático de stock
+          </td>
+        </tr>
+        <tr>
+          <td class="num-col">6</td>
+          <td class="mod-col">Gestión de Productos</td>
+          <td>
+            CRUD de productos con foto y categoría · Control de stock con alerta ≤ 5 ·
+            Historial de ventas con filtros por fecha · Venta rápida desde tabla
+          </td>
+        </tr>
+        <tr>
+          <td class="num-col">7</td>
+          <td class="mod-col">Entrenadores y Clases</td>
+          <td>
+            CRUD de entrenadores (foto, especialidades) ·
+            CRUD de clases grupales (día, horario, capacidad) ·
+            Asignación de entrenador a clase
+          </td>
+        </tr>
+        <tr>
+          <td class="num-col">8</td>
+          <td class="mod-col">Dashboard</td>
+          <td>
+            Miembros activos · Ingresos del mes · Asistencia del día ·
+            Pagos pendientes · Membresías por vencer ·
+            Gráfico de miembros por plan · Últimos 5 pagos
+          </td>
+        </tr>
+        <tr>
+          <td class="num-col">9</td>
+          <td class="mod-col">Reportes</td>
+          <td>
+            Exportación de pagos en Excel y PDF ·
+            Exportación de miembros en Excel ·
+            Exportación de asistencia en Excel · Filtros por rango de fechas
+          </td>
+        </tr>
+        <tr>
+          <td class="num-col">10</td>
+          <td class="mod-col">Landing Page Pública</td>
+          <td>
+            Página pública con planes dinámicos desde la BD ·
+            Secciones: Hero, Características, Sobre Nosotros, Planes, Footer ·
+            Diseño responsive mobile-first
+          </td>
+        </tr>
+        <tr>
+          <td class="num-col">11</td>
+          <td class="mod-col">Roles y Usuarios</td>
+          <td>
+            Administrador (acceso total) · Recepcionista (miembros, pagos, asistencia, ventas) ·
+            Entrenador (vista de miembros, asistencia, clases propias) ·
+            Gestión de contraseñas y asignación de roles
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="section-subtitle">2.3. Alcance Técnico</div>
+
+    <div class="stack-grid">
+      <div class="stack-card">
+        <div class="stack-label">Backend</div>
+        <div class="stack-val">Node.js + Express</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-label">Frontend</div>
+        <div class="stack-val">HTML + CSS + JS Vanilla</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-label">Base de Datos</div>
+        <div class="stack-val">MongoDB (Mongoose)</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-label">Autenticación</div>
+        <div class="stack-val">JWT + bcryptjs</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-label">Almacenamiento</div>
+        <div class="stack-val">Cloudinary / Local</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-label">Despliegue</div>
+        <div class="stack-val">Netlify Functions</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-label">Reportes</div>
+        <div class="stack-val">ExcelJS + PDFKit</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-label">Seguridad</div>
+        <div class="stack-val">Helmet + Rate Limiting</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-label">Integración</div>
+        <div class="stack-val">API RENIEC (DNI)</div>
+      </div>
+    </div>
+
+    <div class="section-subtitle">2.4. Alcance Operativo</div>
+    <ul>
+      <li>Diseño responsive mobile-first (móvil, tablet y desktop)</li>
+      <li>Validaciones en tiempo real y manejo de estados complejos</li>
+      <li>Auditoría de acciones por usuario</li>
+      <li>Despliegue serverless en Netlify con base de datos en MongoDB Atlas</li>
+      <li>Alta disponibilidad mediante arquitectura en la nube</li>
+    </ul>
+
+    <p style="margin-top:8px; font-size:11.5px; color:#e63946; font-weight:600;">
+      ⚠️ No se incluyen: integraciones con sistemas contables externos, aplicaciones móviles nativas, hardware de punto de venta.
+    </p>
+  </div>
+
+  <!-- ══════════════════════════════════ 3. INFRAESTRUCTURA ══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">3. Infraestructura de Despliegue en la Nube</div>
+    <p>Los costos de infraestructura son responsabilidad del cliente una vez entregado el sistema. A continuación se detallan los servicios recomendados con sus precios referenciales:</p>
+
+    <table class="infra-table" style="margin-top:12px;">
+      <thead>
+        <tr>
+          <th class="num-col">#</th>
+          <th>Servicio</th>
+          <th>Plan</th>
+          <th>Detalle</th>
+          <th class="cost-col" style="text-align:right;">Costo Referencial</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="num-col">1</td>
+          <td><strong>MongoDB Atlas</strong><br><span class="badge badge-green">Base de Datos</span></td>
+          <td><strong>Flex</strong></td>
+          <td class="note-col">
+            Hasta 5 GB almacenamiento · RAM compartida · vCPU compartida ·
+            Escalado automático · Para desarrollo, prueba y producción inicial
+          </td>
+          <td class="cost-col">$0.011/hora<br><span style="font-size:10px;color:#888;">Hasta $30/mes</span></td>
+        </tr>
+        <tr>
+          <td class="num-col">2</td>
+          <td><strong>Netlify</strong><br><span class="badge badge-blue">Hosting + Functions</span></td>
+          <td><strong>Starter (Free)</strong></td>
+          <td class="note-col">
+            100 GB de banda ancha/mes · 125,000 invocaciones de funciones ·
+            SSL/TLS automático · Despliegue continuo desde Git · CDN global
+          </td>
+          <td class="cost-col"><strong style="color:#2a7d4f;">$0/mes</strong></td>
+        </tr>
+        <tr>
+          <td class="num-col">3</td>
+          <td><strong>Cloudinary</strong><br><span class="badge badge-gray">Almacenamiento de Imágenes</span></td>
+          <td><strong>Free Tier</strong></td>
+          <td class="note-col">
+            25 créditos/mes · 25 GB de almacenamiento de imágenes ·
+            25 GB de ancho de banda · Transformaciones de imágenes incluidas
+          </td>
+          <td class="cost-col"><strong style="color:#2a7d4f;">$0/mes</strong></td>
+        </tr>
+        <tr>
+          <td class="num-col">4</td>
+          <td><strong>API RENIEC</strong><br><span class="badge badge-red">Integración DNI</span></td>
+          <td><strong>Básico (decolecta.com)</strong></td>
+          <td class="note-col">
+            Consulta de datos personales por DNI en tiempo real ·
+            Precio estimado según consumo mensual del cliente
+          </td>
+          <td class="cost-col">~$5–$15/mes</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p style="font-size:11px; color:#666; margin-top:6px;">
+      * Los precios de infraestructura son referenciales y pueden variar según el proveedor. El costo mensual total estimado de infraestructura oscila entre <strong>$0 y $45/mes</strong> dependiendo del volumen de uso.
+    </p>
+  </div>
+
+  <!-- ══════════════════════════════════ 4. ENTREGABLES ══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">4. Entregables</div>
+    <p>Dentro de los 5 días calendario siguientes a la aprobación de la cotización se presentará: Plan de trabajo, cronograma detallado y acta de inicio.</p>
+
+    <table style="margin-top:12px;">
+      <thead>
+        <tr>
+          <th style="width:110px;">Entregable</th>
+          <th style="width:130px;">Plazo</th>
+          <th>Descripción</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Entregable 1</strong></td>
+          <td>Hasta 30 días calendario</td>
+          <td>
+            Levantamiento de información · Diseño funcional y UX/UI ·
+            Arquitectura del sistema · Modelo de datos MongoDB · Prototipos aprobados
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Entregable 2</strong></td>
+          <td>Hasta 90 días calendario</td>
+          <td>
+            Actas de reuniones firmadas ·
+            Desarrollo e implementación de todos los módulos del sistema ·
+            Integración de servicios en la nube (MongoDB Atlas, Cloudinary, API RENIEC)
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Entregable 3</strong></td>
+          <td>Hasta 120 días calendario</td>
+          <td>
+            Pruebas integrales y de regresión · Manuales de usuario y técnico ·
+            Capacitaciones funcional y técnica · Despliegue en producción (Netlify + Atlas)
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="section-subtitle">4.1. Componentes de Trabajo</div>
+    <table>
+      <thead>
+        <tr>
+          <th class="num-col">N°</th>
+          <th>Componente</th>
+          <th>Descripción</th>
+          <th style="width:70px; text-align:center;">Entregable</th>
+          <th style="width:60px; text-align:center;">Medio</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="num-col">1</td>
+          <td><strong>Plan de Gestión</strong></td>
+          <td>Plan de trabajo, cronograma MS Project, acta de inicio</td>
+          <td style="text-align:center;"><span class="badge badge-blue">E1</span></td>
+          <td style="text-align:center;"><span class="badge badge-gray">Digital</span></td>
+        </tr>
+        <tr>
+          <td class="num-col">2</td>
+          <td><strong>Actas de Reunión</strong></td>
+          <td>Actas de todas las reuniones del proyecto</td>
+          <td style="text-align:center;"><span class="badge badge-blue">E1–E3</span></td>
+          <td style="text-align:center;"><span class="badge badge-gray">Digital</span></td>
+        </tr>
+        <tr>
+          <td class="num-col">3</td>
+          <td><strong>Diseño y Arquitectura</strong></td>
+          <td>Documento de arquitectura, modelo de datos, integraciones, diagrama de clases</td>
+          <td style="text-align:center;"><span class="badge badge-blue">E1–E2</span></td>
+          <td style="text-align:center;"><span class="badge badge-gray">Digital</span></td>
+        </tr>
+        <tr>
+          <td class="num-col">4</td>
+          <td><strong>Código Fuente</strong></td>
+          <td>Repositorio completo: backend Node.js, frontend HTML/CSS/JS, Netlify Functions</td>
+          <td style="text-align:center;"><span class="badge badge-green">E3</span></td>
+          <td style="text-align:center;"><span class="badge badge-gray">Digital</span></td>
+        </tr>
+        <tr>
+          <td class="num-col">5</td>
+          <td><strong>Scripts BD</strong></td>
+          <td>Scripts de colecciones MongoDB, índices, seeds iniciales y configuraciones</td>
+          <td style="text-align:center;"><span class="badge badge-green">E3</span></td>
+          <td style="text-align:center;"><span class="badge badge-gray">Digital</span></td>
+        </tr>
+        <tr>
+          <td class="num-col">6</td>
+          <td><strong>Manual de Usuario</strong></td>
+          <td>Manual por perfil (Administrador, Recepcionista, Entrenador)</td>
+          <td style="text-align:center;"><span class="badge badge-green">E2–E3</span></td>
+          <td style="text-align:center;"><span class="badge badge-gray">Digital</span></td>
+        </tr>
+        <tr>
+          <td class="num-col">7</td>
+          <td><strong>Manual Técnico</strong></td>
+          <td>Guía de instalación, configuración de variables de entorno, proceso de despliegue y marcha atrás</td>
+          <td style="text-align:center;"><span class="badge badge-green">E3</span></td>
+          <td style="text-align:center;"><span class="badge badge-gray">Digital</span></td>
+        </tr>
+        <tr>
+          <td class="num-col">8</td>
+          <td><strong>Plan e Informe de Pruebas</strong></td>
+          <td>Casos de prueba funcionales y no funcionales · Informe de ejecución · Actas de pruebas con usuario</td>
+          <td style="text-align:center;"><span class="badge badge-green">E3</span></td>
+          <td style="text-align:center;"><span class="badge badge-gray">Digital</span></td>
+        </tr>
+        <tr>
+          <td class="num-col">9</td>
+          <td><strong>Acta de Conformidad</strong></td>
+          <td>Acta de conformidad general del servicio firmada por el cliente</td>
+          <td style="text-align:center;"><span class="badge badge-green">E3</span></td>
+          <td style="text-align:center;"><span class="badge badge-gray">Digital</span></td>
+        </tr>
+        <tr>
+          <td class="num-col">10</td>
+          <td><strong>Acta de Capacitación</strong></td>
+          <td>Capacitación funcional (usuarios) y técnica (equipo IT del cliente)</td>
+          <td style="text-align:center;"><span class="badge badge-green">E3</span></td>
+          <td style="text-align:center;"><span class="badge badge-gray">Digital</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ══════════════════════════════════ 5. EQUIPO ══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">5. Equipo de Trabajo Propuesto</div>
+    <div class="equipo-grid">
+      <div class="equipo-card">
+        <div class="rol">Coordinador(a) de Proyecto</div>
+        <ul>
+          <li>Gestión integral del proyecto</li>
+          <li>Control de alcance, tiempo y entregables</li>
+          <li>Coordinación con el cliente</li>
+          <li>Gestión de riesgos y validación funcional</li>
+        </ul>
+      </div>
+      <div class="equipo-card">
+        <div class="rol">Diseñador UX/UI</div>
+        <ul>
+          <li>Prototipos y mockups del sistema</li>
+          <li>Diseño responsive mobile-first</li>
+          <li>Consistencia visual del panel y landing</li>
+          <li>Optimización de flujos de usuario</li>
+        </ul>
+      </div>
+      <div class="equipo-card">
+        <div class="rol">Desarrollador Backend</div>
+        <ul>
+          <li>API REST en Node.js + Express</li>
+          <li>Modelos MongoDB (Mongoose)</li>
+          <li>Módulo de caja, reportes y asistencia</li>
+          <li>Integración Cloudinary y API RENIEC</li>
+          <li>Seguridad: JWT, Helmet, Rate Limiting</li>
+        </ul>
+      </div>
+      <div class="equipo-card">
+        <div class="rol">Desarrollador Frontend</div>
+        <ul>
+          <li>Panel de administración HTML/CSS/JS</li>
+          <li>Landing page pública dinámica</li>
+          <li>Diseño responsive (Flexbox + CSS Grid)</li>
+          <li>Integración con endpoints de la API</li>
+        </ul>
+      </div>
+      <div class="equipo-card">
+        <div class="rol">Especialista QA</div>
+        <ul>
+          <li>Diseño de casos de prueba funcionales</li>
+          <li>Pruebas de integración y regresión</li>
+          <li>Validación de reglas de negocio</li>
+          <li>Aseguramiento de calidad por entregable</li>
+        </ul>
+      </div>
+      <div class="equipo-card">
+        <div class="rol">DevOps / Despliegue</div>
+        <ul>
+          <li>Configuración de Netlify y Functions</li>
+          <li>Setup de MongoDB Atlas y variables de entorno</li>
+          <li>Configuración de Cloudinary en producción</li>
+          <li>Documentación del proceso de despliegue</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════ 6. PLAZO ══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">6. Plazo y Modalidad</div>
+    <p>El servicio será prestado a partir del día siguiente a la notificación de la cotización aprobada y deberá culminar en un plazo máximo de <strong>120 días calendario</strong>.</p>
+    <p style="margin-top:6px;"><strong>Modalidad:</strong> Remoto</p>
+
+    <table style="margin-top:12px; width:60%;">
+      <thead>
+        <tr>
+          <th>Entregable</th>
+          <th>Plazo desde aprobación</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Entregable 1</strong></td>
+          <td>Hasta 30 días calendario</td>
+        </tr>
+        <tr>
+          <td><strong>Entregable 2</strong></td>
+          <td>Hasta 90 días calendario</td>
+        </tr>
+        <tr>
+          <td><strong>Entregable 3</strong></td>
+          <td>Hasta 120 días calendario</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ══════════════════════════════════ 7. INVERSIÓN ══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">7. Inversión</div>
+
+    <table class="price-table">
+      <thead>
+        <tr>
+          <th>Concepto</th>
+          <th style="width:140px; text-align:right;">Monto (S/)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <strong>Servicio de Desarrollo e Implementación — PeruGym</strong><br>
+            <span style="font-size:11px; color:#666;">
+              Incluye: diseño UX/UI, desarrollo backend y frontend, módulos completos,
+              pruebas, manuales, capacitaciones y despliegue en producción.
+            </span>
+          </td>
+          <td style="text-align:right; font-weight:700;">S/ 3 500.00</td>
+        </tr>
+        <tr>
+          <td>
+            <strong>Configuración e Integración de Infraestructura en la Nube</strong><br>
+            <span style="font-size:11px; color:#666;">
+              Setup de MongoDB Atlas Flex, Netlify, Cloudinary y API RENIEC.
+              Incluye configuración inicial y documentación de variables de entorno.
+            </span>
+          </td>
+          <td style="text-align:right; font-weight:700;">S/ 500.00</td>
+        </tr>
+        <tr>
+          <td>
+            <strong>Diseño Responsive Mobile-First</strong><br>
+            <span style="font-size:11px; color:#666;">
+              Implementación del diseño adaptable para móvil (&lt;480px), tablet (768px) y
+              desktop (1024px+) en todas las vistas del panel y la landing page.
+            </span>
+          </td>
+          <td style="text-align:right; font-weight:700;">S/ 500.00</td>
+        </tr>
+        <tr class="total-row">
+          <td style="font-weight:700; font-size:13px;">TOTAL</td>
+          <td style="text-align:right; font-weight:700; font-size:15px;">S/ 4 500.00</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p style="font-size:11px; color:#888; margin-top:6px;">
+      * Los montos no incluyen IGV. La infraestructura en la nube (MongoDB Atlas Flex ~$0.011/hora, Netlify Free, Cloudinary Free) corre por cuenta del cliente una vez entregado el sistema.
+    </p>
+  </div>
+
+  <!-- ══════════════════════════════════ 8. FORMA DE PAGO ══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">8. Forma de Pago</div>
+    <div class="pago-grid">
+      <div class="pago-card">
+        <div class="pct">30%</div>
+        <div class="label">S/ 1 350.00</div>
+        <div class="entregable">Entregable 1</div>
+        <div class="plazo">Hasta 1 día después de aprobación del entregable</div>
+      </div>
+      <div class="pago-card">
+        <div class="pct">40%</div>
+        <div class="label">S/ 1 800.00</div>
+        <div class="entregable">Entregable 2</div>
+        <div class="plazo">Hasta 1 día después de aprobación del entregable</div>
+      </div>
+      <div class="pago-card">
+        <div class="pct">30%</div>
+        <div class="label">S/ 1 350.00</div>
+        <div class="entregable">Entregable 3</div>
+        <div class="plazo">Hasta 1 día después de aprobación del entregable</div>
+      </div>
+    </div>
+    <p style="font-size:11.5px; color:#555;">
+      El servicio será facturado por entregables. Cada factura se emitirá una vez aprobado
+      el entregable correspondiente, sin importar el día del mes. Los montos no incluyen IGV.
+    </p>
+  </div>
+
+  <!-- ══════════════════════════════════ 9. CONFIDENCIALIDAD ══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">9. Acuerdo de Confidencialidad</div>
+    <p>El proveedor protegerá toda la información confidencial del cliente contra uso, difusión o divulgación no autorizada, comprometiéndose a:</p>
+    <ul style="margin-top:8px;">
+      <li>No divulgar información confidencial sin autorización expresa y escrita del cliente.</li>
+      <li>No utilizar la información confidencial para fines distintos al presente servicio.</li>
+      <li>No efectuar copias de la información y restringir el acceso solo al personal necesario.</li>
+      <li>Mantener la obligación de confidencialidad vigente luego del cumplimiento del servicio.</li>
+    </ul>
+  </div>
+
+  <!-- ══════════════════════════════════ 10. CLÁUSULAS ══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">10. Cláusulas</div>
+
+    <div class="clausula">
+      <h4>1. Cláusula de Control de Cambios</h4>
+      <p>Cualquier modificación a los módulos, flujos, reglas de negocio o comportamiento del sistema no definidos en el levantamiento inicial o en los entregables aprobados será considerado un cambio de alcance. Estos cambios deberán ser evaluados técnicamente, estimados en tiempo y costo, y aprobados formalmente. Su implementación estará sujeta a reprogramación del cronograma y emisión de una adenda.</p>
+    </div>
+
+    <div class="clausula">
+      <h4>2. Cláusula de Gestión de Tiempos y Dependencias</h4>
+      <p>El cumplimiento de los plazos está condicionado a la entrega oportuna de información, accesos y retroalimentación por parte del cliente. Cualquier retraso atribuible a demoras en validaciones, cambios solicitados o falta de definición implicará la reprogramación automática del cronograma sin penalidad para el proveedor.</p>
+    </div>
+
+    <div class="clausula">
+      <h4>3. Cláusula de Iteraciones y Validación</h4>
+      <p>Cada entregable será validado por el cliente en un plazo máximo de cinco (05) días hábiles. En caso de no existir observaciones dentro de dicho plazo, el entregable se considerará aprobado automáticamente. Las observaciones deberán estar alineadas al alcance aprobado y ser consolidadas en una única comunicación.</p>
+    </div>
+
+    <div class="clausula">
+      <h4>4. Cláusula de Alcance Funcional Cerrado</h4>
+      <p>El servicio comprende únicamente los módulos descritos en el presente documento. No se incluyen integraciones con sistemas contables externos, aplicaciones móviles nativas, hardware de punto de venta, ni funcionalidades no descritas explícitamente.</p>
+    </div>
+
+    <div class="clausula">
+      <h4>5. Cláusula de Disponibilidad y Performance</h4>
+      <p>El sistema será desarrollado bajo buenas prácticas para soportar la carga operativa típica de un gimnasio. El rendimiento final dependerá de la infraestructura contratada por el cliente (MongoDB Atlas Flex, Netlify). El proveedor no será responsable por problemas de rendimiento derivados de infraestructura insuficiente o fallas de servicios de terceros.</p>
+    </div>
+
+    <div class="clausula">
+      <h4>6. Cláusula de Garantía y Soporte</h4>
+      <p>El proveedor brindará un período de garantía de <strong>30 días</strong> posteriores a la conformidad final, durante el cual se atenderán errores o fallas atribuibles al desarrollo. No incluye nuevas funcionalidades, cambios en reglas ni mejoras evolutivas.</p>
+    </div>
+
+    <div class="clausula">
+      <h4>7. Cláusula de Pago y Suspensión</h4>
+      <p>El incumplimiento en los plazos de pago por parte del cliente facultará al proveedor a suspender temporalmente el servicio hasta la regularización correspondiente, sin afectar el cronograma contractual.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════ 11. VALIDEZ ══════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">11. Validez de la Oferta</div>
+    <div class="validez-box">
+      ⏳ Esta propuesta tiene un plazo de validez de <strong>15 días calendario</strong> a partir de la fecha de emisión (01/09/2026).
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════ FOOTER ══════════════════════════════════ -->
+  <div class="footer">
+    <div class="contact">
+      <strong>DC PROYECTOOS</strong><br>
+      Chiclayo – Perú | +51 950 254 106<br>
+      www.dc-proyectos.web.app<br>
+      Renato_Delgado@dc-proyectos.web.app
+    </div>
+    <div style="text-align:center; font-size:11px; color:#888;">
+      <p>Cotización N° 001-2026 · Fecha: 01/09/2026</p>
+      <p style="margin-top:4px; color:#ccc;">Documento generado por DC PROYECTOS</p>
+    </div>
+    <div class="firm-area">
+      <div style="height:40px;"></div>
+      <div class="line"></div>
+      <p>Firma y sello del proveedor</p>
+      <p style="margin-top:2px; font-weight:600;">DC PROYECTOS</p>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
