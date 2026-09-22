@@ -323,7 +323,94 @@ function requireAuth() {
     _redirectToLogin();
     return null;
   }
+  startSessionKeeper();
   return JSON.parse(localStorage.getItem('gym_user') || '{}');
+}
+
+// ── Sesión: renovación deslizante + aviso + cierre por inactividad ────────────
+const SESSION_REFRESH_MS = 10 * 60 * 1000; // renovar cuando falten < 10 min
+const SESSION_WARN_MS    = 2 * 60 * 1000;  // avisar si no se pudo renovar
+const IDLE_TIMEOUT_MS    = 60 * 60 * 1000; // logout a los 60 min sin usar
+const IDLE_WARN_MS       = 60 * 1000;      // aviso 1 min antes del logout
+
+function _sessionPayload() {
+  const token = localStorage.getItem('gym_token');
+  if (!token) return null;
+  try {
+    return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+  } catch { return null; }
+}
+
+function _sessionRemainingMs() {
+  const payload = _sessionPayload();
+  if (!payload || !payload.exp) return 0;
+  return payload.exp * 1000 - Date.now();
+}
+
+// Pide un token nuevo mientras el actual siga válido (renovación deslizante).
+async function _refreshSession() {
+  const token = localStorage.getItem('gym_token');
+  if (!token) return false;
+  try {
+    const res = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 401) { _redirectToLogin(); return false; }
+    if (!res.ok) return false; // error transitorio → se reintenta en el próximo tick
+    const data = await res.json();
+    localStorage.setItem('gym_token', data.token);
+    if (data.user) localStorage.setItem('gym_user', JSON.stringify(data.user));
+    return true;
+  } catch { return false; }
+}
+
+// Se inicia una sola vez por carga de página (requireAuth se llama en cada
+// navegación del SPA, así que el guard evita intervalos duplicados).
+function startSessionKeeper() {
+  if (window.__sessionKeeperStarted) return;
+  window.__sessionKeeperStarted = true;
+
+  // 1) Renovación deslizante + aviso de expiración
+  window.__sessionTick = setInterval(async () => {
+    if (!localStorage.getItem('gym_token')) return;
+    const remaining = _sessionRemainingMs();
+    if (remaining <= 0) { _redirectToLogin(); return; }
+    if (remaining <= SESSION_REFRESH_MS) {
+      const ok = await _refreshSession();
+      window.__sessionWarned = ok ? false : window.__sessionWarned;
+      if (!ok && !window.__sessionWarned && _sessionRemainingMs() <= SESSION_WARN_MS) {
+        window.__sessionWarned = true;
+        toast('Tu sesión está por vencer y no se pudo renovar. Guarda tu trabajo.', 'warning', 8000);
+      }
+    }
+  }, 60 * 1000);
+
+  // 2) Cierre por inactividad (importante en la PC compartida de recepción):
+  //    solo eventos del usuario cuentan como actividad, no las llamadas API.
+  let lastActivity = Date.now();
+  let idleWarned = false;
+  const markActivity = () => {
+    lastActivity = Date.now();
+    if (idleWarned) { idleWarned = false; window.__idleWarned = false; }
+  };
+  ['mousemove', 'keydown', 'click', 'wheel', 'touchstart', 'input'].forEach(ev => {
+    window.addEventListener(ev, markActivity, { passive: true });
+  });
+
+  window.__idleTick = setInterval(() => {
+    const idle = Date.now() - lastActivity;
+    if (idle >= IDLE_TIMEOUT_MS) {
+      toast('Sesión cerrada por inactividad.', 'warning');
+      if (typeof logout === 'function') logout(); else _redirectToLogin();
+      return;
+    }
+    if (idle >= IDLE_TIMEOUT_MS - IDLE_WARN_MS && !idleWarned) {
+      idleWarned = true;
+      window.__idleWarned = true;
+      toast('Tu sesión se cerrará por inactividad en 1 minuto. Mueve el mouse o escribe para continuar.', 'warning', 8000);
+    }
+  }, 15 * 1000);
 }
 
 // ── Protección contra bfcache ─────────────────────────────────────────────────

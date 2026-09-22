@@ -141,7 +141,7 @@ describe('Authentication Middleware', () => {
       expect(next).not.toHaveBeenCalled();
     });
 
-    it('should reject with 403 when token is invalid', async () => {
+    it('should reject with 401 when token is invalid', async () => {
       // Arrange
       const req = {
         headers: { authorization: 'Bearer invalid-token' }
@@ -155,9 +155,77 @@ describe('Authentication Middleware', () => {
       // Act
       await verifyToken(req, res, next);
 
-      // Assert
-      expect(res.status).toHaveBeenCalledWith(403);
+      // Assert (401, no 403: el cliente cierra sesión ante un 401)
+      expect(res.status).toHaveBeenCalledWith(401);
       expect(res.json).toHaveBeenCalledWith({ error: 'Token inválido o expirado' });
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('should reject with 401 when token is expired', async () => {
+      // Arrange: token ya vencido
+      const usuario = await createUsuario({ activo: true });
+      const token = jwt.sign(
+        { id: usuario._id, role: 'admin' },
+        process.env.JWT_SECRET || 'test-secret',
+        { expiresIn: '-1s' }
+      );
+
+      const req = { headers: { authorization: `Bearer ${token}` } };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+      const next = jest.fn();
+
+      // Act
+      await verifyToken(req, res, next);
+
+      // Assert: el cliente (api.js) debe recibir 401 para hacer logout
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Token inválido o expirado' });
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('should use fresh role from DB instead of stale token role', async () => {
+      // Arrange: token firmado como admin, pero en la BD el usuario es recepcionista
+      const usuario = await createUsuario({ activo: true, rol: 'recepcionista' });
+      const token = jwt.sign(
+        { id: usuario._id, role: 'admin', permisos: ['ventas'] },
+        process.env.JWT_SECRET || 'test-secret',
+        { expiresIn: '1h' }
+      );
+
+      const req = { headers: { authorization: `Bearer ${token}` } };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+      const next = jest.fn();
+
+      // Act
+      await verifyToken(req, res, next);
+
+      // Assert: los privilegios viejos del token no deben prevalecer
+      expect(next).toHaveBeenCalled();
+      expect(req.user.role).toBe('recepcionista');
+    });
+
+    it('should reject with 503 (not 401) on DB errors so the user is not logged out', async () => {
+      // Arrange: id que no es un ObjectId → findById lanza un CastError
+      const req = {
+        headers: { authorization: `Bearer ${jwt.sign({ id: 'no-es-objectid' }, process.env.JWT_SECRET || 'test-secret', { expiresIn: '1h' })}` }
+      };
+      const res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+      const next = jest.fn();
+
+      // Act
+      await verifyToken(req, res, next);
+
+      // Assert: un fallo transitorio de BD no debe expulsar al usuario
+      expect(res.status).toHaveBeenCalledWith(503);
       expect(next).not.toHaveBeenCalled();
     });
   });

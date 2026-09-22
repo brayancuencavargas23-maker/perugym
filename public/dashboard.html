@@ -11,173 +11,207 @@
   <link rel="stylesheet" href="/css/styles-responsive.css">
   <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
   <style>
-    /* ═══════════════ GRID & SECTIONS ═══════════════ */
-    .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
-    .dash-section{background:var(--card-bg);border-radius:14px;padding:20px 22px;border:none;box-shadow:0 1px 3px rgba(0,0,0,0.04),0 4px 12px rgba(0,0,0,0.03);transition:box-shadow 0.25s,transform 0.25s}
-    .dash-section:hover{box-shadow:0 2px 6px rgba(0,0,0,0.06),0 8px 24px rgba(0,0,0,0.06);transform:translateY(-1px)}
-    .section-title{font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px}
-    .section-link{font-size:12px;color:var(--primary);font-weight:600;text-decoration:none;transition:color 0.2s}
+    /* ═══════════════ RETÍCULA 12 COL (sin huecos: cada fila suma 12) ═══════════════ */
+    .dash-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:20px;margin-bottom:20px;align-items:stretch}
+    .col-4{grid-column:span 4}
+    .col-5{grid-column:span 5}
+    .col-6{grid-column:span 6}
+    .col-7{grid-column:span 7}
+    .col-12{grid-column:span 12}
+
+    /* ═══════════════ TARJETA BASE (superficie plana, 1 sombra, borde sutil) ═══════════════ */
+    .dash-section{
+      background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);
+      padding:18px 20px;box-shadow:var(--shadow);display:flex;flex-direction:column;min-width:0;min-height:0
+    }
+    .dash-section-header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;min-height:22px}
+    .section-title{font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;min-width:0}
+    .section-link{font-size:12px;font-weight:600;color:var(--accent-700);text-decoration:none;white-space:nowrap;transition:color .15s}
+    [data-theme="dark"] .section-link,[data-theme="dark"] .notif-toggle{color:#34d399}
     .section-link:hover{color:var(--primary-dark);text-decoration:underline}
+    .section-meta{font-size:11px;font-weight:600;color:var(--text-light);background:var(--bg);padding:3px 10px;border-radius:999px;white-space:nowrap}
 
-    /* ═══════════════ KPI CARDS ═══════════════ */
-    .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    .kpi-card{border-radius:14px;padding:20px;display:flex;align-items:center;gap:16px;border:none;position:relative;overflow:hidden;transition:transform 0.25s,box-shadow 0.25s;cursor:default}
-    .kpi-card::before{content:'';position:absolute;inset:0;opacity:0.06;border-radius:14px}
-    .kpi-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.1)}
-    .kpi-card.purple{background:linear-gradient(135deg,#eef2ff 0%,#e0e7ff 100%);box-shadow:0 2px 8px rgba(99,102,241,0.1)}
-    .kpi-card.purple::before{background:linear-gradient(135deg,#6366f1,#818cf8)}
-    .kpi-card.green{background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%);box-shadow:0 2px 8px rgba(34,197,94,0.1)}
-    .kpi-card.green::before{background:linear-gradient(135deg,#22c55e,#16a34a)}
-    .kpi-card.orange{background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%);box-shadow:0 2px 8px rgba(245,158,11,0.1)}
-    .kpi-card.orange::before{background:linear-gradient(135deg,#f59e0b,#d97706)}
-    .kpi-card.red{background:linear-gradient(135deg,#fef2f2 0%,#fee2e2 100%);box-shadow:0 2px 8px rgba(239,68,68,0.1)}
-    .kpi-card.red::before{background:linear-gradient(135deg,#ef4444,#dc2626)}
-    [data-theme="dark"] .kpi-card.purple{background:linear-gradient(135deg,#1e1b4b 0%,#312e81 100%);box-shadow:0 2px 8px rgba(99,102,241,0.2)}
-    [data-theme="dark"] .kpi-card.green{background:linear-gradient(135deg,#052e16 0%,#14532d 100%);box-shadow:0 2px 8px rgba(34,197,94,0.2)}
-    [data-theme="dark"] .kpi-card.orange{background:linear-gradient(135deg,#451a03 0%,#78350f 100%);box-shadow:0 2px 8px rgba(245,158,11,0.2)}
-    [data-theme="dark"] .kpi-card.red{background:linear-gradient(135deg,#450a0a 0%,#7f1d1d 100%);box-shadow:0 2px 8px rgba(239,68,68,0.2)}
-    .kpi-icon{width:48px;height:48px;border-radius:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
-    .kpi-icon.purple{background:linear-gradient(135deg,#6366f1,#818cf8);color:#fff}
-    .kpi-icon.green{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff}
-    .kpi-icon.orange{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff}
-    .kpi-icon.red{background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff}
-    .kpi-value{font-size:26px;font-weight:800;color:var(--text);line-height:1.1;letter-spacing:-0.5px}
-    .kpi-label{font-size:11px;color:var(--text-light);font-weight:600;margin-top:3px;text-transform:uppercase;letter-spacing:0.3px}
-    .kpi-trend{font-size:11px;font-weight:700;margin-top:4px;display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px}
-    .kpi-trend.up{background:rgba(34,197,94,0.12);color:#16a34a}
-    .kpi-trend.down{background:rgba(239,68,68,0.12);color:#dc2626}
-    .kpi-trend.neutral{background:rgba(108,99,255,0.1);color:var(--primary)}
+    /* ═══════════════ KPI — superficie neutra, color SOLO en el icono ═══════════════ */
+    .kpi-card{
+      grid-column:span 3;background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);
+      padding:16px 18px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow);min-width:0
+    }
+    .kpi-icon{
+      width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+      flex-shrink:0;background:rgba(16,185,129,0.12);color:var(--accent-700)
+    }
+    .kpi-icon.danger{background:rgba(239,68,68,0.12);color:var(--danger-strong)}
+    [data-theme="dark"] .kpi-icon{background:rgba(16,185,129,0.16);color:#34d399}
+    [data-theme="dark"] .kpi-icon.danger{background:rgba(239,68,68,0.16);color:#f87171}
+    .kpi-text{min-width:0;flex:1}
+    .kpi-value{font-size:24px;font-weight:800;line-height:1.15;letter-spacing:-0.02em;color:var(--text);font-variant-numeric:tabular-nums}
+    .kpi-label{font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--text-light);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-    /* ═══════════════ PERIOD FILTER ═══════════════ */
-    .period-filter{display:flex;gap:4px;background:var(--bg);padding:4px;border-radius:10px;border:1px solid var(--border)}
-    .period-btn{padding:7px 16px;border:none;background:transparent;border-radius:7px;font-size:12px;font-weight:600;color:var(--text-light);cursor:pointer;transition:all 0.2s}
-    .period-btn:hover{color:var(--text);background:rgba(0,0,0,0.03)}
-    .period-btn.active{background:var(--card-bg);color:var(--primary);box-shadow:0 1px 4px rgba(0,0,0,0.08);font-weight:700}
+    /* ═══════════════ TENDENCIAS (semántica: éxito / error / neutro) ═══════════════ */
+    .trend-indicator{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;margin-top:6px}
+    .trend-up{background:rgba(34,197,94,0.14);color:var(--success-strong)}
+    .trend-down{background:rgba(239,68,68,0.14);color:var(--danger-strong)}
+    .trend-neutral{background:rgba(100,116,139,0.14);color:var(--text-light)}
 
-    /* ═══════════════ EXPIRING LIST ═══════════════ */
-    .expiring-item{display:flex;justify-content:space-between;align-items:center;padding:11px 12px;border-radius:10px;transition:background 0.2s;margin-bottom:4px}
-    .expiring-item:hover{background:var(--bg)}
-    .expiring-item:last-child{margin-bottom:0}
-    .badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.2px}
-    .badge-success{background:rgba(34,197,94,0.12);color:#16a34a}
-    .badge-warning{background:rgba(245,158,11,0.15);color:#b45309}
-    .badge-info{background:rgba(14,165,233,0.12);color:#0284c7}
-    .badge-danger{background:rgba(239,68,68,0.12);color:#dc2626}
+    /* ═══════════════ FILTRO DE PERIODO (control segmentado) ═══════════════ */
+    .period-filter{display:flex;gap:2px;background:var(--bg);padding:3px;border-radius:10px;border:1px solid var(--border)}
+    .period-btn{padding:6px 14px;border:none;background:transparent;border-radius:7px;font-size:12px;font-weight:600;color:var(--text-light);cursor:pointer;transition:background .15s,color .15s}
+    .period-btn:hover{color:var(--text)}
+    .period-btn.active{background:var(--card-bg);color:var(--accent-700);box-shadow:0 1px 3px rgba(0,0,0,0.08);font-weight:700}
+    [data-theme="dark"] .period-btn.active{color:#34d399}
 
-    /* ═══════════════ CHARTS ═══════════════ */
-    .chart-title-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
-    .chart-title{font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px}
-    .chart-sub{font-size:11px;color:var(--text-light);font-weight:500;background:var(--bg);padding:3px 10px;border-radius:20px}
-    .chart-box{position:relative;height:180px}
+    /* ═══════════════ LISTAS (filas planas, hover de fondo, sin transform) ═══════════════ */
+    .list{display:flex;flex-direction:column;gap:2px;flex:1;min-height:0}
+    .list-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;transition:background .15s;font-size:13px}
+    .list-row:hover{background:var(--bg)}
+    .list-row:last-child{margin-bottom:0}
+    .item-main{min-width:0}
+    .item-main strong{font-weight:600;color:var(--text);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .item-sub{font-size:11px;color:var(--text-light);margin-top:2px}
+    .empty-state{color:var(--text-light);font-size:13px;text-align:center;padding:24px 8px;margin:auto 0}
 
-    /* ═══════════════ TIMELINE ═══════════════ */
-    .timeline-container{position:relative;padding-left:22px}
-    .timeline-container::before{content:'';position:absolute;left:10px;top:4px;bottom:4px;width:2px;background:linear-gradient(to bottom,var(--border),transparent);border-radius:2px}
-    .timeline-item{display:flex;gap:12px;padding:10px 0;position:relative;font-size:12px}
+    /* ═══════════════ BADGES (semánticos, definidos en main.css) ═══════════════ */
+
+    /* ═══════════════ GRÁFICO ═══════════════ */
+    .chart-\boxed{position:relative;height:200px;flex:1;min-height:180px}
+
+    /* ═══════════════ TIMELINE (chips planos por tipo) ═══════════════ */
+    .timeline-container{position:relative;padding-left:20px;flex:1;min-height:0}
+    #timeline-content{flex:1;display:flex;flex-direction:column;min-height:0}
+    #timeline-content .empty-state{margin:auto 0}
+    .timeline-container::before{content:'';position:absolute;left:9px;top:6px;bottom:6px;width:2px;background:var(--border);border-radius:2px}
+    .timeline-item{display:flex;gap:12px;padding:9px 0;position:relative;font-size:12px;align-items:flex-start}
     .timeline-item:last-child{padding-bottom:0}
-    .timeline-dot{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;z-index:1;box-shadow:0 2px 6px rgba(0,0,0,0.08)}
-    .timeline-dot.pago{background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#16a34a}
-    .timeline-dot.asistencia{background:linear-gradient(135deg,#e0f2fe,#bae6fd);color:#0284c7}
-    .timeline-dot.membresia{background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#7c3aed}
+    .timeline-dot{
+      width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+      flex-shrink:0;position:relative;z-index:1;background:rgba(100,116,139,0.12);color:var(--text-light)
+    }
+    .timeline-dot.pago{background:rgba(34,197,94,0.12);color:var(--success-strong)}
+    .timeline-dot.asistencia{background:rgba(14,165,233,0.12);color:var(--info-strong)}
+    .timeline-dot.membresia{background:rgba(16,185,129,0.12);color:var(--accent-700)}
     .timeline-text{flex:1;min-width:0}
     .timeline-text strong{font-weight:600;color:var(--text);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .timeline-text span{color:var(--text-light);font-size:11px}
-    .timeline-time{font-size:10px;color:var(--text-light);flex-shrink:0;text-align:right;padding:2px 8px;background:var(--bg);border-radius:20px;font-weight:500}
+    .timeline-time{font-size:10px;color:var(--text-light);flex-shrink:0;text-align:right;padding:2px 8px;background:var(--bg);border-radius:999px;font-weight:600;align-self:center}
 
-    /* ═══════════════ NOTIFICATIONS ═══════════════ */
-    .notif-item{display:flex;align-items:flex-start;gap:12px;padding:10px 12px;border-radius:10px;transition:background 0.2s;font-size:12px;margin-bottom:4px}
+    /* ═══════════════ NOTIFICACIONES ═══════════════ */
+    .notif-item{display:flex;align-items:flex-start;gap:12px;padding:10px 12px;border-radius:10px;transition:background .15s;font-size:12px}
     .notif-item:hover{background:var(--bg)}
     .notif-item:last-child{margin-bottom:0}
-    .notif-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:3px;box-shadow:0 0 0 3px rgba(0,0,0,0.04)}
-    .notif-dot.alta{background:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,0.15)}
-    .notif-dot.media{background:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,0.15)}
-    .notif-dot.baja{background:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,0.15)}
+    .notif-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
+    .notif-dot.alta{background:var(--danger);box-shadow:0 0 0 3px rgba(239,68,68,0.15)}
+    .notif-dot.media{background:var(--warning);box-shadow:0 0 0 3px rgba(245,158,11,0.15)}
+    .notif-dot.baja{background:var(--info);box-shadow:0 0 0 3px rgba(14,165,233,0.15)}
+    .notif-body{flex:1;min-width:0}
+    .notif-title{font-weight:600;color:var(--text)}
+    .notif-sub{font-size:11px;color:var(--text-light);margin-top:2px}
     .notif-clickable{cursor:pointer}
-    .notif-clickable:hover{background:var(--bg);border-color:var(--border)}
+    .notif-toggle{background:none;border:none;color:var(--accent-700);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+    .notif-toggle:hover{text-decoration:underline}
 
-    /* ═══════════════ INGRESOS HOY ═══════════════ */
-    .ingresos-total{font-size:32px;font-weight:800;color:var(--text);margin-bottom:4px;letter-spacing:-1px;background:linear-gradient(135deg,#10b981,#34d399);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    .ingresos-trend{font-size:12px;font-weight:600;margin-bottom:14px;padding:4px 10px;border-radius:20px;display:inline-block}
-    .ingreso-metodo{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:10px;transition:background 0.2s;font-size:13px;margin-bottom:4px}
+    /* ═══════════════ INGRESOS DEL DÍA ═══════════════ */
+    #ingresos-hoy-content{flex:1;display:flex;flex-direction:column;justify-content:center}
+    .ingresos-total{font-size:30px;font-weight:800;color:var(--text);letter-spacing:-0.02em;font-variant-numeric:tabular-nums;line-height:1.15}
+    .ingresos-trend{font-size:12px;font-weight:600;margin:4px 0 12px}
+    .ingreso-metodo{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;transition:background .15s;font-size:13px}
     .ingreso-metodo:hover{background:var(--bg)}
     .ingreso-metodo:last-child{margin-bottom:0}
-    .ingreso-metodo-left{display:flex;align-items:center;gap:10px}
-    .ingreso-metodo-dot{width:10px;height:10px;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
-    .ingreso-metodo-right{font-weight:700;color:var(--text)}
+    .ingreso-metodo-left{display:flex;align-items:center;gap:10px;min-width:0}
+    .ingreso-metodo-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .ingreso-metodo-right{font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
 
-    /* ═══════════════ TOP CLIENTS & PRODUCTS ═══════════════ */
-    .rank-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;transition:background 0.2s;margin-bottom:4px}
+    /* ═══════════════ RANKINGS (sin medallas doradas: un solo acento en el #1) ═══════════════ */
+    .rank-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;transition:background .15s}
     .rank-item:hover{background:var(--bg)}
     .rank-item:last-child{margin-bottom:0}
-    .rank-badge{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,0.08)}
-    .rank-badge.gold{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#78350f}
-    .rank-badge.silver{background:linear-gradient(135deg,#d1d5db,#9ca3af);color:#374151}
-    .rank-badge.bronze{background:linear-gradient(135deg,#d97706,#b45309);color:#fff}
-    .rank-badge.default{background:var(--bg);color:var(--text-light);border:1px solid var(--border)}
+    .rank-badge{
+      width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+      font-size:11px;font-weight:800;flex-shrink:0;background:var(--bg);border:1px solid var(--border);color:var(--text-light)
+    }
+    .rank-badge.top{background:rgba(16,185,129,0.12);border-color:transparent;color:var(--accent-700)}
     .rank-info{flex:1;min-width:0}
     .rank-info .name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .rank-info .sub{font-size:11px;color:var(--text-light);margin-top:1px}
-    .rank-info .bar{background:var(--bg);border-radius:4px;height:4px;margin-top:5px;overflow:hidden}
-    .rank-info .bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#10b981,#34d399);transition:width 0.6s ease}
-    .rank-value{font-size:13px;font-weight:700;color:var(--primary);flex-shrink:0;text-align:right}
+    .rank-info .bar{background:var(--bg);border-radius:4px;height:4px;margin-top:6px;overflow:hidden}
+    .rank-info .bar-fill{height:100%;border-radius:4px;background:var(--primary);transition:width .5s ease}
+    .rank-value{font-size:13px;font-weight:700;color:var(--text);flex-shrink:0;text-align:right;font-variant-numeric:tabular-nums}
     .rank-value .sub{font-size:10px;color:var(--text-light);font-weight:500}
 
     /* ═══════════════ FAB & MODAL ═══════════════ */
-    .fab{position:fixed;bottom:28px;right:28px;width:58px;height:58px;border-radius:16px;background:linear-gradient(135deg,#10b981,#34d399);color:#fff;border:none;font-size:24px;cursor:pointer;box-shadow:0 4px 20px rgba(16,185,129,0.4);display:flex;align-items:center;justify-content:center;z-index:100;transition:transform 0.25s,box-shadow 0.25s}
-    .fab:hover{transform:scale(1.08) translateY(-2px);box-shadow:0 8px 30px rgba(16,185,129,0.5)}
-    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+    .fab{
+      position:fixed;bottom:28px;right:28px;width:56px;height:56px;border-radius:14px;
+      background:var(--primary);color:var(--on-primary);border:none;cursor:pointer;
+      box-shadow:0 8px 24px var(--primary-glow);display:flex;align-items:center;justify-content:center;
+      z-index:100;transition:background .15s,box-shadow .15s
+    }
+    .fab:hover{background:var(--primary-dark);box-shadow:0 10px 28px var(--primary-glow)}
+    .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,0.55);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
     .modal-overlay.visible{display:flex}
-    .modal{background:var(--card-bg);border-radius:20px;padding:32px;width:100%;max-width:440px;box-shadow:0 25px 60px rgba(0,0,0,0.3);animation:modalIn 0.25s ease}
-    @keyframes modalIn{from{opacity:0;transform:scale(0.95) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
-    .modal h2{margin:0 0 24px;font-size:20px;font-weight:800;color:var(--text)}
-    .form-row{margin-bottom:16px}
-    .form-row label{display:block;font-size:12px;font-weight:700;color:var(--text-light);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.3px}
-    .form-row input,.form-row select{width:100%;padding:11px 14px;border:2px solid var(--border);border-radius:10px;font-size:13px;background:var(--bg);color:var(--text);outline:none;transition:border 0.2s,box-shadow 0.2s}
-    .form-row input:focus,.form-row select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(108,99,255,0.1)}
-    .form-actions{display:flex;gap:10px;margin-top:24px}
-    .form-actions button{flex:1;padding:13px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s}
-    .btn-cancel{background:var(--bg);color:var(--text);border:2px solid var(--border)}
+    .modal{background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:28px;width:100%;max-width:440px;box-shadow:0 24px 60px rgba(15,23,42,0.25);animation:modalIn .2s ease}
+    @keyframes modalIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+    .modal h2{margin:0 0 20px;font-size:18px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px}
+    .form-row{margin-bottom:14px}
+    .form-row label{display:block;font-size:11px;font-weight:700;color:var(--text-light);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em}
+    .form-row input,.form-row select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:var(--bg);color:var(--text);outline:none;transition:border-color .15s,box-shadow .15s}
+    .form-row input:focus,.form-row select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(16,185,129,0.15)}
+    .form-hint{font-size:11px;color:var(--text-light);margin-top:3px}
+    .form-actions{display:flex;gap:10px;margin-top:20px}
+    .form-actions button{flex:1;padding:12px;border:1px solid transparent;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s,opacity .15s}
+    .btn-cancel{background:var(--bg);color:var(--text);border-color:var(--border)}
     .btn-cancel:hover{background:var(--border)}
-    .btn-submit{background:linear-gradient(135deg,#10b981,#34d399);color:#fff;box-shadow:0 4px 12px rgba(16,185,129,0.3)}
-    .btn-submit:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(16,185,129,0.4)}
-    .btn-submit:disabled{opacity:0.5;cursor:not-allowed;transform:none;box-shadow:none}
+    .btn-submit{background:var(--primary);color:var(--on-primary)}
+    .btn-submit:hover{background:var(--primary-dark)}
+    .btn-submit:disabled{opacity:.5;cursor:not-allowed}
 
-    /* ═══════════════ ALERT BANNER ═══════════════ */
-    .alert-banner{background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid rgba(245,158,11,0.3);border-radius:14px;padding:16px 20px;margin-bottom:20px;display:none;box-shadow:0 2px 8px rgba(245,158,11,0.1)}
+    /* ═══════════════ BANNER DE ALERTA (tinte plano, sin gradiente) ═══════════════ */
+    .alert-banner{background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.35);border-radius:var(--radius);padding:14px 18px;margin-bottom:20px;display:none}
     .alert-banner.visible{display:block}
-    .alert-banner-header{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;color:#92400e;margin-bottom:10px}
+    .alert-banner-header{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;color:var(--warning-strong);margin-bottom:10px}
     .alert-banner-list{display:flex;flex-wrap:wrap;gap:8px}
-    .alert-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.8);border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;border:1px solid rgba(245,158,11,0.2)}
+    .alert-chip{display:inline-flex;align-items:center;gap:6px;background:var(--card-bg);border:1px solid rgba(245,158,11,0.3);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;color:var(--text)}
 
     /* ═══════════════ SKELETON ═══════════════ */
-    .skeleton-line{height:12px;border-radius:6px;background:linear-gradient(90deg,var(--bg) 25%,rgba(0,0,0,0.04) 50%,var(--bg) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;margin-bottom:10px}
+    .skeleton-line{height:12px;border-radius:6px;background:linear-gradient(90deg,var(--bg) 25%,rgba(100,116,139,0.12) 50%,var(--bg) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;margin-bottom:10px}
     .skeleton-line.medium{width:60%}
     .skeleton-line.short{width:40%}
     @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
-    /* ═══════════════ TREND ═══════════════ */
-    .trend-indicator{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px}
-    .trend-up{background:rgba(34,197,94,0.12);color:#16a34a}
-    .trend-down{background:rgba(239,68,68,0.12);color:#dc2626}
-    .trend-neutral{background:rgba(16,185,129,0.1);color:var(--primary)}
+    /* ═══════════════ CABECERA / BARRA DE ACCIONES ═══════════════ */
+    .dash-greeting{margin-bottom:20px}
+    .dash-greeting h1{font-size:22px;font-weight:800;letter-spacing:-0.01em;color:var(--text);line-height:1.25}
+    .dash-greeting p{font-size:13px;color:var(--text-light);font-weight:500;margin-top:4px}
+    .dash-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+    .dash-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .dash-action-btn{
+      display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:10px;font-size:13px;
+      font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--card-bg);color:var(--text);
+      transition:background .15s,border-color .15s,color .15s
+    }
+    .dash-action-btn:hover{border-color:var(--primary);color:var(--accent-700);background:var(--accent-50)}
+    [data-theme="dark"] .dash-action-btn:hover{background:rgba(16,185,129,0.10);color:#34d399}
+    .dash-action-btn.primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+    .dash-action-btn.primary:hover{background:var(--primary-dark);border-color:var(--primary-dark);color:var(--on-primary)}
 
-    /* ═══════════════ RESPONSIVE ═══════════════ */
-    .dash-greeting{margin-bottom:24px}
-    .dash-greeting h1{font-size:26px;font-weight:800;color:var(--text);margin-bottom:4px}
-    .dash-greeting h1 .wave{display:inline-block;animation:wave 1.5s infinite;transform-origin:70% 70%}
-    @keyframes wave{0%,100%{transform:rotate(0)}10%{transform:rotate(14deg)}20%{transform:rotate(-8deg)}30%{transform:rotate(14deg)}40%{transform:rotate(-4deg)}50%{transform:rotate(10deg)}60%{transform:rotate(0)}}
-    .dash-greeting p{font-size:14px;color:var(--text-light);font-weight:500}
-    .dash-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
-    .dash-action-btn{display:flex;align-items:center;gap:8px;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;border:2px solid var(--border);background:var(--card-bg);color:var(--text)}
-    .dash-action-btn:hover{border-color:var(--primary);color:var(--primary);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.06)}
-    .dash-action-btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
-    .dash-action-btn.primary:hover{background:var(--primary-dark);box-shadow:0 4px 16px var(--primary-glow)}
-    .dash-live{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--primary);margin-bottom:8px}
-    .dash-live .dot{width:8px;height:8px;border-radius:50%;background:var(--primary);animation:pulse 2s infinite}
-    @media(max-width:900px){.dash-grid{grid-template-columns:1fr}.kpi-grid{grid-template-columns:1fr 1fr}}
-    @media(max-width:500px){.kpi-grid{grid-template-columns:1fr}.kpi-card{padding:16px}.kpi-icon{width:42px;height:42px}.kpi-value{font-size:22px}.dash-greeting h1{font-size:20px}.dash-actions{flex-direction:column}}
-
-    /* RIGHT PANEL — estilos movidos a main.css */
+    /* ═══════════════ RESPONSIVE — cada fila sigue sumando 12 ═══════════════ */
+    @media(max-width:1199px){
+      .kpi-card{grid-column:span 6}
+      .col-4{grid-column:span 6}
+      .col-5,.col-7{grid-column:span 12}
+      .col-4.last{grid-column:span 12}
+    }
+    @media(max-width:899px){
+      .col-4,.col-6{grid-column:span 12}
+      .dash-greeting h1{font-size:20px}
+    }
+    @media(max-width:559px){
+      .kpi-card,.col-6{grid-column:span 12}
+      .kpi-card{padding:14px 16px}
+      .kpi-value{font-size:22px}
+      .dash-actions{width:100%}
+      .dash-toolbar{gap:10px}
+      .period-filter{width:100%;justify-content:space-between}
+      .period-btn{flex:1}
+    }
   </style>
 </head>
 <body>
@@ -189,158 +223,181 @@
 
       <div class="alert-banner" id="alert-banner">
         <div class="alert-banner-header">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           Membresías vencen hoy o mañana
         </div>
         <div class="alert-banner-list" id="alert-list"></div>
       </div>
 
       <div class="dash-greeting">
-        <div class="dash-live"><span class="dot"></span> En Directo · Sincronizado</div>
-        <h1><span id="greeting-text">Buenos días</span>, <span id="greeting-name"></span> <span class="wave">👋</span> | Centro</h1>
+        <h1><span id="greeting-text">Buenos días</span>, <span id="greeting-name"></span></h1>
         <p id="greeting-center">Central — PeruGym</p>
       </div>
 
-      <div class="flex-between" style="margin-bottom:20px">
+      <div class="dash-toolbar">
         <div class="dash-actions">
           <button class="dash-action-btn primary" onclick="sessionStorage.setItem('_spa_open_nuevo','1'); GymRouter.navigate('clientes')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
             Nuevo Socio
           </button>
           <button class="dash-action-btn" onclick="GymRouter.navigate('asistencia')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             Agendar Clase
           </button>
           <button class="dash-action-btn" onclick="sessionStorage.setItem('_spa_open_nuevo','1'); GymRouter.navigate('pagos')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
             Generar Cobro
           </button>
         </div>
-        <div class="period-filter">
-          <button class="period-btn active" data-period="mes">Mes</button>
-          <button class="period-btn" data-period="semana">Semana</button>
-          <button class="period-btn" data-period="hoy">Hoy</button>
+        <div class="period-filter" role="group" aria-label="Filtrar por periodo">
+          <button class="period-btn active" data-period="mes" aria-pressed="true">Mes</button>
+          <button class="period-btn" data-period="semana" aria-pressed="false">Semana</button>
+          <button class="period-btn" data-period="hoy" aria-pressed="false">Hoy</button>
         </div>
       </div>
 
-      <div class="dash-grid" style="margin-bottom:20px">
-        <div class="kpi-grid">
-          <div class="kpi-card purple"><div class="kpi-icon purple" id="si-members"></div><div><div class="kpi-value" id="stat-members">-</div><div class="kpi-label">Clientes Activos</div></div></div>
-          <div class="kpi-card green"><div class="kpi-icon green" id="si-income"></div><div><div class="kpi-value" id="stat-income">-</div><div class="kpi-label">Ingresos del Mes</div><div id="trend-income"></div></div></div>
-          <div class="kpi-card orange"><div class="kpi-icon orange" id="si-attendance"></div><div><div class="kpi-value" id="stat-attendance">-</div><div class="kpi-label">Asistencia</div><div id="trend-attendance"></div></div></div>
-          <div class="kpi-card red"><div class="kpi-icon red" id="si-pending"></div><div><div class="kpi-value" id="stat-pending">-</div><div class="kpi-label">Pagos Pendientes</div></div></div>
+      <!-- Retícula 12 col: filas 3+3+3+3 / 5+7 / 4+4+4 / 6+6 / 12 -->
+      <div class="dash-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon" id="si-members"></div>
+          <div class="kpi-text">
+            <div class="kpi-value" id="stat-members">-</div>
+            <div class="kpi-label">Clientes Activos</div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon" id="si-income"></div>
+          <div class="kpi-text">
+            <div class="kpi-value" id="stat-income">-</div>
+            <div class="kpi-label">Ingresos del Mes</div>
+            <div id="trend-income"></div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon" id="si-attendance"></div>
+          <div class="kpi-text">
+            <div class="kpi-value" id="stat-attendance">-</div>
+            <div class="kpi-label">Asistencia</div>
+            <div id="trend-attendance"></div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon danger" id="si-pending"></div>
+          <div class="kpi-text">
+            <div class="kpi-value" id="stat-pending">-</div>
+            <div class="kpi-label">Pagos Pendientes</div>
+          </div>
         </div>
 
-        <div class="dash-section">
-          <div class="dash-section-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="dash-section col-5">
+          <div class="dash-section-header">
             <div class="section-title" id="h-activity"></div>
-            <span class="chart-sub" id="activity-count"></span>
+            <span class="section-meta" id="activity-count"></span>
           </div>
           <div id="timeline-content">
             <div class="skeleton-line medium"></div><div class="skeleton-line short"></div><div class="skeleton-line medium"></div>
           </div>
         </div>
-      </div>
 
-      <div class="dash-grid">
-        <div class="dash-section">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <div class="section-title" id="h-vencer"></div>
-            <a href="/membresias.html" class="section-link">Ver todas</a>
+        <div class="dash-section col-7">
+          <div class="dash-section-header">
+            <div class="section-title" id="h-chart-asistencia"></div>
+            <span class="section-meta">Últimos 7 días</span>
           </div>
-          <div id="expiring-list"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>
+          <div class="chart-box"><canvas id="chart-asistencia" role="img" aria-label="Asistencia de los últimos 7 días"></canvas></div>
         </div>
 
-        <div class="dash-section">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <div class="section-title" id="h-top-clients"></div>
-            <span class="chart-sub">Esta semana</span>
-          </div>
-          <div id="top-clients-content"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>
-        </div>
-
-        <div class="dash-section">
-          <div class="chart-title-row">
-            <div class="chart-title" id="h-chart-asistencia"></div>
-            <span class="chart-sub">Últimos 7 días</span>
-          </div>
-          <div class="chart-box"><canvas id="chart-asistencia"></canvas></div>
-        </div>
-
-        <div class="dash-section">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="dash-section col-4">
+          <div class="dash-section-header">
             <div class="section-title" id="h-ingresos-hoy"></div>
           </div>
           <div id="ingresos-hoy-content"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>
         </div>
 
-        <div class="dash-section">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <div class="section-title" id="h-top-products"></div>
-            <span class="chart-sub">Esta semana</span>
+        <div class="dash-section col-4">
+          <div class="dash-section-header">
+            <div class="section-title" id="h-vencer"></div>
+            <a href="/membresias.html" class="section-link">Ver todas</a>
           </div>
-          <div id="top-products-content"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>
+          <div id="expiring-list" class="list"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>
         </div>
 
-        <div class="dash-section" id="notif-section">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="dash-section col-4 last" id="notif-section">
+          <div class="dash-section-header">
             <div class="section-title" id="h-notificaciones"></div>
-            <button id="notif-toggle-btn" style="background:none;border:none;color:var(--primary);font-size:12px;font-weight:600;cursor:pointer;display:none">Ver todas</button>
+            <button id="notif-toggle-btn" class="notif-toggle" style="display:none">Ver todas</button>
           </div>
-          <div id="notif-content"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>
+          <div id="notif-content" class="list"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>
         </div>
 
-        <div class="dash-section" id="card-solicitudes" style="display:none">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="dash-section col-6">
+          <div class="dash-section-header">
+            <div class="section-title" id="h-top-clients"></div>
+            <span class="section-meta">Esta semana</span>
+          </div>
+          <div id="top-clients-content" class="list"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>
+        </div>
+
+        <div class="dash-section col-6">
+          <div class="dash-section-header">
+            <div class="section-title" id="h-top-products"></div>
+            <span class="section-meta">Esta semana</span>
+          </div>
+          <div id="top-products-content" class="list"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>
+        </div>
+
+        <div class="dash-section col-12" id="card-solicitudes" style="display:none">
+          <div class="dash-section-header">
             <div class="section-title" id="h-solicitudes"></div>
             <a href="/solicitudes.html" class="section-link">Ver todas</a>
           </div>
-          <div id="solicitudes-list"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>
+          <div id="solicitudes-list" class="list"><div class="skeleton-line medium"></div><div class="skeleton-line short"></div></div>
         </div>
       </div>
+
+      <!-- FAB dentro de .page-content para que el router SPA lo conserve -->
+      <button class="fab" id="fab-register" title="Registro rápido" aria-label="Registro rápido">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
 
     </div>
   </div>
 </div>
 
-<button class="fab" id="fab-register" title="Registro rápido">
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-</button>
-
 <div class="modal-overlay" id="modal-quick-register">
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="h-modal-register">
     <h2 id="h-modal-register"></h2>
     <div class="form-row">
-      <label>DNI</label>
-      <input type="text" id="qr-dni" maxlength="8" placeholder="00000000">
-      <div id="qr-dni-hint" style="font-size:11px;color:var(--text-light);margin-top:3px"></div>
+      <label for="qr-dni">DNI</label>
+      <input type="text" id="qr-dni" maxlength="8" placeholder="00000000" autocomplete="off">
+      <div id="qr-dni-hint" class="form-hint"></div>
     </div>
     <div class="form-row">
-      <label>Nombres</label>
+      <label for="qr-nombre">Nombres</label>
       <input type="text" id="qr-nombre" placeholder="Nombres">
     </div>
     <div class="form-row">
-      <label>Apellido Paterno</label>
+      <label for="qr-apellido">Apellido Paterno</label>
       <input type="text" id="qr-apellido" placeholder="Apellido">
     </div>
     <div class="form-row">
-      <label>Teléfono</label>
+      <label for="qr-telefono">Teléfono</label>
       <input type="text" id="qr-telefono" maxlength="9" placeholder="900000000">
     </div>
     <div class="form-row">
-      <label>Email</label>
+      <label for="qr-email">Email</label>
       <input type="email" id="qr-email" placeholder="correo@ejemplo.com">
     </div>
     <div class="form-row">
-      <label>Plan</label>
+      <label for="qr-plan">Plan</label>
       <select id="qr-plan"><option value="">Cargando planes...</option></select>
     </div>
     <div class="form-row">
-      <label>Monto (S/.)</label>
+      <label for="qr-monto">Monto (S/.)</label>
       <input type="number" id="qr-monto" step="0.01" min="0" placeholder="0.00">
     </div>
     <div class="form-actions">
-      <button class="btn-cancel" onclick="closeQuickRegisterModal()">Cancelar</button>
+      <button class="btn-cancel" id="qr-cancel" type="button">Cancelar</button>
       <button class="btn-submit" id="qr-submit" disabled>Registrar</button>
     </div>
   </div>
@@ -376,6 +433,26 @@
 
   function _pageActive() { return !!document.getElementById('stat-members'); }
 
+  const _emptyState = t => '<p class="empty-state">' + t + '</p>';
+
+  // Lee los tokens del tema en uso (claro/oscuro) para el canvas de Chart.js,
+  // que no interpreta variables CSS.
+  function _themeColors() {
+    const css = getComputedStyle(document.documentElement);
+    const accent = (css.getPropertyValue('--primary') || '#10b981').trim();
+    const textLight = (css.getPropertyValue('--text-light') || '#64748b').trim();
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    return { accent, textLight, grid: dark ? 'rgba(148,163,184,0.14)' : 'rgba(15,23,42,0.06)' };
+  }
+
+  function _rgbTriplet(hex) {
+    let h = String(hex).replace('#', '').trim();
+    if (h.length === 3) h = h.split('').map(c => c + c).join('');
+    const n = parseInt(h, 16);
+    if (isNaN(n)) return '16,185,129';
+    return ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255);
+  }
+
   function showSectionSkeletons() {
     ['expiring-list','top-clients-content','top-products-content','ingresos-hoy-content','notif-content','timeline-content'].forEach(id => {
       const el = document.getElementById(id);
@@ -387,8 +464,8 @@
     const el = document.getElementById(elementId);
     if (!el) return;
     if (value === 0) el.innerHTML = '<span class="trend-indicator trend-neutral">= 0%</span>';
-    else if (value > 0) el.innerHTML = '<span class="trend-indicator trend-up"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>+' + value + '%</span>';
-    else el.innerHTML = '<span class="trend-indicator trend-down"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>' + value + '%</span>';
+    else if (value > 0) el.innerHTML = '<span class="trend-indicator trend-up"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg>+' + value + '%</span>';
+    else el.innerHTML = '<span class="trend-indicator trend-down"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>' + value + '%</span>';
   }
 
   function renderAlerts(alertas) {
@@ -418,16 +495,16 @@
   function renderTimeline(events) {
     const container = document.getElementById('timeline-content');
     if (!container) return;
-    if (!events || events.length === 0) { container.innerHTML = '<p style="color:var(--text-light);font-size:13px;text-align:center;padding:16px 0">Sin actividad reciente</p>'; return; }
+    if (!events || events.length === 0) { container.innerHTML = _emptyState('Sin actividad reciente'); return; }
     const dotIcons = {
-      pago: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>',
-      asistencia: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
-      membresia: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>',
+      pago: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>',
+      asistencia: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+      membresia: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>',
     };
     container.innerHTML = '<div class="timeline-container">' + events.slice(0, 8).map(e => {
       const tipo = e.icono || e.tipo;
       return '<div class="timeline-item">' +
-        '<div class="timeline-dot ' + tipo + '">' + (dotIcons[tipo] || dotIcons.pago) + '</div>' +
+        '<div class="timeline-dot ' + (dotIcons[tipo] ? tipo : '') + '">' + (dotIcons[tipo] || dotIcons.pago) + '</div>' +
         '<div class="timeline-text"><strong>' + e.titulo + '</strong><span>' + (e.detalle || '') + '</span></div>' +
         '<div class="timeline-time">' + timeAgo(e.fecha) + '</div>' +
       '</div>';
@@ -439,15 +516,15 @@
     const toggleBtn = document.getElementById('notif-toggle-btn');
     if (!container) return;
     _notifData = data;
-    if (!data.items || data.items.length === 0) { container.innerHTML = '<p style="color:var(--text-light);font-size:13px;text-align:center;padding:16px 0">Sin notificaciones</p>'; if (toggleBtn) toggleBtn.style.display = 'none'; return; }
+    if (!data.items || data.items.length === 0) { container.innerHTML = _emptyState('Sin notificaciones'); if (toggleBtn) toggleBtn.style.display = 'none'; return; }
     const shown = _notifExpanded ? data.items : data.items.slice(0, 6);
-    container.innerHTML = shown.map((n, i) => {
+    container.innerHTML = shown.map(n => {
       const isStock = n.tipo === 'stock_bajo' && n.producto;
       const dataAttr = isStock ? ' data-producto="' + encodeURIComponent(JSON.stringify(n.producto)) + '"' : '';
       const cls = isStock ? ' notif-clickable' : '';
       return '<div class="notif-item' + cls + '"' + dataAttr + '>' +
-        '<div class="notif-dot ' + (n.prioridad || 'media') + '"></div>' +
-        '<div style="flex:1;min-width:0"><div style="font-weight:600;color:var(--text)">' + n.titulo + '</div><div style="font-size:11px;color:var(--text-light)">' + (n.detalle || '') + '</div></div>' +
+        '<span class="notif-dot ' + (n.prioridad || 'media') + '" aria-hidden="true"></span>' +
+        '<div class="notif-body"><div class="notif-title">' + n.titulo + '</div><div class="notif-sub">' + (n.detalle || '') + '</div></div>' +
       '</div>';
     }).join('');
     if (toggleBtn && data.items.length > 6) { toggleBtn.style.display = ''; toggleBtn.textContent = _notifExpanded ? 'Ver menos' : 'Ver todas (' + data.items.length + ')'; }
@@ -463,25 +540,25 @@
     if (!container) return;
     const totalFmt = 'S/. ' + data.total_hoy.toLocaleString('es-PE', { minimumFractionDigits: 2 });
     let trendHTML = '';
-    if (data.tendencia > 0) trendHTML = '<span style="color:#198754">▲ +' + data.tendencia + '% vs ayer</span>';
-    else if (data.tendencia < 0) trendHTML = '<span style="color:#dc3545">▼ ' + data.tendencia + '% vs ayer</span>';
+    if (data.tendencia > 0) trendHTML = '<span style="color:var(--success-strong)">▲ +' + data.tendencia + '% vs ayer</span>';
+    else if (data.tendencia < 0) trendHTML = '<span style="color:var(--danger-strong)">▼ ' + data.tendencia + '% vs ayer</span>';
     else trendHTML = '<span style="color:var(--text-light)">= Igual que ayer</span>';
-    const colores = { efectivo: '#28a745', yape: '#6c63ff', plin: '#0ea5e9', transferencia: '#f59e0b' };
+    // Colores categóricos por canal de pago (codifican dato, no decoración)
+    const colores = { efectivo: '#16a34a', yape: '#7c3aed', plin: '#0ea5e9', transferencia: '#f59e0b' };
     const desgloseHTML = data.desglose.length > 0
-      ? data.desglose.map(d => '<div class="ingreso-metodo"><div class="ingreso-metodo-left"><span class="ingreso-metodo-dot" style="background:' + (colores[d.metodo] || '#6c63ff') + '"></span>' + d.label + '</div><div class="ingreso-metodo-right">S/. ' + d.hoy.toLocaleString('es-PE', { minimumFractionDigits: 2 }) + '</div></div>').join('')
-      : '<p style="color:var(--text-light);font-size:13px;text-align:center;padding:16px 0">Sin ingresos hoy</p>';
+      ? data.desglose.map(d => '<div class="ingreso-metodo"><div class="ingreso-metodo-left"><span class="ingreso-metodo-dot" style="background:' + (colores[d.metodo] || '#64748b') + '" aria-hidden="true"></span>' + d.label + '</div><div class="ingreso-metodo-right">S/. ' + d.hoy.toLocaleString('es-PE', { minimumFractionDigits: 2 }) + '</div></div>').join('')
+      : _emptyState('Sin ingresos hoy');
     container.innerHTML = '<div class="ingresos-total">' + totalFmt + '</div><div class="ingresos-trend">' + trendHTML + '</div><div class="ingresos-desglose">' + desgloseHTML + '</div>';
   }
 
   function renderTopClients(data) {
     const container = document.getElementById('top-clients-content');
     if (!container) return;
-    if (!data.topClients || data.topClients.length === 0) { container.innerHTML = '<p style="color:var(--text-light);font-size:13px;text-align:center;padding:16px 0">Sin actividad esta semana</p>'; return; }
+    if (!data.topClients || data.topClients.length === 0) { container.innerHTML = _emptyState('Sin actividad esta semana'); return; }
     const maxV = Math.max(...data.topClients.map(c => c.visitas), 1);
     container.innerHTML = data.topClients.map((c, i) => {
-      const badgeClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'default';
       return '<div class="rank-item">' +
-        '<div class="rank-badge ' + badgeClass + '">' + (i + 1) + '</div>' +
+        '<div class="rank-badge' + (i === 0 ? ' top' : '') + '">' + (i + 1) + '</div>' +
         '<div class="rank-info"><div class="name">' + c.nombre + '</div><div class="bar"><div class="bar-fill" style="width:' + (c.visitas / maxV * 100).toFixed(0) + '%"></div></div></div>' +
         '<div class="rank-value">' + c.visitas + 'v</div></div>';
     }).join('');
@@ -490,11 +567,10 @@
   function renderTopProducts(data) {
     const container = document.getElementById('top-products-content');
     if (!container) return;
-    if (!data.topProducts || data.topProducts.length === 0) { container.innerHTML = '<p style="color:var(--text-light);font-size:13px;text-align:center;padding:16px 0">Sin ventas esta semana</p>'; return; }
+    if (!data.topProducts || data.topProducts.length === 0) { container.innerHTML = _emptyState('Sin ventas esta semana'); return; }
     container.innerHTML = data.topProducts.map((p, i) => {
-      const badgeClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'default';
       return '<div class="rank-item">' +
-        '<div class="rank-badge ' + badgeClass + '">' + (i + 1) + '</div>' +
+        '<div class="rank-badge' + (i === 0 ? ' top' : '') + '">' + (i + 1) + '</div>' +
         '<div class="rank-info"><div class="name">' + p.nombre + '</div><div class="sub">Stock: ' + p.stock + '</div></div>' +
         '<div class="rank-value">' + p.total_vendido + ' u.<div class="sub">S/. ' + (p.total_ingreso || 0).toFixed(0) + '</div></div></div>';
     }).join('');
@@ -517,11 +593,11 @@
     renderAlerts(data.alertas);
     const expiringEl = document.getElementById('expiring-list');
     if (data.membresiasVencenPronto.length === 0) {
-      expiringEl.innerHTML = '<p style="color:var(--text-light);font-size:13px">Sin membresías próximas a vencer</p>';
+      expiringEl.innerHTML = _emptyState('Sin membresías próximas a vencer');
     } else {
       expiringEl.innerHTML = data.membresiasVencenPronto.slice(0, 5).map(m => {
         const days = daysUntil(m.fecha_fin);
-        return '<div class="expiring-item"><div><strong>' + m.nombre + '</strong><div style="font-size:11px;color:var(--text-light)">' + (m.plan_nombre || 'Sin plan') + '</div></div><span class="badge badge-warning">' + (days === 0 ? 'Hoy' : days + 'd') + '</span></div>';
+        return '<div class="list-row"><div class="item-main"><strong>' + m.nombre + '</strong><div class="item-sub">' + (m.plan_nombre || 'Sin plan') + '</div></div><span class="badge badge-warning">' + (days === 0 ? 'Hoy' : days + 'd') + '</span></div>';
       }).join('');
     }
   }
@@ -547,8 +623,8 @@
         const items = [...pending.data, ...contacted.data].slice(0, 5);
         const solList = document.getElementById('solicitudes-list');
         if (solList) solList.innerHTML = items.length
-          ? items.map(s => '<div class="expiring-item" style="border-left-color:var(--primary)"><div><strong>' + s.nombre + '</strong><div style="font-size:11px;color:var(--text-light)">' + (s.plan_nombre || 'Sin plan') + ' — ' + s.telefono + '</div></div><span class="badge ' + (s.estado === 'pendiente' ? 'badge-warning' : 'badge-info') + '">' + s.estado + '</span></div>').join('')
-          : '<p style="color:var(--text-light);font-size:13px">Sin solicitudes activas</p>';
+          ? items.map(s => '<div class="list-row"><div class="item-main"><strong>' + s.nombre + '</strong><div class="item-sub">' + (s.plan_nombre || 'Sin plan') + ' — ' + s.telefono + '</div></div><span class="badge ' + (s.estado === 'pendiente' ? 'badge-warning' : 'badge-info') + '">' + s.estado + '</span></div>').join('')
+          : _emptyState('Sin solicitudes activas');
       }
     } catch {}
   }
@@ -578,22 +654,34 @@
     if (_chartAsistencia) { _chartAsistencia.destroy(); _chartAsistencia = null; }
     const existing = Chart.getChart(canvas);
     if (existing) existing.destroy();
+    const theme = _themeColors();
+    const accentRGB = _rgbTriplet(theme.accent);
+    const last = asistencia.labels.length - 1;
     _chartAsistencia = new Chart(canvas.getContext('2d'), {
       type: 'bar',
       data: {
         labels: asistencia.labels,
-        datasets: [{ label: 'Asistencias', data: asistencia.data, backgroundColor: asistencia.labels.map((l, i) => i === asistencia.labels.length - 1 ? 'rgba(108,99,255,0.9)' : 'rgba(108,99,255,0.3)'), borderColor: 'rgba(108,99,255,0.6)', borderWidth: 1, borderRadius: 5, borderSkipped: false }],
+        datasets: [{
+          label: 'Asistencias',
+          data: asistencia.data,
+          backgroundColor: asistencia.labels.map((l, i) => 'rgba(' + accentRGB + ',' + (i === last ? 0.95 : 0.25) + ')'),
+          hoverBackgroundColor: 'rgba(' + accentRGB + ',0.75)',
+          borderColor: 'rgba(' + accentRGB + ',0.6)',
+          borderWidth: 1, borderRadius: 5, borderSkipped: false,
+        }],
       },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false }, tooltip: { ..._tooltipDefaults, callbacks: { label: ctx => ' ' + ctx.parsed.y + ' asistencia' + (ctx.parsed.y !== 1 ? 's' : '') } } },
-        scales: { x: { grid: { display: false }, ticks: { font: { size: 10, weight: '600' }, color: 'var(--text-light)' } }, y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 10 }, color: 'var(--text-light)', precision: 0 } } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 11, weight: '600' }, color: theme.textLight } },
+          y: { beginAtZero: true, grid: { color: theme.grid }, ticks: { font: { size: 11 }, color: theme.textLight, precision: 0, maxTicksLimit: 5 } },
+        },
       },
     });
   }
 
-  async function loadNotifications() { try { const data = await api.get('/dashboard/notifications', true); if (!_pageActive()) return; renderNotifications(data); } catch {} }
-  async function loadActivity() { try { const data = await api.get('/dashboard/activity', true); if (!_pageActive()) return; renderTimeline(data); document.getElementById('activity-count').textContent = data.length + ' eventos'; } catch {} }
+  async function loadNotifications() { try { const data = await api.get('/dashboard/notifications', true); if (!_pageActive()) return; renderNotifications(data); } catch {} }  async function loadActivity() { try { const data = await api.get('/dashboard/activity', true); if (!_pageActive()) return; renderTimeline(data); document.getElementById('activity-count').textContent = data.length + ' eventos'; } catch {} }
   async function loadIngresosHoy() { try { const data = await api.get('/dashboard/ingresos-hoy', true); if (!_pageActive()) return; renderIngresosHoy(data); } catch {} }
   async function loadTopClients() { try { const data = await api.get('/dashboard/top-clients', true); if (!_pageActive()) return; renderTopClients(data); } catch {} }
   async function loadTopProducts() { try { const data = await api.get('/dashboard/top-products', true); if (!_pageActive()) return; renderTopProducts(data); } catch {} }
@@ -650,16 +738,28 @@
     finally { submitBtn.disabled = false; submitBtn.textContent = 'Registrar'; }
   }
 
-  function startAutoRefresh() { stopAutoRefresh(); _autoRefreshTimer = setInterval(() => { if (_pageActive()) { gymCache.invalidate('/dashboard?periodo=' + _currentPeriod); loadDashboard(); } }, 60000); }
-  function stopAutoRefresh() { if (_autoRefreshTimer) { clearInterval(_autoRefreshTimer); _autoRefreshTimer = null; } }
+  // El timer vive en window: al volver al dashboard (SPA) se limpia el anterior
+  // y nunca quedan intervalos huérfanos de visitas previas.
+  function startAutoRefresh() {
+    stopAutoRefresh();
+    _autoRefreshTimer = window.__dashRefresh = setInterval(() => {
+      if (_pageActive()) { gymCache.invalidate('/dashboard?periodo=' + _currentPeriod); loadDashboard(); }
+    }, 60000);
+  }
+  function stopAutoRefresh() {
+    if (_autoRefreshTimer) { clearInterval(_autoRefreshTimer); _autoRefreshTimer = null; }
+    if (window.__dashRefresh) { clearInterval(window.__dashRefresh); window.__dashRefresh = null; }
+  }
 
+  stopAutoRefresh(); // mata el intervalo de una visita previa
   loadDashboard();
   startAutoRefresh();
 
   document.querySelectorAll('.period-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.period-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); });
       btn.classList.add('active');
+      btn.setAttribute('aria-pressed', 'true');
       _currentPeriod = btn.dataset.period;
       gymCache.invalidate('/dashboard?periodo=' + _currentPeriod);
       loadDashboard();
@@ -667,8 +767,17 @@
   });
 
   document.getElementById('notif-toggle-btn')?.addEventListener('click', toggleNotifExpanded);
+
+  // Al cambiar claro/oscuro, repintar el gráfico (el <canvas> no lee variables CSS)
+  if (!window.__dashThemeObserver) {
+    window.__dashThemeObserver = new MutationObserver(() => {
+      if (_pageActive() && typeof Chart !== 'undefined') loadCharts().catch(() => {});
+    });
+    window.__dashThemeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  }
   document.getElementById('notif-badge-topbar')?.addEventListener('click', () => { document.getElementById('notif-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   document.getElementById('fab-register')?.addEventListener('click', openQuickRegisterModal);
+  document.getElementById('qr-cancel')?.addEventListener('click', closeQuickRegisterModal);
   document.getElementById('modal-quick-register')?.addEventListener('click', e => { if (e.target === e.currentTarget) closeQuickRegisterModal(); });
   document.getElementById('qr-submit')?.addEventListener('click', handleQuickRegister);
   ['qr-nombre','qr-apellido','qr-telefono','qr-email'].forEach(id => { document.getElementById(id)?.addEventListener('input', updateSubmitBtn); });
@@ -695,10 +804,10 @@
         DNI_CACHE[dni] = res;
         fillReniecData(res);
         hint.textContent = '✓ Datos encontrados';
-        hint.style.color = '#198754';
+        hint.style.color = 'var(--success-strong)';
       } catch {
         hint.textContent = 'No encontrado. Ingresa los datos manualmente.';
-        hint.style.color = '#f59e0b';
+        hint.style.color = 'var(--warning-strong)';
       }
     }, 500);
   });

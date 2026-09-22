@@ -2,7 +2,7 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Usuario = require('../models/Usuario');
-const { verifyToken, requireRole } = require('../middleware/auth');
+const { verifyToken, requireRole, isDeveloperUser } = require('../middleware/auth');
 const { validators, handleValidationErrors } = require('../middleware/validation');
 const { param } = require('express-validator');
 
@@ -53,6 +53,55 @@ router.post('/login', async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
     res.json({ token, user: { id: user._id, name: user.usuario, email: user.email, role: user.rol, permisos } });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/**
+ * Renovación deslizante de sesión.
+ * Mientras el token actual siga siendo válido, emitimos uno nuevo con los
+ * datos frescos de la BD. Así la sesión se extiende mientras haya actividad
+ * y ya no se corta en seco a los 7 días exactos (el usuario solo pierde la
+ * sesión si pasa 7 días sin usar el sistema o si lo desactivan).
+ */
+const noStore = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  'Pragma':        'no-cache',
+  'Expires':       '0',
+};
+
+router.post('/refresh', verifyToken, async (req, res) => {
+  res.set(noStore);
+  try {
+    let payload;
+    if (isDeveloperUser(req.user.id)) {
+      payload = {
+        id: 'dev',
+        name: req.user.name || process.env.DEV_USERNAME,
+        email: req.user.email || process.env.DEV_EMAIL,
+        role: 'admin',
+        permisos: [],
+      };
+    } else {
+      const user = await Usuario.findById(req.user.id).select('usuario email rol permisos').lean();
+      if (!user) return res.status(401).json({ error: 'Usuario no encontrado' });
+      payload = {
+        id: user._id,
+        name: user.usuario,
+        email: user.email,
+        role: user.rol,
+        permisos: user.rol === 'admin' ? [] : (user.permisos || []),
+      };
+    }
+
+    const token = jwt.sign(
+      payload,
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+    res.json({
+      token,
+      user: { id: payload.id, name: payload.name, email: payload.email, role: payload.role, permisos: payload.permisos },
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

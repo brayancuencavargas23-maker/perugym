@@ -26,9 +26,13 @@ const api = {
           const errData = await res.json().catch(() => ({}));
           throw new Error(errData.error || 'Usuario o contraseña incorrectos');
         }
-        // Cualquier otro 401 → token inválido o expirado → forzar logout
+        // Cualquier otro 401 → token inválido/expirado o usuario desactivado
+        // → forzar logout. Limpiamos TODO el sessionStorage (gym_cache y
+        // _sidebar_html): antes el sidebar del usuario anterior quedaba en
+        // caché y el siguiente usuario que iniciara sesión lo heredaba.
         console.error('[API] ❌ 401 Unauthorized - Cerrando sesión');
         gymCache.clear();
+        sessionStorage.clear();
         localStorage.removeItem('gym_token');
         localStorage.removeItem('gym_user');
         window.location.href = '/login.html';

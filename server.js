@@ -9,6 +9,15 @@ const { connectDB } = require('./config/database');
 
 const app = express();
 
+// ── Proxy inverso (nginx, Render, Cloudflare, etc.) ──────────────────────────
+// Sin esto, req.ip = IP del proxy y TODOS los clientes comparten el mismo
+// contador del rate-limit de login (una sola persona podría bloquear a toda la
+// oficina, o el límite no serviría de nada). TRUST_PROXY = nº de saltos.
+const TRUST_PROXY = process.env.TRUST_PROXY;
+if (TRUST_PROXY && TRUST_PROXY !== '0' && TRUST_PROXY !== 'false') {
+  app.set('trust proxy', TRUST_PROXY === 'true' ? 1 : Number(TRUST_PROXY));
+}
+
 // ── Seguridad: headers HTTP ──────────────────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: {
@@ -33,21 +42,47 @@ app.use(cors({
   credentials: true,
 }));
 
-// ── Rate limiting ─────────────────────────────────────────────────────────────
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 10,
-  message: { error: 'Demasiados intentos de inicio de sesión. Espera 15 minutos.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-// Solo aplica al login
-app.use('/api/auth/login', loginLimiter);
+// ── Rate limiting de login ───────────────────────────────────────────────────
+// (Va DESPUÉS de los body parsers: el limitidor por usuario necesita leer
+//  req.body.username. Ver más abajo.)
 
 // ── Body parsers y archivos ───────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(fileUpload({ limits: { fileSize: 5 * 1024 * 1024 } }));
+
+// ── Rate limiting de login ───────────────────────────────────────────────────
+// Dos límites independientes, ambos con `skipSuccessfulRequests` para que los
+// inicios de sesión EXITOSOS no consuman cupo (antes, 10 logins válidos en
+// 15 minutos agotaban el límite de la IP aunque no hubiera ningún error):
+//   · por IP       → acota ataques que rotan de cuenta desde una conexión
+//   · por usuario  → evita fuerza bruta contra una cuenta concreta sin castigar
+//                    a toda la oficina que comparte la misma IP pública (NAT)
+const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutos
+
+const loginIpLimiter = rateLimit({
+  windowMs: LOGIN_WINDOW_MS,
+  limit: 30,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiados intentos fallidos de inicio de sesión desde esta conexión. Intenta de nuevo en 15 minutos.' },
+});
+
+const loginUserLimiter = rateLimit({
+  windowMs: LOGIN_WINDOW_MS,
+  limit: 10,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const user = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
+    return user ? `user:${user}` : `ip:${req.ip}`;
+  },
+  message: { error: 'Demasiados intentos fallidos para esta cuenta. Intenta de nuevo en 15 minutos.' },
+});
+
+app.use('/api/auth/login', loginIpLimiter, loginUserLimiter);
 
 const { noCache } = require('./middleware/auth');
 

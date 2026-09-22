@@ -61,31 +61,42 @@ const verifyToken = async (req, res, next) => {
 
   if (!token) return res.status(401).json({ error: 'Token requerido' });
 
+  let decoded;
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'test-secret');
+    decoded = jwt.verify(token, process.env.JWT_SECRET || 'test-secret');
+  } catch (jwtError) {
+    // Token inválido o expirado → 401 SIEMPRE (antes era 403).
+    // El cliente (api.js) solo cierra sesión ante un 401; con un 403 mostraba
+    // "No tienes permiso" y la sesión vencida nunca hacía logout, dejando al
+    // usuario con errores de permisos hasta que recargara la página.
+    return res.status(401).json({ error: 'Token inválido o expirado' });
+  }
 
-    // El usuario desarrollador vive solo en el token (no está en la BD)
-    if (isDeveloperUser(decoded.id)) {
-      req.user = decoded;
-      return next();
-    }
+  // El usuario desarrollador vive solo en el token (no está en la BD)
+  if (isDeveloperUser(decoded.id)) {
+    req.user = decoded;
+    return next();
+  }
 
-    // Verificar que el usuario siga existiendo y esté activo
-    try {
-      const user = await Usuario.findById(decoded.id).select('activo rol').lean();
-      if (!user || !user.activo) {
-        return res.status(401).json({ error: 'Usuario inactivo o eliminado' });
-      }
-
-      req.user = decoded;
-      next();
-    } catch (dbError) {
-      // Error de base de datos (usuario no encontrado, etc.)
+  try {
+    const user = await Usuario.findById(decoded.id).select('activo rol permisos').lean();
+    if (!user || !user.activo) {
       return res.status(401).json({ error: 'Usuario inactivo o eliminado' });
     }
-  } catch (jwtError) {
-    // Error de JWT (token inválido o expirado)
-    return res.status(403).json({ error: 'Token inválido o expirado' });
+
+    // Rol y permisos frescos desde la BD: el token puede llevar datos de hace
+    // hasta 7 días. Así, si a un usuario le quitan permisos, el cambio surte
+    // efecto en la siguiente petición y no cuando venza su token.
+    req.user = {
+      ...decoded,
+      role: user.rol,
+      permisos: user.rol === 'admin' ? [] : (user.permisos || []),
+    };
+    next();
+  } catch (dbError) {
+    // Fallo transitorio de BD → 503, no 401 (antes un timeout de BD expulsaba
+    // al usuario de la sesión sin motivo y perdía su trabajo).
+    return res.status(503).json({ error: 'Error temporal de base de datos, intenta de nuevo' });
   }
 };
 
