@@ -87,6 +87,12 @@ if (isSolicitudes && typeof loadSolicitudes === 'function') {
     .catch(err => console.error('  ❌ Error al cargar solicitudes:', err));
 }
 
+
+
+
+
+
+
 // ── 7. Verificar peticiones de red ──────────────────────────────────────────
 console.log('\n%c7️⃣ PETICIONES DE RED', 'font-weight:bold;color:#0d6efd');
 console.log('  Abre la pestaña Network y verifica si hay peticiones a:');
