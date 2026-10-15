@@ -6,10 +6,10 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>Productos - GymPro</title>
+   <title>Productos e inventario - PeruGym</title>
   <link rel="stylesheet" href="/css/main.css">
   <!-- SPA redirect: si se accede directamente, redirigir al shell -->
-  <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
+  <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html?page=productos');}</script>
   <style>
     .product-img { width:44px; height:44px; border-radius:8px; object-fit:cover; background:var(--bg); }
     .product-img-placeholder { width:44px; height:44px; border-radius:8px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:20px; }
@@ -28,13 +28,24 @@
 
       <!-- ── PRODUCTOS ── -->
       <div id="section-products">
+      <!-- KPIs de inventario (solo admin) -->
+      <div class="stats-grid hidden" id="prod-kpis" style="margin-bottom:16px">
+        <div class="stat-card">
+          <div class="stat-icon purple">💰</div>
+          <div><div class="stat-value" id="kpi-val-prod">—</div><div class="stat-label">Valorización de inventario</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue">📦</div>
+          <div><div class="stat-value" id="kpi-val-unidades">—</div><div class="stat-label">Unidades en stock (activos)</div></div>
+        </div>
+      </div>
       <!-- Filtros -->
       <div class="card" style="margin-bottom:16px;padding:16px">
         <!-- Fila 1: Buscar producto -->
         <div style="margin-bottom:12px">
           <div style="position:relative;max-width:400px;width:100%">
             <span class="search-icon" id="icon-search-prod" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-light)"></span>
-            <input type="text" id="search-prod" class="form-control" style="padding-left:36px" placeholder="Buscar producto...">
+            <input type="text" id="search-prod" class="form-control" style="padding-left:36px" placeholder="Buscar producto o escanear código de barras...">
           </div>
         </div>
 
@@ -58,9 +69,9 @@
             <label style="font-size:12px">Stock</label>
             <select id="filter-stock" class="form-control">
               <option value="">Todos</option>
-              <option value="bajo">Stock bajo (≤5)</option>
+              <option value="bajo">Bajo el mínimo o igual</option>
               <option value="agotado">Agotado (0)</option>
-              <option value="ok">Stock OK (>5)</option>
+              <option value="ok">Por encima del mínimo</option>
             </select>
           </div>
         </div>
@@ -82,6 +93,7 @@
         <!-- Fila 4: Botones -->
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <button class="btn btn-primary" id="btn-new-prod" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-plus-prod"></span> Nuevo Producto</button>
+          <button class="btn btn-outline hidden" id="btn-conteo" onclick="openConteo()" style="display:inline-flex;align-items:center;gap:6px">Conteo físico</button>
           <button class="btn btn-success" onclick="exportarStock()" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-excel-stock"></span> Exportar Stock</button>
           <button class="btn btn-outline" onclick="document.getElementById('advanced-filters').style.display = document.getElementById('advanced-filters').style.display === 'none' ? 'block' : 'none'" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-filter-prod"></span> Filtros avanzados</button>
         </div>
@@ -90,7 +102,7 @@
           <div class="table-wrapper">
             <table>
               <thead>
-                <tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Estado</th><th>Acciones</th></tr>
+                <tr><th>Producto</th><th>Categoría</th><th>Precio</th><th class="col-admin-cost hidden">Costo</th><th class="col-admin-cost hidden">Valorizado</th><th>Stock</th><th>Estado</th><th>Acciones</th></tr>
               </thead>
               <tbody id="products-table"></tbody>
             </table>
@@ -133,8 +145,10 @@
       </div>
       <div class="form-row">
         <div class="form-group"><label>Precio (S/) *</label><input type="number" id="prod-price" class="form-control" step="0.01" required></div>
-        <div class="form-group"><label>Stock inicial</label><input type="number" id="prod-stock" class="form-control" value="0" min="0"></div>
+        <div class="form-group"><label>Stock inicial</label><input type="number" id="prod-stock" class="form-control" value="0" min="0"><small id="prod-stock-hint" hidden>El stock se modifica con <strong>Entrada</strong> o <strong>Ajustar</strong> desde el inventario (requiere motivo).</small></div>
       </div>
+      <div class="form-group"><label for="prod-minimo">Stock mínimo</label><input type="number" id="prod-minimo" class="form-control" value="5" min="0" step="1"><small>Se avisará cuando las existencias sean iguales o menores a este valor.</small></div>
+      <div class="form-group"><label for="prod-code">Código de barras</label><input type="text" id="prod-code" class="form-control" maxlength="30" placeholder="Ej: 7750000123456"><small>Con el lector en foco, escanearlo lo busca en la tabla de productos.</small></div>
       <div class="form-group"><label>Descripción</label><textarea id="prod-desc" class="form-control" rows="2"></textarea></div>
       <div class="form-group hidden" id="prod-active-group">
         <label><input type="checkbox" id="prod-active"> Producto activo</label>
@@ -149,20 +163,277 @@
 
 
 
+<div class="modal-overlay hidden" id="modal-inventario">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="inv-title" style="width:min(900px,95vw);max-width:900px">
+    <div class="modal-header"><h3 id="inv-title">Inventario</h3><button class="btn btn-outline" onclick="closeModal('modal-inventario')" aria-label="Cerrar inventario">Cerrar</button></div>
+    <div class="modal-body">
+      <p id="inv-stock" role="status"></p>
+      <form id="inv-form" hidden>
+        <div class="form-group"><label for="inv-cantidad" id="inv-cantidad-label">Cantidad</label><input id="inv-cantidad" class="form-control" type="number" step="1" required></div>
+        <div class="form-group"><label for="inv-motivo">Motivo</label><textarea id="inv-motivo" class="form-control" required maxlength="500" placeholder="Ej.: reposición, producto dañado o diferencia de conteo"></textarea></div>
+        <p id="inv-error" role="alert" tabindex="-1"></p>
+        <button class="btn btn-primary" id="inv-save" type="submit">Registrar movimiento</button>
+      </form>
+      <h4>Lotes y vencimientos</h4>
+      <form id="lote-form" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">
+        <div class="form-group" style="margin:0;flex:1;min-width:110px"><label for="lote-numero" style="font-size:12px">N° de lote</label><input id="lote-numero" class="form-control" maxlength="40" placeholder="Opcional"></div>
+        <div class="form-group" style="margin:0;flex:1;min-width:90px"><label for="lote-cantidad" style="font-size:12px">Cantidad</label><input id="lote-cantidad" class="form-control" type="number" min="1" step="1" required></div>
+        <div class="form-group" style="margin:0;flex:1;min-width:130px"><label for="lote-vence" style="font-size:12px">Vencimiento</label><input id="lote-vence" class="form-control" type="date" required></div>
+        <button class="btn btn-primary" id="lote-save" type="submit">Agregar lote</button>
+      </form>
+      <p id="lote-error" role="alert" tabindex="-1"></p>
+      <div class="table-wrapper"><table><thead><tr><th>N° de lote</th><th>Cantidad</th><th>Vencimiento</th><th>Estado</th><th>Origen</th><th></th></tr></thead><tbody id="lotes-list"><tr><td colspan="6">Sin lotes registrados.</td></tr></tbody></table></div>
+      <p style="color:var(--text-light);font-size:12px">Registrar un lote no modifica el stock; es trazabilidad. Alertas a 30 días del vencimiento.</p>
+
+      <h4>Historial de movimientos</h4>
+      <p style="color:var(--text-light)">Los productos anteriores a esta actualización conservan su stock. Aquí se muestran los movimientos registrados desde entonces.</p>
+      <div class="table-wrapper"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Cantidad</th><th>Antes → Después</th><th>Responsable</th><th>Motivo / Venta</th></tr></thead><tbody id="inv-history"></tbody></table></div>
+      <div style="display:flex;gap:12px;align-items:center;margin-top:12px"><button class="btn btn-outline" id="inv-prev" type="button">Anterior</button><span id="inv-page" role="status"></span><button class="btn btn-outline" id="inv-next" type="button">Siguiente</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Conteo físico -->
+<div class="modal-overlay hidden" id="modal-conteo">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="conteo-title" style="width:min(900px,95vw);max-width:900px">
+    <div class="modal-header"><h3 id="conteo-title">Conteo físico</h3><button class="btn btn-outline" onclick="closeModal('modal-conteo')" aria-label="Cerrar conteo">Cerrar</button></div>
+    <div class="modal-body">
+      <p style="color:var(--text-light)">Cuenta y escribe solo las diferencias; los campos vacíos no se modifican. Al confirmar se aplican ajustes con motivo automático <strong>Conteo físico #n</strong>.</p>
+      <div style="margin-bottom:10px;max-width:400px">
+        <input type="text" id="conteo-search" class="form-control" aria-label="Buscar producto en el conteo" placeholder="Buscar producto o escanear código..." oninput="renderConteoRows()">
+      </div>
+      <div class="table-wrapper" style="max-height:320px;overflow:auto">
+        <table><thead><tr><th>Producto</th><th>Stock sistema</th><th>Contado</th><th>Diferencia</th></tr></thead>
+        <tbody id="conteo-table"><tr><td colspan="4">Cargando productos…</td></tr></tbody></table>
+      </div>
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:10px">
+        <span id="conteo-resumen" role="status" style="font-size:13px;color:var(--text-light)"></span>
+        <p id="conteo-error" role="alert" tabindex="-1" style="color:var(--danger);margin:0"></p>
+        <button class="btn btn-primary" id="conteo-save" onclick="withLoading(this, confirmarConteo)">Confirmar conteo</button>
+      </div>
+      <h4 style="margin-top:18px">Historial de conteos</h4>
+      <div class="table-wrapper"><table><thead><tr><th>Fecha</th><th>Responsable</th><th>Ajustados</th><th>Sin cambio</th><th>Notas</th></tr></thead><tbody id="conteo-history"><tr><td colspan="5">Sin conteos registrados.</td></tr></tbody></table></div>
+    </div>
+  </div>
+</div>
 <script src="/js/cache.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/utils.js"></script>
 <script src="/js/icons.js"></script>
 <script src="/js/layout.js"></script>
+<script src="/js/catalogo-data.js"></script>
 <script>
   const user = JSON.parse(localStorage.getItem('gym_user') || '{}');
+  const pageSignal = window.__spaPageAbort?.signal;
+  let productsTicket = 0, categoriesTicket = 0, summaryTicket = 0, lotesTicket = 0, panelEditId = null;
   let pageProd = 1;
   let allProducts = [];
   let tablePaginator = null;
+  const invEscape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  let invProduct, invType, invPage = 1, invTicket = 0;
+  async function loadInventoryHistory() {
+    const ticket = ++invTicket;
+    document.getElementById('inv-history').innerHTML = '<tr><td colspan="6">Cargando movimientos…</td></tr>';
+    try {
+      const result = await api.get(`/productos/${invProduct._id || invProduct.id}/movimientos?page=${invPage}`, true);
+      if (!_pageActive() || ticket !== invTicket) return;
+      document.getElementById('inv-history').innerHTML = result.data.map(m => `<tr><td>${invEscape(fmtDateTime(m.fecha))}</td><td>${invEscape(m.tipo)}</td><td>${m.cantidad > 0 ? '+' : ''}${m.cantidad}</td><td>${m.stock_anterior} → ${m.stock_nuevo}</td><td>${invEscape(m.responsable)}</td><td style="white-space:normal">${invEscape(m.motivo)}${m.venta_id ? '<br>Venta: ' + invEscape(m.venta_id) : ''}${m.compra_id ? '<br>Compra: ' + invEscape(m.compra_id) : ''}</td></tr>`).join('') || '<tr><td colspan="6">Sin movimientos registrados.</td></tr>';
+      document.getElementById('inv-page').textContent = `${result.total} registros · Página ${invPage} de ${Math.max(1, result.pages)}`;
+      document.getElementById('inv-prev').disabled = invPage <= 1;
+      document.getElementById('inv-next').disabled = invPage >= result.pages;
+    } catch (err) { if (_pageActive() && ticket === invTicket) document.getElementById('inv-history').innerHTML = `<tr><td colspan="6">${invEscape(err.message)}</td></tr>`; }
+  }
+  function openInventory(id, type = '') {
+    invProduct = allProducts.find(p => String(p._id || p.id) === id);
+    if (!invProduct) return;
+    invType = type; invPage = 1;
+    document.getElementById('inv-title').textContent = `${type === 'entrada' ? 'Registrar entrada' : type === 'ajuste' ? 'Ajustar inventario' : 'Historial'} · ${invProduct.nombre}`;
+    document.getElementById('inv-stock').textContent = `Stock actual: ${invProduct.stock} · Mínimo: ${invProduct.stock_minimo ?? 5}`;
+    document.getElementById('inv-form').hidden = !type || user.role !== 'admin';
+    document.getElementById('inv-form').reset();
+    document.getElementById('inv-error').textContent = '';
+    document.getElementById('inv-cantidad-label').textContent = type === 'ajuste' ? 'Stock físico contado (cantidad final)' : 'Unidades recibidas (se suman al stock)';
+    document.getElementById('inv-cantidad').min = type === 'ajuste' ? 0 : 1;
+    openModal('modal-inventario');
+    loadInventoryHistory();
+    loadLotes();
+  }
+  document.getElementById('inv-prev').onclick = () => { invPage--; loadInventoryHistory(); };
+  document.getElementById('inv-next').onclick = () => { invPage++; loadInventoryHistory(); };
+  document.getElementById('inv-form').onsubmit = async event => {
+    event.preventDefault();
+    const product = invProduct;
+    const button = document.getElementById('inv-save'); button.disabled = true;
+    try {
+      const cantidad = Number(document.getElementById('inv-cantidad').value);
+      const p = await api.post(`/productos/${product._id || product.id}/movimientos`, { tipo: invType, cantidad, stock_nuevo: cantidad, stock_anterior: product.stock, motivo: document.getElementById('inv-motivo').value });
+      GymCatalogo.invalidar();
+      if (!_pageActive()) return;
+      Object.assign(product, p); refreshTable(); loadProductSummary();
+      if (invProduct !== product) return;
+      document.getElementById('inv-stock').textContent = `Stock actual: ${p.stock} · Mínimo: ${p.stock_minimo ?? 5}`;
+      document.getElementById('inv-form').reset(); document.getElementById('inv-error').textContent = '';
+      invPage = 1; loadInventoryHistory(); toast('Movimiento registrado');
+    } catch (err) {
+      if (_pageActive()) { const el = document.getElementById('inv-error'); el.textContent = err.message; el.focus(); }
+    } finally { if (_pageActive()) button.disabled = false; }
+  };
+  window.openInventory = openInventory;
 
-  // ── Apertura inmediata de modal desde panel de notificaciones ───────────────
-  // Se lee ANTES de cualquier async para abrir el modal en el mismo frame
-  // en que el script se ejecuta (los modales ya están en el DOM en este punto).
+  // ── Lotes y vencimientos (trazabilidad) ─────────────────────────────────────
+  async function loadLotes() {
+    const ticket = ++lotesTicket;
+    const productId = invProduct._id || invProduct.id;
+    const tbody = document.getElementById('lotes-list');
+    const form = document.getElementById('lote-form');
+    const puedeEditar = user.role === 'admin' && invProduct?.activo;
+    form.classList.toggle('hidden', !puedeEditar);
+    document.getElementById('lote-error').textContent = '';
+    try {
+      const r = await api.get(`/productos/${productId}/lotes`, true);
+      if (!_pageActive() || ticket !== lotesTicket) return;
+      const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+      tbody.innerHTML = r.data.map(l => {
+        const v = new Date(l.fecha_vencimiento);
+        const dias = Math.ceil((new Date(v.getFullYear(), v.getMonth(), v.getDate()) - hoy) / 86400000);
+        const estado = dias < 0 ? '<span class="badge badge-danger">Vencido</span>'
+          : dias <= 30 ? `<span class="badge badge-info">Vence en ${dias}d</span>`
+          : '<span class="badge badge-success">Vigente</span>';
+        const fecha = `${String(v.getDate()).padStart(2, '0')}/${String(v.getMonth() + 1).padStart(2, '0')}/${v.getFullYear()}`;
+        return `<tr><td>${invEscape(l.numero_lote || '—')}</td><td>${l.cantidad}</td><td>${fecha}</td><td>${estado}</td>
+          <td>${l.compra_id ? 'Compra' : 'Manual'}</td>
+          <td>${puedeEditar ? `<button class="btn btn-sm btn-danger" onclick="deleteLote('${l._id}')">Eliminar</button>` : ''}</td></tr>`;
+      }).join('') || '<tr><td colspan="6">Sin lotes registrados.</td></tr>';
+    } catch (err) { if (_pageActive() && ticket === lotesTicket) tbody.innerHTML = `<tr><td colspan="6">${invEscape(err.message)}</td></tr>`; }
+  }
+  document.getElementById('lote-form').onsubmit = async event => {
+    event.preventDefault();
+    const btn = document.getElementById('lote-save'); btn.disabled = true;
+    try {
+      await api.post(`/productos/${invProduct._id || invProduct.id}/lotes`, {
+        numero_lote: document.getElementById('lote-numero').value,
+        cantidad: Number(document.getElementById('lote-cantidad').value),
+        fecha_vencimiento: document.getElementById('lote-vence').value,
+      });
+      if (!_pageActive()) return;
+      document.getElementById('lote-form').reset();
+      GymCatalogo.invalidar();
+      document.getElementById('lote-error').textContent = '';
+      toast('Lote registrado (el stock no cambia)');
+      loadLotes();
+    } catch (err) {
+      if (_pageActive()) { const el = document.getElementById('lote-error'); el.textContent = err.message; el.focus(); }
+    } finally { if (_pageActive()) btn.disabled = false; }
+  };
+  async function deleteLote(loteId) {
+    const ok = await confirmDialog({ title: 'Eliminar lote', message: '¿Eliminar este lote? Es solo trazabilidad: el stock no cambia.', confirmText: 'Eliminar', type: 'danger' });
+    if (!ok) return;
+    try {
+      await api.delete(`/productos/${invProduct._id || invProduct.id}/lotes/${loteId}`);
+      GymCatalogo.invalidar();
+      toast('Lote eliminado'); loadLotes();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+  window.deleteLote = deleteLote;
+
+  // ── Conteo físico ───────────────────────────────────────────────────────────
+  let conteoRows = [];
+  function buildConteoRows(prev = new Map()) {
+    conteoRows = allProducts.filter(p => p.activo).map(p => ({
+      id: p._id || p.id, nombre: p.nombre, codigo: p.codigo_barras || '',
+      stock: Number(p.stock || 0), contado: prev.get(p._id || p.id) ?? '',
+    }));
+  }
+  function openConteo() {
+    if (user.role !== 'admin') return toast('Solo administradores', 'warning');
+    buildConteoRows();
+    document.getElementById('conteo-search').value = '';
+    document.getElementById('conteo-error').textContent = '';
+    document.getElementById('conteo-resumen').textContent = '';
+    renderConteoRows();
+    loadConteoHistory();
+    openModal('modal-conteo');
+  }
+  function renderConteoRows() {
+    const q = (document.getElementById('conteo-search').value || '').toLowerCase();
+    const rows = conteoRows.filter(r => !q || r.nombre.toLowerCase().includes(q) || r.codigo.toLowerCase().includes(q));
+    document.getElementById('conteo-table').innerHTML = rows.map(r => {
+      const dif = r.contado === '' ? '' : Number(r.contado) - r.stock;
+      return `<tr data-id="${r.id}">
+        <td><div style="font-weight:600">${invEscape(r.nombre)}</div>${r.codigo ? `<div style="font-size:11px;color:var(--text-light)">Cód: ${invEscape(r.codigo)}</div>` : ''}</td>
+        <td>${r.stock}</td>
+        <td><input type="number" min="0" step="1" class="form-control conteo-input" style="max-width:110px" value="${r.contado}" data-id="${r.id}" oninput="actualizarConteo('${r.id}', this.value)" aria-label="Stock contado de ${invEscape(r.nombre)}"></td>
+        <td class="${dif === '' ? '' : dif !== 0 ? 'stock-low' : 'stock-ok'}">${dif === '' ? '—' : (dif > 0 ? '+' : '') + dif}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="4">Sin productos para mostrar.</td></tr>';
+    actualizarResumenConteo();
+  }
+  function actualizarConteo(id, val) {
+    const r = conteoRows.find(x => x.id === id); if (!r) return;
+    r.contado = val === '' ? '' : Math.max(0, Math.floor(Number(val) || 0));
+    const row = document.querySelector(`#conteo-table tr[data-id="${id}"]`);
+    if (row) {
+      const dif = r.contado === '' ? '' : Number(r.contado) - r.stock;
+      const cell = row.lastElementChild;
+      cell.className = dif === '' ? '' : dif !== 0 ? 'stock-low' : 'stock-ok';
+      cell.textContent = dif === '' ? '—' : (dif > 0 ? '+' : '') + dif;
+    }
+    actualizarResumenConteo();
+  }
+  function actualizarResumenConteo() {
+    const contados = conteoRows.filter(r => r.contado !== '');
+    const difs = contados.filter(r => Number(r.contado) !== r.stock);
+    document.getElementById('conteo-resumen').textContent = contados.length
+      ? `${contados.length} productos contados · ${difs.length} con diferencia` : '';
+  }
+  async function refrescarConteo() {
+    await loadProducts();
+    const prev = new Map(conteoRows.map(r => [r.id, r.contado]));
+    buildConteoRows(prev);
+    renderConteoRows();
+  }
+  async function confirmarConteo() {
+    const errEl = document.getElementById('conteo-error'); errEl.textContent = '';
+    const items = conteoRows.filter(r => r.contado !== '')
+      .map(r => ({ producto_id: r.id, stock_sistema: r.stock, stock_contado: Number(r.contado) }));
+    if (!items.length) { errEl.textContent = 'Escribe el stock contado de al menos un producto.'; errEl.focus(); return; }
+    try {
+      const res = await api.post('/inventario/conteos', { items });
+      if (!_pageActive()) return;
+      res.conteo.items.forEach(it => {
+        const pid = String(it.producto_id);
+        const prod = allProducts.find(x => String(x._id || x.id) === pid);
+        if (prod) prod.stock = it.stock_contado;
+        const r = conteoRows.find(x => x.id === pid);
+        if (r) { r.stock = it.stock_contado; r.contado = ''; }
+      });
+      GymCatalogo.invalidar();
+      loadProductSummary();
+      refreshTable();
+      renderConteoRows();
+      loadConteoHistory();
+      toast(`Conteo confirmado: ${res.ajustados} ajuste(s), ${res.sin_cambio} sin cambio`);
+    } catch (err) {
+      if (!_pageActive()) return;
+      errEl.textContent = err.message; errEl.focus();
+      if (String(err.message).includes('cambió')) await refrescarConteo();
+    }
+  }
+  async function loadConteoHistory() {
+    const tbody = document.getElementById('conteo-history');
+    try {
+      const r = await api.get('/inventario/conteos?limit=10', true);
+      if (!_pageActive()) return;
+      tbody.innerHTML = r.data.map(c => `<tr><td>${invEscape(fmtDateTime(c.fecha))}</td><td>${invEscape(c.responsable)}</td><td>${c.ajustados}</td><td>${c.sin_cambio}</td><td style="white-space:normal">${invEscape(c.notas || '')}</td></tr>`).join('')
+        || '<tr><td colspan="5">Sin conteos registrados.</td></tr>';
+    } catch (err) { if (_pageActive()) tbody.innerHTML = `<tr><td colspan="5">${invEscape(err.message)}</td></tr>`; }
+  }
+  window.openConteo = openConteo;
+  window.renderConteoRows = renderConteoRows;
+  window.actualizarConteo = actualizarConteo;
+  window.confirmarConteo = confirmarConteo;
+
+  // Abrir desde notificaciones usando el catálogo actualizado, no la copia de la alerta.
   (function _checkPanelEdit() {
     const raw = sessionStorage.getItem('_spa_edit_producto');
     if (!raw) return;
@@ -170,16 +441,12 @@
     try {
       const p = JSON.parse(raw);
       if (!p || !( p._id || p.id)) return;
-      // Pre-poblar allProducts para que editProduct lo encuentre
-      allProducts = [p];
-      // Abrir modal en el siguiente frame (el DOM del modal ya existe pero
-      // requestAnimationFrame garantiza que el browser terminó el layout)
-      requestAnimationFrame(() => editProduct(p._id || p.id));
+      panelEditId = p._id || p.id;
     } catch { /* JSON inválido, ignorar */ }
   })();
 
   function _pageActive() {
-    return !!document.getElementById('products-table');
+    return !pageSignal?.aborted && !!document.getElementById('products-table');
   }
 
   function renderRow(p) {
@@ -192,15 +459,18 @@
               : `<div class="product-img-placeholder">📦</div>`}
             <div>
               <div style="font-weight:600">${p.nombre}</div>
-              <div style="font-size:11px;color:var(--text-light)">${p.descripcion || ''}</div>
+              <div style="font-size:11px;color:var(--text-light)">${p.codigo_barras ? 'Cód: ' + p.codigo_barras + ' · ' : ''}${p.descripcion || ''}</div>
             </div>
           </div>
         </td>
         <td>${p.categoria ? `<span class="badge badge-info">${p.categoria}</span>` : '-'}</td>
         <td style="font-weight:600">S/ ${parseFloat(p.precio_venta).toFixed(2)}</td>
-        <td class="${p.stock <= 5 ? 'stock-low' : 'stock-ok'}">${p.stock} ${p.stock <= 5 ? '⚠️' : ''}</td>
+        ${user.role === 'admin' ? `<td style="color:var(--text-light)">S/ ${Number(p.costo || 0).toFixed(2)}</td><td style="font-weight:600">S/ ${(Number(p.costo || 0) * Number(p.stock || 0)).toFixed(2)}</td>` : ''}
+         <td class="${p.stock <= (p.stock_minimo ?? 5) ? 'stock-low' : 'stock-ok'}">${p.stock}<div style="font-size:12px">Mínimo: ${p.stock_minimo ?? 5} · ${p.stock === 0 ? 'Agotado' : p.stock <= (p.stock_minimo ?? 5) ? 'Reponer' : 'Disponible'}</div></td>
         <td><span class="badge ${p.activo ? 'badge-success' : 'badge-danger'}">${p.activo ? 'Activo' : 'Inactivo'}</span></td>
         <td>
+          <button class="btn btn-sm btn-outline" onclick="openInventory('${p._id || p.id}')">Historial</button>
+          ${user.role === 'admin' && p.activo ? `<button class="btn btn-sm btn-outline" onclick="openInventory('${p._id || p.id}', 'entrada')">Entrada</button><button class="btn btn-sm btn-outline" onclick="openInventory('${p._id || p.id}', 'ajuste')">Ajustar</button>` : ''}
           ${user.role === 'admin' ? `<button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center" onclick="editProduct('${p._id || p.id}')">${icon('edit')}</button>` : ''}
           ${user.role === 'admin' ? `<button class="btn btn-sm btn-danger" style="display:inline-flex;align-items:center" onclick="withLoading(this, () => deleteProduct('${p._id || p.id}', '${p.nombre.replace(/'/g, "\\'")}'), 'Eliminando...')">${icon('trash')}</button>` : ''}
         </td>
@@ -227,14 +497,15 @@
       if (search) {
         const name = (p.nombre || '').toLowerCase();
         const desc = (p.descripcion || '').toLowerCase();
-        if (!name.includes(search) && !desc.includes(search)) return false;
+        const code = (p.codigo_barras || '').toLowerCase();
+        if (!name.includes(search) && !desc.includes(search) && !code.includes(search)) return false;
       }
       if (category && p.categoria !== category) return false;
       if (active === 'true' && !p.activo) return false;
       if (active === 'false' && p.activo) return false;
-      if (stock === 'bajo' && (p.stock > 5 || p.stock === 0)) return false;
+      if (stock === 'bajo' && p.stock > (p.stock_minimo ?? 5)) return false;
       if (stock === 'agotado' && p.stock !== 0) return false;
-      if (stock === 'ok' && p.stock <= 5) return false;
+      if (stock === 'ok' && p.stock <= (p.stock_minimo ?? 5)) return false;
       if (p.precio_venta < precioMin || p.precio_venta > precioMax) return false;
       return true;
     });
@@ -251,24 +522,43 @@
   }
 
   async function loadProducts() {
-    showTableSkeleton('products-table', 6);
+    if (!_pageActive()) return;
+    const ticket = ++productsTicket;
+    showTableSkeleton('products-table', user.role === 'admin' ? 8 : 6);
     try {
-      const data = await api.get('/productos?limit=500');
-      if (!_pageActive()) return;
-      allProducts = data.data;
+      const data = await GymCatalogo.listar('/productos', pageSignal);
+      if (!_pageActive() || ticket !== productsTicket) return;
+      allProducts = data;
       refreshTable();
-    } catch (err) { toast(err.message, 'error'); }
+      if (panelEditId) { const id = panelEditId; panelEditId = null; editProduct(id); }
+    } catch (err) { if (_pageActive() && ticket === productsTicket) toast(err.message, 'error'); }
   }
 
   async function loadCategories() {
-    const cats = await api.get('/productos/categorias');
-    if (!_pageActive()) return;
-    const sel = document.getElementById('filter-cat');
-    const dl  = document.getElementById('cat-list');
-    cats.forEach(c => {
-      if (sel) sel.innerHTML += `<option value="${c}">${c}</option>`;
-      if (dl)  dl.innerHTML  += `<option value="${c}">`;
-    });
+    const ticket = ++categoriesTicket;
+    try {
+      const cats = await api.get('/productos/categorias', true);
+      if (!_pageActive() || ticket !== categoriesTicket) return;
+      const sel = document.getElementById('filter-cat');
+      const dl = document.getElementById('cat-list');
+      const actual = sel.value;
+      const categorias = [...new Set(cats.filter(c => typeof c === 'string' && c.trim()))];
+      sel.replaceChildren(new Option('Todas las categorías', ''), ...categorias.map(c => new Option(c, c)));
+      dl.replaceChildren(...categorias.map(c => new Option(c, c)));
+      if (categorias.includes(actual)) sel.value = actual;
+      refreshTable();
+    } catch (err) { if (_pageActive()) toast(err.message, 'error'); }
+  }
+
+  async function loadProductSummary() {
+    if (user.role !== 'admin' || !_pageActive()) return;
+    const ticket = ++summaryTicket;
+    try {
+      const r = await api.get('/compras/resumen', true);
+      if (!_pageActive() || ticket !== summaryTicket) return;
+      document.getElementById('kpi-val-prod').textContent = 'S/ ' + Number(r.valorizacion || 0).toFixed(2);
+      document.getElementById('kpi-val-unidades').textContent = String(r.unidades ?? 0);
+    } catch (err) { if (_pageActive()) toast(err.message, 'error'); }
   }
 
   document.getElementById('btn-new-prod') && (document.getElementById('btn-new-prod').onclick = () => {
@@ -278,11 +568,16 @@
     document.getElementById('prod-cat').value = '';
     document.getElementById('prod-price').value = '';
     document.getElementById('prod-stock').value = 0;
+    document.getElementById('prod-stock').disabled = false;
+    document.getElementById('prod-stock-hint').hidden = true;
+    document.getElementById('prod-minimo').value = 5;
+    document.getElementById('prod-code').value = '';
     document.getElementById('prod-desc').value = '';
     document.getElementById('prod-active-group').classList.add('hidden');
     document.getElementById('prod-photo-preview').style.display = 'none';
     document.getElementById('prod-photo-placeholder').style.display = '';
     document.getElementById('prod-modal-title').textContent = 'Nuevo Producto';
+    document.getElementById('prod-photo').value = '';
     openModal('modal-product');
   });
 
@@ -301,11 +596,18 @@
   async function editProduct(id) {
     const p = allProducts.find(x => x._id === id || x.id === id);
     if (!p) return;
+    document.getElementById('prod-photo').value = '';
+    document.getElementById('prod-photo-preview').style.display = 'none';
+    document.getElementById('prod-photo-placeholder').style.display = '';
     document.getElementById('prod-id').value = p._id || p.id;
     document.getElementById('prod-name').value = p.nombre;
     document.getElementById('prod-cat').value = p.categoria || '';
     document.getElementById('prod-price').value = p.precio_venta;
     document.getElementById('prod-stock').value = p.stock;
+    document.getElementById('prod-stock').disabled = true;
+    document.getElementById('prod-stock-hint').hidden = false;
+    document.getElementById('prod-minimo').value = p.stock_minimo ?? 5;
+    document.getElementById('prod-code').value = p.codigo_barras || '';
     document.getElementById('prod-desc').value = p.descripcion || '';
     document.getElementById('prod-active').checked = p.activo;
     document.getElementById('prod-active-group').classList.remove('hidden');
@@ -324,7 +626,9 @@
     formData.append('nombre',      document.getElementById('prod-name').value);
     formData.append('categoria',   document.getElementById('prod-cat').value);
     formData.append('precio_venta',document.getElementById('prod-price').value);
-    formData.append('stock',       document.getElementById('prod-stock').value);
+    if (!id) formData.append('stock', document.getElementById('prod-stock').value);
+    formData.append('stock_minimo', document.getElementById('prod-minimo').value);
+    formData.append('codigo_barras', document.getElementById('prod-code').value.trim());
     formData.append('descripcion', document.getElementById('prod-desc').value);
     formData.append('activo',      id ? document.getElementById('prod-active').checked : true);
     const foto = document.getElementById('prod-photo').files[0];
@@ -335,9 +639,10 @@
       const res = await fetch(url, { method, headers: { Authorization: `Bearer ${api.getToken()}` }, body: formData });
       if (!res.ok) throw new Error((await res.json()).error);
       const data = await res.json().catch(() => null);
+      GymCatalogo.invalidar();
+      if (!_pageActive()) return;
 
       if (id && data) {
-        gymCache.patchItem('productos', id, () => data);
         const idx = allProducts.findIndex(p => p._id === id || p.id === id);
         if (idx !== -1) allProducts[idx] = { ...allProducts[idx], ...data };
       } else {
@@ -349,27 +654,31 @@
       closeModal('modal-product');
       refreshTable();
       loadCategories();
+      loadProductSummary();
     } catch (err) { toast(err.message, 'error'); }
   }
 
   async function deleteProduct(id, nombre) {
     const ok = await confirmDialog({
-      title: 'Eliminar producto',
-      message: `¿Eliminar <strong>${nombre}</strong>? Esta acción no se puede deshacer.`,
-      confirmText: 'Sí, eliminar',
+      title: 'Desactivar producto',
+      message: `¿Desactivar <strong>${invEscape(nombre)}</strong>? Se conservarán sus existencias e historial.`,
+      confirmText: 'Sí, desactivar',
       type: 'danger'
     });
     if (!ok) return;
     try {
-      await api.delete(`/productos/${id}`, { remove: { ns: 'productos', id } });
-      allProducts = allProducts.filter(p => p._id !== id && p.id !== id);
-      toast('Producto eliminado');
+      await api.delete(`/productos/${id}`);
+      const p = allProducts.find(p => (p._id || p.id) === id); if (p) p.activo = false;
+      GymCatalogo.invalidar();
+      loadProductSummary();
+      toast('Producto desactivado; historial conservado');
       refreshTable();
     } catch (err) { toast(err.message, 'error'); }
   }
 
   // Búsqueda con debounce
   let searchTimer;
+  pageSignal?.addEventListener('abort', () => clearTimeout(searchTimer), { once: true });
   document.getElementById('search-prod') && (document.getElementById('search-prod').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => refreshTable(), 400); });
   document.getElementById('filter-cat') && (document.getElementById('filter-cat').onchange = () => refreshTable());
   document.getElementById('filter-active-prod') && (document.getElementById('filter-active-prod').onchange = () => refreshTable());
@@ -386,7 +695,15 @@
 
   // ── Inicialización ──────────────────────────────────────────────────────────
   (function _initPage() {
-    initLayout('productos', 'Productos');
+    initLayout('productos', 'Productos e inventario');
+    if (user.role === 'admin') {
+      document.querySelectorAll('th.col-admin-cost').forEach(th => th.classList.remove('hidden'));
+      const kpis = document.getElementById('prod-kpis');
+      if (kpis) kpis.classList.remove('hidden');
+      const btnConteo = document.getElementById('btn-conteo');
+      if (btnConteo) btnConteo.classList.remove('hidden');
+      loadProductSummary();
+    }
     const iconMap = {
       'icon-search-prod':       icon('search'),
       'icon-plus-prod':         icon('plus'),

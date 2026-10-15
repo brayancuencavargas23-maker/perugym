@@ -19,6 +19,7 @@ const GymRouter = (() => {
     pagos:           '/pagos.html',
     asistencia:      '/asistencia.html',
     productos:       '/productos.html',
+    compras:         '/compras.html',
     caja:            '/caja.html',
     reports:         '/reports.html',
     users:           '/users.html',
@@ -35,6 +36,27 @@ const GymRouter = (() => {
   let _isNavigating = false;
   const _htmlCache  = {};
 
+  function _showNavigationError(page) {
+    const container = document.getElementById('spa-content');
+    if (!container) return;
+    const card = document.createElement('section');
+    card.className = 'card';
+    card.style.padding = '24px';
+    card.setAttribute('role', 'alert');
+    const title = document.createElement('h2');
+    title.textContent = 'No se pudo cargar el módulo';
+    const description = document.createElement('p');
+    description.textContent = 'El servidor puede estar reiniciándose o temporalmente sin conexión. Espera unos segundos y vuelve a intentarlo.';
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'btn btn-primary';
+    retry.textContent = 'Reintentar';
+    retry.onclick = () => navigate(page, false);
+    card.append(title, description, retry);
+    container.replaceChildren(card);
+    retry.focus();
+  }
+
   // ── Parsear HTML completo → partes relevantes ──────────────────────────────
   function _parse(html) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -45,7 +67,8 @@ const GymRouter = (() => {
 
     // Contenido de .page-content
     const pc = doc.querySelector('.page-content');
-    const content = pc ? pc.innerHTML : '';
+    if (!pc) throw new Error('La respuesta no contiene el módulo solicitado.');
+    const content = pc.innerHTML;
 
     // Modales (fuera de .app-layout)
     const modals = Array.from(doc.querySelectorAll('.modal-overlay'))
@@ -59,49 +82,29 @@ const GymRouter = (() => {
     ];
     
     const allBodyScripts = Array.from(doc.querySelectorAll('body script'));
-    console.log('[Router] 🔍 Scripts encontrados en body:', allBodyScripts.length);
     allBodyScripts.forEach((s, i) => {
-      console.log(`  Script ${i}:`, {
-        src: s.src || 'inline',
-        hasContent: !!s.textContent,
-        contentLength: s.textContent.length,
-        preview: s.textContent.substring(0, 50)
-      });
     });
     
     const bodyScripts = allBodyScripts.filter(s => {
         // Saltar solo el script de redirect del head (muy corto y específico)
         if (s.textContent.includes('window.location.replace') && s.textContent.length < 100) {
-          console.log('  ⏭️ Saltando script de redirect');
           return false;
         }
         if (!s.src) {
-          console.log('  ✅ Script inline aceptado');
           return true;
         }
         const isShellScript = SHELL_SCRIPTS.some(ss => s.src.includes(ss));
         if (isShellScript) {
-          console.log(`  ⏭️ Saltando script del shell: ${s.src}`);
         } else {
-          console.log(`  ✅ Script externo aceptado: ${s.src}`);
         }
         return !isShellScript;
       });
 
-    console.log('[Router] ✅ Scripts después de filtrar:', bodyScripts.length);
 
     // Separar externos e inline
     const external = bodyScripts.filter(s => s.src).map(s => s.src);
     const inlines  = bodyScripts.filter(s => !s.src).map(s => s.textContent);
 
-    console.log('[Router] 📄 Parseado:', {
-      styles: styles.length + ' chars',
-      content: content.length + ' chars',
-      modals: modals.length + ' chars',
-      external: external.length + ' scripts',
-      inlines: inlines.length + ' scripts',
-      inlineSizes: inlines.map(i => i.length + ' chars')
-    });
 
     return { styles, content, modals, external, inlines };
   }
@@ -111,14 +114,12 @@ const GymRouter = (() => {
   // contaminación del scope global entre navegaciones.
   function _prepareScript(inlines) {
     if (!inlines.length) {
-      console.log('[Router] ⚠️ No hay scripts inline para ejecutar');
       return { code: '', vars: [] };
     }
 
     // Unir y normalizar line endings
     const raw = inlines.join('\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-    console.log('[Router] 📝 Script inline original:', raw.substring(0, 200) + '...');
 
     // NO detectar variables - las dejaremos en el scope local del IIFE
     const vars = [];
@@ -136,24 +137,20 @@ const GymRouter = (() => {
 })();
 `;
 
-    console.log('[Router] ✅ Script preparado y aislado en IIFE');
 
     return { code, vars };
   }
 
   // ── Ejecutar un bloque de código JS en el contexto global ─────────────────
   function _runScript(code) {
-    console.log('[Router] 🚀 Ejecutando script inline...');
     const s = document.createElement('script');
     s.textContent = code;
     document.head.appendChild(s);
     s.remove(); // limpiar del DOM tras ejecución
-    console.log('[Router] ✅ Script ejecutado');
   }
 
   // ── Limpiar recursos de la página anterior ─────────────────────────────────
   function _cleanup() {
-    console.log('[Router] 🧹 Limpiando página anterior...');
     
     // Abortar event listeners con signal
     if (window.__spaPageAbort) window.__spaPageAbort.abort();
@@ -166,7 +163,6 @@ const GymRouter = (() => {
     const st = document.getElementById('_spa_styles');
     if (st) st.textContent = '';
     
-    console.log('[Router] ✅ Limpieza completada');
   }
 
   // ── Skeleton de carga ──────────────────────────────────────────────────────
@@ -198,7 +194,6 @@ const GymRouter = (() => {
     if (_isNavigating || page === _currentPage) return;
     _isNavigating = true;
 
-    console.log(`[Router] 🧭 Navegando a: ${page}`);
 
     const route = ROUTES[page];
     if (!route) { 
@@ -242,7 +237,6 @@ const GymRouter = (() => {
         external = cached.external;
         inlines  = cached.inlines;
         restoring = true;
-        console.log(`[Router] ⚡ Restaurando ${page} desde caché`);
       } else {
         // 5. Skeleton (solo primera visita)
         _skeleton();
@@ -296,7 +290,10 @@ const GymRouter = (() => {
           const s = document.createElement('script');
           s.src = src;
           s.onload = resolve;
-          s.onerror = reject;
+          s.onerror = () => {
+            s.remove();
+            reject(new Error('No se pudo cargar un recurso del módulo.'));
+          };
           document.head.appendChild(s);
         });
       }
@@ -307,14 +304,12 @@ const GymRouter = (() => {
       const { code } = _prepareScript(inlines);
 
       if (code) {
-        console.log('[Router] ⏳ Esperando renderizado completo...');
         // Esperar DOS frames para asegurar que el DOM esté completamente renderizado
         await new Promise(resolve => {
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
               try {
                 _runScript(code);
-                console.log('[Router] ✅ Scripts ejecutados correctamente');
                 resolve();
               } catch (err) {
                 console.error('[Router] ❌ Error ejecutando scripts de', page, err);
@@ -339,7 +334,10 @@ const GymRouter = (() => {
 
     } catch (err) {
       console.error('[Router] Error en', page, err);
-      window.location.href = route; // fallback
+      // Conservar el shell: una caída transitoria no debe abrir el error del navegador.
+      _currentPage = null;
+      delete _htmlCache[page];
+      _showNavigationError(page);
     } finally {
       _isNavigating = false;
     }
@@ -399,3 +397,6 @@ const GymRouter = (() => {
 
   return { navigate, init, ROUTES };
 })();
+
+// Los atajos de los módulos y del panel consultan el router desde window.
+window.GymRouter = GymRouter;

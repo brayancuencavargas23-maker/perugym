@@ -8,6 +8,7 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const { validators, handleValidationErrors } = require('../middleware/validation');
 const TransactionManager = require('../utils/TransactionManager');
 const StockService = require('../services/StockService');
+const mongoose = require('mongoose');
 
 router.use(verifyToken);
 
@@ -29,11 +30,13 @@ router.post(
 
     const venta = await TransactionManager.execute(async (session) => {
       // Descontar stock de múltiples productos de forma atómica
-      const ventaItems = await StockService.descontarMultiple(items, session);
+      const ventaId = new mongoose.Types.ObjectId();
+      const ventaItems = await StockService.descontarMultiple(items, session, { user: req.user, tipo: 'venta', motivo: 'Venta de productos', venta_id: ventaId });
 
       // Crear venta
       const [nuevaVenta] = await Venta.create(
         [{ 
+          _id: ventaId,
           caja_id, 
           cliente_id: cliente_id || null, 
           metodo_pago: metodo_pago || 'efectivo', 
@@ -61,7 +64,7 @@ router.put('/:id/anular', requireRole('admin', 'recepcionista'), asyncHandler(as
     }
 
     // Revertir stock de múltiples productos de forma atómica
-    await StockService.revertirMultiple(venta.items, session);
+    await StockService.revertirMultiple(venta.items, session, { user: req.user, tipo: 'anulacion', motivo: 'Anulación de venta', venta_id: venta._id });
 
     // Marcar venta como anulada
     await Venta.findByIdAndUpdate(
@@ -74,7 +77,7 @@ router.put('/:id/anular', requireRole('admin', 'recepcionista'), asyncHandler(as
     // pueda hacer patch quirúrgico del caché sin invalidar toda la lista
     const productosActualizados = await Producto.find({
       _id: { $in: venta.items.map(i => i.producto_id) }
-    });
+    }).session(session);
 
     return { message: 'Venta anulada correctamente', productos: productosActualizados };
   });

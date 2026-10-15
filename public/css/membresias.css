@@ -1,0 +1,28 @@
+.renewal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.renewal-note {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 14px;
+  color: var(--text);
+}
+.renewal-summary { border-color: var(--primary); margin-top: 14px; }
+.renewal-error {
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.renewal-history { display: grid; gap: 12px; }
+.renewal-history article { border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+#modal-renovar .modal { max-width: 640px; }
+#modal-renovar small { color: var(--text-light); }
+@media (max-width: 540px) {
+  .renewal-grid { grid-template-columns: 1fr; gap: 0; }
+}

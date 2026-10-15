@@ -33,7 +33,7 @@
         <h3 style="font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:6px" id="h-checkin"></h3>
         <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
           <div class="form-group" style="flex:1;min-width:220px;margin:0;position:relative">
-            <label>Buscar Cliente</label>
+            <label for="checkin-search">Buscar Cliente</label>
             <input type="text" id="checkin-search" class="form-control" placeholder="Escribe el nombre..." autocomplete="off">
             <input type="hidden" id="checkin-cliente">
             <div id="checkin-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);z-index:100;max-height:220px;overflow-y:auto;margin-top:2px"></div>
@@ -41,6 +41,7 @@
           <button class="btn btn-success" onclick="withLoading(this, doCheckin, 'Registrando...')" style="display:inline-flex;align-items:center;gap:6px" id="btn-checkin-el"></button>
           <button class="btn btn-warning" onclick="withLoading(this, doCheckout, 'Registrando...')" style="display:inline-flex;align-items:center;gap:6px" id="btn-checkout-el"></button>
         </div>
+        <p id="checkin-policy" role="status" aria-live="polite" style="margin-top:12px;font-size:13px">Selecciona un cliente para consultar su membresía y visitas disponibles.</p>
       </div>
 
       <!-- Resumen del dia -->
@@ -271,6 +272,7 @@
 
     input.addEventListener('input', function() {
       hidden.value = '';
+      document.getElementById('checkin-policy').textContent = 'Selecciona un cliente para consultar su membresía y visitas disponibles.';
       const q = this.value.trim().toLowerCase();
       if (!q) { dropdown.style.display = 'none'; return; }
       const filtered = clientes.filter(c =>
@@ -298,10 +300,30 @@
     }, { signal: window.__spaPageAbort?.signal });
   }
 
+  let policyRequest = 0;
+  async function consultarCupos(id) {
+    const request = ++policyRequest;
+    const status = document.getElementById('checkin-policy');
+    if (!status) return;
+    status.textContent = 'Consultando membresía y visitas…';
+    try {
+      const estado = await api.request('GET', '/asistencia/disponibilidad/' + encodeURIComponent(id));
+      if (!status.isConnected || request !== policyRequest || document.getElementById('checkin-cliente')?.value !== id || !estado) return;
+      const cupos = estado.limite_semanal == null
+        ? `${estado.visitas_semana} visitas esta semana · Sin límite semanal`
+        : `${estado.visitas_semana}/${estado.limite_semanal} visitas esta semana · ${estado.disponibles} disponibles`;
+      const fin = new Date(estado.fecha_fin).toLocaleString('es-PE', { timeZone: 'America/Lima' });
+      status.textContent = `${estado.plan_nombre} · ${cupos} · Máximo 1 al día · Vence: ${fin} (Perú). ${estado.permitido ? 'Ingreso disponible.' : estado.motivo}`;
+    } catch (err) {
+      if (status.isConnected && request === policyRequest && document.getElementById('checkin-cliente')?.value === id) status.textContent = err.message;
+    }
+  }
+
   window.selectCheckinCliente = function(id, name) {
     document.getElementById('checkin-cliente').value = id;
     document.getElementById('checkin-search').value  = name;
     document.getElementById('checkin-dropdown').style.display = 'none';
+    consultarCupos(id);
   };
 
   function renderRow(a) {
@@ -462,9 +484,13 @@
       const clientEl = document.getElementById('checkin-cliente');
       if (searchEl) searchEl.value = '';
       if (clientEl) clientEl.value = '';
+      document.getElementById('checkin-policy').textContent = 'Entrada registrada. La visita ya fue descontada del cupo disponible.';
       gymCache.invalidateMany(['asistencia', 'dashboard']);
       refreshTable();
-    } catch (err) { toast(err.message, 'error'); }
+    } catch (err) {
+      toast(err.message, 'error');
+      if (_pageActive()) consultarCupos(cliente_id);
+    }
   }
 
   async function doCheckout() {
@@ -482,6 +508,7 @@
       const clientEl = document.getElementById('checkin-cliente');
       if (searchEl) searchEl.value = '';
       if (clientEl) clientEl.value = '';
+      document.getElementById('checkin-policy').textContent = 'Salida registrada. El cupo de esta visita permanece consumido.';
       gymCache.invalidateMany(['asistencia', 'dashboard']);
       refreshTable();
     } catch (err) { toast(err.message, 'error'); }
@@ -498,6 +525,8 @@
       toast('Check-out registrado');
       gymCache.invalidateMany(['asistencia', 'dashboard']);
       refreshTable();
+      const seleccionado = document.getElementById('checkin-cliente')?.value;
+      if (seleccionado) consultarCupos(seleccionado);
     } catch (err) { toast(err.message, 'error'); }
   }
 

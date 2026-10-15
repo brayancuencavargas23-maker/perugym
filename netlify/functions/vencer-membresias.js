@@ -11,14 +11,9 @@ exports.handler = async () => {
       await mongoose.connect(MONGO_URI);
     }
 
-    const Membresia = require('../../models/Membresia');
-    const result = await Membresia.updateMany(
-      { fecha_fin: { $lt: new Date() }, estado: 'activo' },
-      { $set: { estado: 'vencido' } }
-    );
+    const actualizadas = await require('../../services/MembresiaService').autoVencer();
 
-    console.log(`[vencer-membresias] ${result.modifiedCount} membresías marcadas como vencidas`);
-    return { statusCode: 200, body: JSON.stringify({ actualizadas: result.modifiedCount }) };
+    return { statusCode: 200, body: JSON.stringify({ actualizadas }) };
   } catch (err) {
     console.error('[vencer-membresias] Error:', err.message);
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };

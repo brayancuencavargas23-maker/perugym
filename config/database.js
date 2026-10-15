@@ -53,7 +53,6 @@ function setupAutoSync() {
       const docs = await db.collection(colName).find({}).toArray();
       const filePath = path.join(EXPORT_DIR, `${colName}.json`);
       fs.writeFileSync(filePath, JSON.stringify(docs, null, 2), 'utf8');
-      console.log(`  [JSON-SYNC] ${colName}: ${docs.length} docs → JSON`);
     } catch (err) {
       console.error(`  [JSON-SYNC] Error sync ${colName}:`, err.message);
     }
@@ -75,7 +74,7 @@ function setupAutoSync() {
       return result;
     };
 
-    const staticMethods = ['create', 'insertMany', 'updateOne', 'updateMany', 'deleteOne', 'deleteMany', 'findOneAndUpdate', 'findOneAndDelete', 'findByIdAndUpdate', 'findByIdAndDelete'];
+    const staticMethods = ['create', 'insertMany', 'bulkWrite', 'updateOne', 'updateMany', 'deleteOne', 'deleteMany', 'findOneAndUpdate', 'findOneAndDelete', 'findByIdAndUpdate', 'findByIdAndDelete'];
     for (const method of staticMethods) {
       if (model[method]) {
         const orig = model[method];
@@ -90,7 +89,6 @@ function setupAutoSync() {
       }
     }
   }
-  console.log(`  [JSON-SYNC] Auto-sync activo para ${modelNames.length} modelos (method wrap)`);
 }
 
 async function connectLocal() {
@@ -116,7 +114,8 @@ async function connectLocal() {
       if (cleaned._id && typeof cleaned._id === 'string') {
         try { cleaned._id = new mongoose.Types.ObjectId(cleaned._id); } catch { /* keep */ }
       }
-      const refFields = ['usuario_id','cliente_id','caja_id','membresia_id','plan_id','producto_id'];
+      const refFields = ['usuario_id','cliente_id','caja_id','membresia_id','periodo_id','plan_id','producto_id']
+        .filter(field => !(collectionName === 'notificacionleidas' && field === 'usuario_id'));
       for (const field of refFields) {
         if (cleaned[field] && typeof cleaned[field] === 'string') {
           try { cleaned[field] = new mongoose.Types.ObjectId(cleaned[field]); } catch { /* keep */ }
@@ -131,6 +130,13 @@ async function connectLocal() {
           return c;
         });
       }
+      if (Array.isArray(cleaned.periodos)) {
+        cleaned.periodos = cleaned.periodos.map(periodo => ({ ...periodo,
+          _id: new mongoose.Types.ObjectId(periodo._id), plan_id: new mongoose.Types.ObjectId(periodo.plan_id),
+          fecha_inicio: new Date(periodo.fecha_inicio), fecha_fin: new Date(periodo.fecha_fin),
+          registrado_en: periodo.registrado_en ? new Date(periodo.registrado_en) : undefined,
+        }));
+      }
       const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
       for (const [k, v] of Object.entries(cleaned)) {
         if (typeof v === 'string' && ISO_DATE_RE.test(v)) {
@@ -142,19 +148,16 @@ async function connectLocal() {
 
     try {
       await db.collection(collectionName).insertMany(docs);
-      console.log(`  [JSON] ${collectionName}: ${docs.length} documentos cargados`);
     } catch (err) {
       console.error(`  [JSON] Error cargando ${collectionName}:`, err.message);
     }
   }
 
   setupAutoSync();
-  console.log('✅ Base de datos local inicializada desde JSON');
 }
 
 process.on('SIGINT', async () => {
   if (DB_MODE === 'json' && mongoose.connection.readyState === 1) {
-    console.log('\n🔄 Exportando datos a JSON antes de cerrar...');
     await exportToJson();
   }
   process.exit(0);
@@ -162,7 +165,6 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
   if (DB_MODE === 'json' && mongoose.connection.readyState === 1) {
-    console.log('\n🔄 Exportando datos a JSON antes de cerrar...');
     await exportToJson();
   }
   process.exit(0);
@@ -171,10 +173,8 @@ process.on('SIGTERM', async () => {
 const connectDB = async () => {
   try {
     if (DB_MODE === 'json') {
-      console.log('🔧 Modo: JSON local (db-export/)');
       await connectLocal();
     } else {
-      console.log('🔧 Modo: MongoDB Atlas');
       await connectMongo();
     }
   } catch (err) {

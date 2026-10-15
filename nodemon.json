@@ -1,0 +1,24 @@
+{
+  "watch": [
+    "server.js",
+    "config/",
+    "models/",
+    "routes/",
+    "services/",
+    "middleware/",
+    "utils/",
+    "functions/",
+    "package.json",
+    ".env"
+  ],
+  "ext": "js,mjs,cjs,json",
+  "ignore": [
+    "db-export/**",
+    "public/**",
+    "tests/**",
+    "coverage/**",
+    "logs/**",
+    "*.log",
+    ".opencode/**"
+  ]
+}

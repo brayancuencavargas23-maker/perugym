@@ -37,10 +37,9 @@ function log(level, message, context = {}) {
       console.info(logString);
       break;
     case logLevels.DEBUG:
-      console.log(logString);
       break;
     default:
-      console.log(logString);
+      ;
   }
 }
 

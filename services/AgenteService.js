@@ -1,18 +1,19 @@
 const OpenAI = require('openai');
 const { FUNCTIONS_DEFINITIONS, FUNCTIONS_MAP } = require('../functions/agenteFunctions');
 
-// Groq usa API compatible con OpenAI
-const groq = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY,
-  baseURL: 'https://api.groq.com/openai/v1',
-});
-
 const SYSTEM_PROMPT = `Eres el asistente de PeruGym. Respondes SOLO consultas del gimnasio en español.
 
 REGLAS GENERALES:
 - Sé breve y directo (máximo 3 líneas en respuestas simples).
 - Si no hay resultados, di "No se encontraron resultados".
 - Si la pregunta no es del gimnasio, responde: "Solo puedo ayudar con consultas del gimnasio."
+- Consulta herramientas para cifras reales; nunca inventes saldos, fechas, reportes ni confirmaciones de envío.
+- Usa generar_reporte para reportes y comparaciones; recomendar_acciones para recomendaciones y prioridades.
+- Para informes puedes responder hasta 12 líneas con período, cifras y acciones concretas. Distingue ingresos de utilidad y saldos actuales de cifras del período.
+- Las recomendaciones son señales verificables, no predicciones de abandono.
+- Para mensajes usa preparar_mensaje_cliente. Primero identifica al cliente; si hay varias coincidencias, pregunta cuál. El usuario revisa el borrador y lo envía desde WhatsApp. Nunca digas que ya fue enviado.
+- Los botones de descarga y mensajes se muestran automáticamente cuando la herramienta los devuelve. No inventes enlaces ni pegues URLs internas.
+- Si no se indica período, usa mes hasta hoy. La semana del reporte son los últimos 7 días; el cupo de asistencia es de lunes a domingo.
 
 SECCIONES DE LECTURA (responde directamente):
 - Clientes: buscar por nombre/DNI, perfil completo
@@ -78,33 +79,35 @@ function obtenerHistorial(usuarioId) {
   return historiales.get(usuarioId);
 }
 
-function guardarMensaje(usuarioId, role, contenido) {
+function guardarMensaje(usuarioId, role, contenido, acciones = []) {
   const historial = obtenerHistorial(usuarioId);
-  historial.push({ role, content: contenido });
+  historial.push({ role, content: contenido, ...(acciones.length ? { acciones } : {}) });
   if (historial.length > MAX_HISTORIAL) {
     historial.splice(0, historial.length - MAX_HISTORIAL);
   }
 }
 
-async function ejecutarFuncion(nombre, args) {
+async function ejecutarFuncion(nombre, args, usuario) {
   const fn = FUNCTIONS_MAP[nombre];
   if (!fn) throw new Error(`Función no encontrada: ${nombre}`);
+  if (['generar_reporte', 'recomendar_acciones', 'preparar_mensaje_cliente'].includes(nombre) && !['admin', 'recepcionista'].includes(usuario?.role)) {
+    throw new Error('Tu rol no permite esta operación.');
+  }
 
   let parsed = args;
   if (typeof args === 'string') {
     try { parsed = JSON.parse(args); } catch { parsed = {}; }
   }
 
-  console.log(`[Agente] Ejecutando: ${nombre}`, parsed);
   const resultado = await fn(parsed);
-  console.log(`[Agente] Resultado ${nombre}:`, JSON.stringify(resultado).substring(0, 120));
+  JSON.stringify(resultado).substring(0, 120);
   return resultado;
 }
 
-async function chat(mensaje, usuarioId) {
+async function chat(mensaje, usuarioId, usuario = {}) {
   if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'tu_api_key_de_groq_aqui') {
     return {
-      respuesta: '⚠️ El agente no está configurado. Configura GROQ_API_KEY en .env.',
+      respuesta: 'El chat IA no está configurado. Puedes usar los botones de Reportes, Recomendaciones y Mensajes; funcionan sin IA.',
       historial: [],
     };
   }
@@ -113,9 +116,11 @@ async function chat(mensaje, usuarioId) {
   const historial = obtenerHistorial(usuarioId);
 
   try {
+    const groq = new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: 'https://api.groq.com/openai/v1', timeout: 30000, maxRetries: 1 });
+    const acciones = [];
     const messages = [
-      { role: 'system', content: SYSTEM_PROMPT },
-      ...historial,
+      { role: 'system', content: SYSTEM_PROMPT + `\nFecha y hora actuales en Perú: ${new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' })}.` },
+      ...historial.map(({ role, content }) => ({ role, content })),
     ];
 
     let response = await groq.chat.completions.create({
@@ -124,14 +129,14 @@ async function chat(mensaje, usuarioId) {
       tools: TOOLS,
       tool_choice: 'auto',
       temperature: 0.2,
-      max_tokens: 500,
+      max_tokens: 1400,
     });
 
     let assistantMessage = response.choices[0].message;
 
     // Si Groq pide ejecutar funciones
     let iteraciones = 0;
-    while (assistantMessage.tool_calls?.length > 0 && iteraciones < 3) {
+    while (assistantMessage.tool_calls?.length > 0 && iteraciones < 5) {
       iteraciones++;
 
       // Limpiar y agregar mensaje del asistente (solo campos necesarios)
@@ -149,7 +154,10 @@ async function chat(mensaje, usuarioId) {
 
         let resultado;
         try {
-          resultado = await ejecutarFuncion(nombre, args);
+          resultado = await ejecutarFuncion(nombre, args, usuario);
+          if (['generar_reporte', 'recomendar_acciones', 'preparar_mensaje_cliente'].includes(nombre) && Array.isArray(resultado.acciones)) {
+            acciones.push(...resultado.acciones);
+          }
         } catch (fnError) {
           resultado = { error: fnError.message };
         }
@@ -167,22 +175,25 @@ async function chat(mensaje, usuarioId) {
         model: process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
         messages,
         tools: TOOLS,
-        tool_choice: 'auto',
+        tool_choice: iteraciones >= 5 ? 'none' : 'auto',
         temperature: 0.2,
-        max_tokens: 500,
+        max_tokens: 1400,
       });
 
       assistantMessage = response.choices[0].message;
     }
 
     const respuesta = assistantMessage.content || 'No pude generar una respuesta.';
-    guardarMensaje(usuarioId, 'assistant', respuesta);
+    const botones = [...new Map(acciones.map(a => [JSON.stringify(a), a])).values()].slice(0, 20);
+    guardarMensaje(usuarioId, 'assistant', respuesta, botones);
 
     return {
       respuesta,
+      acciones: botones,
       historial: historial.map(m => ({
         role: m.role,
         content: m.content,
+        acciones: m.acciones || [],
       })),
     };
   } catch (error) {
@@ -203,7 +214,7 @@ async function chat(mensaje, usuarioId) {
     }
 
     return {
-      respuesta: `❌ Error: ${error.message}`,
+      respuesta: 'No pude consultar el chat IA en este momento. Intenta de nuevo o usa los accesos directos a reportes, recomendaciones y mensajes.',
       historial: [],
     };
   }

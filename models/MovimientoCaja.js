@@ -11,4 +11,6 @@ const movimientoCajaSchema = new mongoose.Schema({
   fecha:        { type: Date, default: Date.now },
 });
 
+movimientoCajaSchema.index({ fecha: -1 });
+
 module.exports = mongoose.model('MovimientoCaja', movimientoCajaSchema);

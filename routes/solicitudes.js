@@ -12,6 +12,7 @@ const TransactionManager = require('../utils/TransactionManager');
 const MembresiaService = require('../services/MembresiaService');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { validators, handleValidationErrors } = require('../middleware/validation');
+const NotificacionesService = require('../services/NotificacionesService');
 const logger = require('../utils/logger');
 
 // ── Rate limiting específico para el endpoint público ─────────────────────────
@@ -164,15 +165,30 @@ router.get('/', async (req, res) => {
 // ── GET /stats — conteo por estado para el badge del sidebar y dashboard ──────
 router.get('/stats', async (req, res) => {
   try {
-    const [pendiente, contactado, convertido, descartado] = await Promise.all([
-      Solicitud.countDocuments({ estado: 'pendiente' }),
+    const [pendientes, contactado, convertido, descartado] = await Promise.all([
+      Solicitud.find({ estado: 'pendiente' }).select('_id').lean(),
       Solicitud.countDocuments({ estado: 'contactado' }),
       Solicitud.countDocuments({ estado: 'convertido' }),
       Solicitud.countDocuments({ estado: 'descartado' }),
     ]);
-    res.json({ pendiente, contactado, convertido, descartado, total: pendiente + contactado + convertido + descartado });
+    const pendienteNoLeidas = await NotificacionesService.solicitudesNoLeidas(
+      req.user.id, pendientes.map(p => p._id));
+    res.json({
+      pendiente: pendientes.length,
+      pendiente_no_leidas: pendienteNoLeidas,
+      contactado, convertido, descartado,
+      total: pendientes.length + contactado + convertido + descartado,
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// ── POST /read — el usuario vio las solicitudes: oculta su badge/notificación ─
+router.post('/read', asyncHandler(async (req, res) => {
+  const pendientes = await Solicitud.find({ estado: 'pendiente' }).select('_id').lean();
+  await NotificacionesService.marcarClaves(
+    req.user.id, pendientes.map(p => NotificacionesService.claveSolicitud(p._id)));
+  res.json({ ok: true, pendiente: pendientes.length, pendiente_no_leidas: 0 });
+}));
 
 // ── PUT /:id/estado — cambiar estado + notas ──────────────────────────────────
 router.put(

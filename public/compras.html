@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Compras - PeruGym</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <!-- SPA redirect: si se accede directamente, redirigir al shell -->
+  <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html?page=compras');}</script>
+  <style>
+    .compra-item-row { display: grid; grid-template-columns: minmax(180px, 2fr) 90px 120px 135px 110px 36px; gap: 8px; align-items: end; margin-bottom: 8px; }
+    .compra-item-row .form-group { margin: 0; }
+    .compra-subtotal { text-align: right; font-weight: 600; padding-bottom: 8px; font-size: 13px; }
+    .compra-total-row { display: flex; justify-content: space-between; align-items: center; font-size: 15px; font-weight: 700; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 8px; }
+    @media (max-width: 700px) { .compra-item-row { grid-template-columns: 1fr 1fr; } }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <div class="topbar" id="topbar"></div>
+    <div class="page-content">
+
+      <div id="compras-forbidden" class="card hidden" style="text-align:center;padding:40px">
+        <h3>Acceso no autorizado</h3>
+        <p style="color:var(--text-light)">Solicita a un administrador el permiso de Compras y proveedores.</p>
+      </div>
+
+      <div id="compras-section">
+        <div class="flex-between mb-2" style="margin-bottom:20px;flex-wrap:wrap;gap:10px">
+          <p style="font-size:13px;color:var(--text-light)">Registra compras a proveedores: el stock y el costo (promedio ponderado) se actualizan automáticamente.</p>
+          <div style="display:flex;gap:10px">
+            <button class="btn btn-outline" id="btn-nuevo-prov" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-prov"></span> Nuevo proveedor</button>
+            <button class="btn btn-primary" id="btn-nueva-compra" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-plus-c"></span> Nueva compra</button>
+          </div>
+        </div>
+
+        <!-- KPIs -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon purple" id="kpi-icon-val">💰</div>
+            <div><div class="stat-value" id="kpi-valorizacion">—</div><div class="stat-label">Valorización de inventario</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon orange" id="kpi-icon-mes">🛒</div>
+            <div><div class="stat-value" id="kpi-compras-mes">—</div><div class="stat-label">Compras del mes</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon blue" id="kpi-icon-prov">🚚</div>
+            <div><div class="stat-value" id="kpi-proveedores">—</div><div class="stat-label">Proveedores activos</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green" id="kpi-icon-hist">📦</div>
+            <div><div class="stat-value" id="kpi-compras-total">—</div><div class="stat-label">Compras registradas</div></div>
+          </div>
+        </div>
+
+        <!-- Historial de compras -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="flex-between mb-2">
+            <h3>Historial de compras</h3>
+            <button class="btn btn-success btn-sm" id="btn-export-compras" style="display:inline-flex;align-items:center;gap:4px"><span id="icon-excel-c"></span> Exportar Excel</button>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead><tr><th>Fecha</th><th>Proveedor</th><th>Ítems</th><th>Costo total</th><th>Registró</th><th></th></tr></thead>
+              <tbody id="compras-table"></tbody>
+            </table>
+          </div>
+          <div class="pagination" style="display:flex;gap:10px;align-items:center;justify-content:center;margin-top:12px">
+            <button class="btn btn-outline btn-sm" id="compras-prev" type="button">Anterior</button>
+            <span id="compras-page" role="status" style="font-size:13px;color:var(--text-light)"></span>
+            <button class="btn btn-outline btn-sm" id="compras-next" type="button">Siguiente</button>
+          </div>
+        </div>
+
+        <!-- Proveedores -->
+        <div class="card">
+          <div class="flex-between mb-2" style="flex-wrap:wrap;gap:10px">
+            <h3>Proveedores</h3>
+            <div style="position:relative;max-width:280px;width:100%">
+              <span class="search-icon" id="icon-search-prov" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-light)"></span>
+              <input type="text" id="search-prov" class="form-control" style="padding-left:36px" placeholder="Buscar proveedor...">
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead><tr><th>Proveedor</th><th>Contacto</th><th>Teléfono</th><th>Email</th><th>Estado</th><th>Acciones</th></tr></thead>
+              <tbody id="prov-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Modal: nueva compra -->
+<div class="modal-overlay hidden" id="modal-compra">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-header">
+      <h3 id="compra-modal-title">Nueva compra</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-compra')" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="c-proveedor">Proveedor</label>
+          <select id="c-proveedor" class="form-control"><option value="">— Sin proveedor —</option></select>
+        </div>
+        <div class="form-group">
+          <label for="c-fecha">Fecha *</label>
+          <input type="date" id="c-fecha" class="form-control" required>
+        </div>
+      </div>
+
+      <label style="font-size:13px;font-weight:600;display:block;margin-bottom:8px">Productos de la compra *</label>
+      <div id="c-items"></div>
+      <button type="button" class="btn btn-outline btn-sm" id="c-add-item" style="display:inline-flex;align-items:center;gap:4px"><span id="icon-plus-item"></span> Agregar producto</button>
+
+      <div class="compra-total-row"><span>Total de la compra</span><span id="c-total">S/ 0.00</span></div>
+
+      <div class="form-group" style="margin-top:12px">
+        <label for="c-notas">Notas</label>
+        <textarea id="c-notas" class="form-control" rows="2" maxlength="500" placeholder="Opcional: guía de remisión, observaciones…"></textarea>
+      </div>
+      <p id="compra-error" role="alert" tabindex="-1" style="color:var(--danger);font-size:13px;min-height:18px"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-compra')">Cancelar</button>
+      <button class="btn btn-primary" id="c-save" type="button">Registrar compra</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: proveedor -->
+<div class="modal-overlay hidden" id="modal-proveedor">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-header">
+      <h3 id="prov-modal-title">Nuevo proveedor</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-proveedor')" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="pr-id">
+      <div class="form-group"><label for="pr-nombre">Nombre *</label><input type="text" id="pr-nombre" class="form-control" maxlength="120" required></div>
+      <div class="form-row">
+        <div class="form-group"><label for="pr-contacto">Contacto</label><input type="text" id="pr-contacto" class="form-control" maxlength="120"></div>
+        <div class="form-group"><label for="pr-telefono">Teléfono</label><input type="text" id="pr-telefono" class="form-control" maxlength="30"></div>
+      </div>
+      <div class="form-group"><label for="pr-email">Email</label><input type="email" id="pr-email" class="form-control" maxlength="120"></div>
+      <div class="form-group"><label for="pr-direccion">Dirección</label><input type="text" id="pr-direccion" class="form-control" maxlength="200"></div>
+      <div class="form-group"><label for="pr-notas">Notas</label><textarea id="pr-notas" class="form-control" rows="2" maxlength="500"></textarea></div>
+      <div class="form-group hidden" id="pr-active-group">
+        <label><input type="checkbox" id="pr-active"> Proveedor activo</label>
+      </div>
+      <p id="prov-error" role="alert" tabindex="-1" style="color:var(--danger);font-size:13px;min-height:18px"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-proveedor')">Cancelar</button>
+      <button class="btn btn-primary" id="pr-save" type="button">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: detalle de compra -->
+<div class="modal-overlay hidden" id="modal-detalle">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <h3>Detalle de compra</h3>
+      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-detalle')" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="d-meta" style="font-size:13px;color:var(--text-light);margin-bottom:12px"></p>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Producto</th><th>Cant.</th><th>Costo unit.</th><th>Vencimiento</th><th>Subtotal</th></tr></thead>
+          <tbody id="d-items"></tbody>
+          <tfoot><tr><td colspan="4" style="text-align:right;font-weight:700">Total</td><td style="font-weight:700" id="d-total"></td></tr></tfoot>
+        </table>
+      </div>
+      <p id="d-notas" style="font-size:13px;color:var(--text-light);margin-top:12px"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-detalle')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/cache.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/icons.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/catalogo-data.js"></script>
+<script>
+  const user = JSON.parse(localStorage.getItem('gym_user') || '{}');
+  const pageSignal = window.__spaPageAbort?.signal;
+  let comprasTicket = 0, detalleTicket = 0, productosTicket = 0, resumenTicket = 0, proveedoresTicket = 0;
+  let comprasPage = 1, comprasPages = 1;
+  let allProveedores = [];
+  let productosCompra = [];
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  const soles = n => 'S/ ' + Number(n || 0).toFixed(2);
+  const setText = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+
+  function _pageActive() { return !pageSignal?.aborted && !!document.getElementById('compras-table'); }
+
+  // ── KPIs ─────────────────────────────────────────────────────────────────────
+  async function loadResumen() {
+    const ticket = ++resumenTicket;
+    try {
+      const r = await api.get('/compras/resumen', true);
+      if (!_pageActive() || ticket !== resumenTicket) return;
+      setText('kpi-valorizacion', soles(r.valorizacion));
+      setText('kpi-compras-mes', soles(r.compras_mes));
+      setText('kpi-proveedores', String(r.proveedores_activos ?? 0));
+      setText('kpi-compras-total', String(r.compras_total ?? 0));
+    } catch (err) { if (_pageActive()) toast(err.message, 'error'); }
+  }
+
+  // ── Historial de compras ─────────────────────────────────────────────────────
+  async function loadCompras() {
+    const ticket = ++comprasTicket;
+    const page = comprasPage;
+    const tbody = document.getElementById('compras-table');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6">Cargando…</td></tr>';
+    try {
+      const r = await api.get(`/compras?page=${page}&limit=10`, true);
+      if (!_pageActive() || ticket !== comprasTicket) return;
+      comprasPages = Math.max(1, r.pages);
+      if (!r.data.length) { tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-light)">Sin compras registradas.</td></tr>'; }
+      else {
+        tbody.innerHTML = r.data.map(c => `
+          <tr>
+            <td>${esc(fmtDateTime(c.fecha))}</td>
+            <td>${c.proveedor_id ? esc(c.proveedor_id.nombre) : (c.proveedor_nombre ? esc(c.proveedor_nombre) : '—')}</td>
+            <td>${c.items.length}</td>
+            <td style="font-weight:600">${soles(c.costo_total)}</td>
+            <td>${esc(c.responsable)}</td>
+            <td><button class="btn btn-outline btn-sm" onclick="verDetalle('${c._id}')">Ver detalle</button></td>
+          </tr>`).join('');
+      }
+      setText('compras-page', `Página ${comprasPage} de ${comprasPages} · ${r.total} compras`);
+      document.getElementById('compras-prev').disabled = comprasPage <= 1;
+      document.getElementById('compras-next').disabled = comprasPage >= comprasPages;
+    } catch (err) { if (_pageActive() && ticket === comprasTicket) { tbody.innerHTML = `<tr><td colspan="6">${esc(err.message)}</td></tr>`; toast(err.message, 'error'); } }
+  }
+
+  document.getElementById('compras-prev').onclick = () => { if (comprasPage > 1) { comprasPage--; loadCompras(); } };
+  document.getElementById('compras-next').onclick = () => { if (comprasPage < comprasPages) { comprasPage++; loadCompras(); } };
+
+  async function verDetalle(id) {
+    const ticket = ++detalleTicket;
+    try {
+      const c = await api.get('/compras/' + id, true);
+      if (!_pageActive() || ticket !== detalleTicket) return;
+      const prov = c.proveedor_id ? c.proveedor_id.nombre : (c.proveedor_nombre || 'Sin proveedor');
+      setText('d-meta', `${fmtDateTime(c.fecha)} · ${prov} · Registró ${c.responsable}`);
+      document.getElementById('d-items').innerHTML = c.items.map(it => `
+        <tr><td style="white-space:normal">${esc(it.nombre)}</td><td>${it.cantidad}</td><td>${soles(it.costo_unit)}</td><td>${it.fecha_vencimiento ? esc(String(it.fecha_vencimiento).slice(0, 10)) : '—'}</td><td>${soles(it.subtotal)}</td></tr>`).join('');
+      setText('d-total', soles(c.costo_total));
+      setText('d-notas', c.notas ? 'Notas: ' + c.notas : '');
+      openModal('modal-detalle');
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  // ── Proveedores ──────────────────────────────────────────────────────────────
+  function renderProveedores() {
+    const tbody = document.getElementById('prov-table');
+    if (!tbody) return;
+    const q = (document.getElementById('search-prov').value || '').toLowerCase();
+    const lista = allProveedores.filter(p => !q || (p.nombre || '').toLowerCase().includes(q) || (p.contacto || '').toLowerCase().includes(q));
+    if (!lista.length) { tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-light)">Sin proveedores registrados.</td></tr>'; return; }
+    tbody.innerHTML = lista.map(p => `
+      <tr>
+        <td style="font-weight:600">${esc(p.nombre)}</td>
+        <td>${esc(p.contacto) || '—'}</td>
+        <td>${esc(p.telefono) || '—'}</td>
+        <td>${esc(p.email) || '—'}</td>
+        <td><span class="badge ${p.activo ? 'badge-success' : 'badge-danger'}">${p.activo ? 'Activo' : 'Inactivo'}</span></td>
+        <td>
+          <button class="btn btn-sm btn-outline" onclick="editProveedor('${p._id}')" aria-label="Editar ${esc(p.nombre)}">${icon('edit')}</button>
+          ${p.activo ? `<button class="btn btn-sm btn-danger" onclick="withLoading(this, () => deleteProveedor('${p._id}'), 'Desactivando...')" aria-label="Desactivar ${esc(p.nombre)}">${icon('trash')}</button>` : ''}
+        </td>
+      </tr>`).join('');
+  }
+
+  async function loadProveedores() {
+    const ticket = ++proveedoresTicket;
+    try {
+      const data = await GymCatalogo.listar('/proveedores', pageSignal);
+      if (!_pageActive() || ticket !== proveedoresTicket) return;
+      allProveedores = data;
+      renderProveedores();
+      fillProveedorSelect();
+    } catch (err) { if (_pageActive()) toast(err.message, 'error'); }
+  }
+
+  function fillProveedorSelect() {
+    const sel = document.getElementById('c-proveedor');
+    const actual = sel.value;
+    sel.innerHTML = '<option value="">— Sin proveedor —</option>' +
+      allProveedores.filter(p => p.activo).map(p => `<option value="${p._id}">${esc(p.nombre)}</option>`).join('');
+    sel.value = actual;
+  }
+
+  let provTimer;
+  pageSignal?.addEventListener('abort', () => clearTimeout(provTimer), { once: true });
+  document.getElementById('search-prov').oninput = () => { clearTimeout(provTimer); provTimer = setTimeout(renderProveedores, 300); };
+
+  function openProveedorModal(p) {
+    document.getElementById('pr-id').value = p ? p._id : '';
+    document.getElementById('pr-nombre').value = p ? (p.nombre || '') : '';
+    document.getElementById('pr-contacto').value = p && p.contacto ? p.contacto : '';
+    document.getElementById('pr-telefono').value = p && p.telefono ? p.telefono : '';
+    document.getElementById('pr-email').value = p && p.email ? p.email : '';
+    document.getElementById('pr-direccion').value = p && p.direccion ? p.direccion : '';
+    document.getElementById('pr-notas').value = p && p.notas ? p.notas : '';
+    document.getElementById('pr-active').checked = p ? !!p.activo : true;
+    document.getElementById('pr-active-group').classList.toggle('hidden', !p);
+    document.getElementById('prov-error').textContent = '';
+    document.getElementById('prov-modal-title').textContent = p ? 'Editar proveedor' : 'Nuevo proveedor';
+    openModal('modal-proveedor');
+    document.getElementById('pr-nombre').focus();
+  }
+
+  function editProveedor(id) { openProveedorModal(allProveedores.find(p => p._id === id)); }
+
+  async function saveProveedor() {
+    const id = document.getElementById('pr-id').value;
+    const body = {
+      nombre: document.getElementById('pr-nombre').value,
+      contacto: document.getElementById('pr-contacto').value,
+      telefono: document.getElementById('pr-telefono').value,
+      email: document.getElementById('pr-email').value,
+      direccion: document.getElementById('pr-direccion').value,
+      notas: document.getElementById('pr-notas').value,
+    };
+    const errEl = document.getElementById('prov-error');
+    errEl.textContent = '';
+    if (!body.nombre.trim()) { errEl.textContent = 'Indica el nombre del proveedor.'; errEl.focus(); return; }
+    if (body.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) { errEl.textContent = 'Correo electrónico inválido.'; errEl.focus(); return; }
+    try {
+      if (id) {
+        body.activo = document.getElementById('pr-active').checked;
+        await api.put('/proveedores/' + id, body, { invalidate: ['proveedores'] });
+      } else {
+        await api.post('/proveedores', body, false, { invalidate: ['proveedores'] });
+      }
+      if (!_pageActive()) return;
+      toast(id ? 'Proveedor actualizado' : 'Proveedor creado');
+      closeModal('modal-proveedor');
+      await loadProveedores();
+      loadResumen();
+    } catch (err) { errEl.textContent = err.message; errEl.focus(); }
+  }
+
+  async function deleteProveedor(id) {
+    const p = allProveedores.find(x => x._id === id);
+    const ok = await confirmDialog({
+      title: 'Desactivar proveedor',
+      message: `¿Desactivar <strong>${esc(p ? p.nombre : '')}</strong>? Sus compras registradas se conservan.`,
+      confirmText: 'Sí, desactivar',
+      type: 'danger'
+    });
+    if (!ok) return;
+    try {
+      await api.delete('/proveedores/' + id, { invalidate: ['proveedores'] });
+      if (!_pageActive()) return;
+      toast('Proveedor desactivado');
+      await loadProveedores();
+      loadResumen();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  // ── Nueva compra ─────────────────────────────────────────────────────────────
+  function productoOptions() {
+    return productosCompra.map(p =>
+      `<option value="${p._id}">${esc(p.nombre)} — ${soles(p.precio_venta)} (stock ${p.stock}${p.costo ? ' · costo ' + soles(p.costo) : ''})</option>`
+    ).join('');
+  }
+
+  function addCompraRow() {
+    const elegidos = new Set([...document.querySelectorAll('#c-items .c-prod')].map(sel => sel.value));
+    const disponible = productosCompra.find(p => !elegidos.has(p._id));
+    if (!disponible) return toast('Todos los productos disponibles ya están incluidos.', 'warning');
+    const wrap = document.getElementById('c-items');
+    const row = document.createElement('div');
+    row.className = 'compra-item-row';
+    row.innerHTML = `
+      <div class="form-group"><label style="font-size:12px">Producto *</label><select class="form-control c-prod">${productoOptions()}</select></div>
+      <div class="form-group"><label style="font-size:12px">Cant. *</label><input type="number" class="form-control c-cant" min="1" step="1" value="1"></div>
+      <div class="form-group"><label style="font-size:12px">Costo unit. (S/) *</label><input type="number" class="form-control c-costo" min="0" step="0.01" value=""></div>
+      <div class="form-group"><label style="font-size:12px">Vencimiento</label><input type="date" class="form-control c-vence" title="Crea un lote con este vencimiento"></div>
+      <div class="compra-subtotal">S/ 0.00</div>
+      <button type="button" class="btn btn-outline btn-sm c-remove" aria-label="Quitar producto" style="height:38px">✕</button>`;
+    wrap.appendChild(row);
+
+    const prodSel = row.querySelector('.c-prod');
+    prodSel.value = disponible._id;
+    const cant = row.querySelector('.c-cant');
+    const costo = row.querySelector('.c-costo');
+    const upd = () => {
+      const p = productosCompra.find(x => x._id === prodSel.value);
+      if (p && costo.value === '' && p.costo) costo.value = p.costo;
+      const sub = (Number(cant.value) || 0) * (parseFloat(costo.value) || 0);
+      row.querySelector('.compra-subtotal').textContent = soles(sub);
+      refreshSelects();
+      updateTotal();
+    };
+    prodSel.onchange = () => { const p = productosCompra.find(x => x._id === prodSel.value); if (p) { costo.value = p.costo || ''; } upd(); };
+    cant.oninput = upd;
+    costo.oninput = upd;
+    row.querySelector('.c-remove').onclick = () => { row.remove(); refreshSelects(); updateTotal(); };
+    upd();
+    prodSel.focus();
+  }
+
+  // Evita productos repetidos entre filas
+  function refreshSelects() {
+    const sels = Array.from(document.querySelectorAll('#c-items .c-prod'));
+    const elegidos = sels.map(s => s.value);
+    sels.forEach(s => {
+      Array.from(s.options).forEach(opt => {
+        opt.disabled = elegidos.some((v, i) => v === opt.value && sels[i] !== s);
+      });
+    });
+  }
+
+  function updateTotal() {
+    let total = 0;
+    document.querySelectorAll('#c-items .compra-item-row').forEach(row => {
+      const cant = Number(row.querySelector('.c-cant').value) || 0;
+      const costo = parseFloat(row.querySelector('.c-costo').value) || 0;
+      total += cant * costo;
+    });
+    setText('c-total', soles(total));
+  }
+
+  async function openCompraModal() {
+    const button = document.getElementById('btn-nueva-compra');
+    button.disabled = true;
+    try {
+      await Promise.all([loadProductos(), loadProveedores()]);
+      if (!_pageActive()) return;
+      if (!productosCompra.length) return toast('Crea o activa un producto antes de registrar compras.', 'warning');
+      document.getElementById('c-items').innerHTML = '';
+      document.getElementById('c-notas').value = '';
+      document.getElementById('compra-error').textContent = '';
+      document.getElementById('c-fecha').value = GymCatalogo.hoy();
+      document.getElementById('c-proveedor').value = '';
+      addCompraRow();
+      openModal('modal-compra');
+    } finally { button.disabled = false; }
+  }
+
+  async function saveCompra() {
+    const errEl = document.getElementById('compra-error');
+    errEl.textContent = '';
+    const filas = Array.from(document.querySelectorAll('#c-items .compra-item-row'));
+    if (!filas.length) { errEl.textContent = 'Agrega al menos un producto.'; errEl.focus(); return; }
+
+    const items = [];
+    const elegidos = new Set();
+    for (const row of filas) {
+      const producto_id = row.querySelector('.c-prod').value;
+      const cantidad = Number(row.querySelector('.c-cant').value);
+      const costo_unit = parseFloat(row.querySelector('.c-costo').value);
+      if (!producto_id) { errEl.textContent = 'Selecciona un producto en cada fila.'; errEl.focus(); return; }
+      if (elegidos.has(producto_id)) { errEl.textContent = 'Un producto no puede repetirse; indica sus unidades en una sola fila.'; errEl.focus(); return; }
+      elegidos.add(producto_id);
+      if (!Number.isSafeInteger(cantidad) || cantidad < 1) { errEl.textContent = 'La cantidad debe ser un entero mayor a 0.'; errEl.focus(); row.querySelector('.c-cant').focus(); return; }
+      if (!isFinite(costo_unit) || costo_unit < 0) { errEl.textContent = 'Indica un costo unitario válido.'; errEl.focus(); row.querySelector('.c-costo').focus(); return; }
+      const item = { producto_id, cantidad, costo_unit };
+      const vence = row.querySelector('.c-vence').value;
+      if (vence) item.fecha_vencimiento = vence;
+      items.push(item);
+    }
+
+    const body = {
+      proveedor_id: document.getElementById('c-proveedor').value || null,
+      fecha: document.getElementById('c-fecha').value,
+      notas: document.getElementById('c-notas').value,
+      items,
+    };
+
+    const btn = document.getElementById('c-save');
+    btn.disabled = true;
+    try {
+      await api.post('/compras', body, false, { invalidate: ['compras', 'productos', 'inventario', 'dashboard', 'reports'] });
+      if (!_pageActive()) return;
+      toast('Compra registrada: stock y costos actualizados');
+      closeModal('modal-compra');
+      comprasPage = 1;
+      await Promise.all([loadCompras(), loadResumen(), loadProductos()]);
+    } catch (err) { errEl.textContent = err.message; errEl.focus(); }
+    finally { btn.disabled = false; }
+  }
+
+  async function loadProductos() {
+    const ticket = ++productosTicket;
+    try {
+      const data = await GymCatalogo.listar('/productos?activo=true', pageSignal);
+      if (!_pageActive() || ticket !== productosTicket) return;
+      productosCompra = data;
+    } catch (err) {
+      if (_pageActive() && ticket === productosTicket) { productosCompra = []; toast(err.message, 'error'); }
+    }
+  }
+
+  function exportarCompras() {
+    api.download('/reports/compras/excel', 'compras.xlsx').then(() => toast('Descarga iniciada')).catch(err => toast(err.message, 'error'));
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────────
+  (async function _initPage() {
+    initLayout('compras', 'Compras');
+    const iconMap = { 'icon-plus-c': icon('plus'), 'icon-prov': icon('proveedor'), 'icon-plus-item': icon('plus'), 'icon-search-prov': icon('search'), 'icon-excel-c': icon('excel') };
+    Object.entries(iconMap).forEach(([id, html]) => { const el = document.getElementById(id); if (el) el.innerHTML = html; });
+
+    if (user.role !== 'admin' && !user.permisos?.includes('compras')) {
+      document.getElementById('compras-section').classList.add('hidden');
+      document.getElementById('compras-forbidden').classList.remove('hidden');
+      return;
+    }
+
+    document.getElementById('btn-nueva-compra').onclick = () => { openCompraModal(); };
+    document.getElementById('btn-nuevo-prov').onclick = () => openProveedorModal(null);
+    document.getElementById('c-add-item').onclick = addCompraRow;
+    document.getElementById('c-save').onclick = saveCompra;
+    document.getElementById('pr-save').onclick = saveProveedor;
+    document.getElementById('btn-export-compras').onclick = exportarCompras;
+
+    await Promise.all([loadProductos(), loadProveedores()]);
+    if (!_pageActive()) return;
+    fillProveedorSelect();
+    loadCompras();
+    loadResumen();
+  })();
+
+  window.saveProveedor = saveProveedor;
+  window.editProveedor = editProveedor;
+  window.deleteProveedor = deleteProveedor;
+  window.verDetalle = verDetalle;
+</script>
+</body>
+</html>

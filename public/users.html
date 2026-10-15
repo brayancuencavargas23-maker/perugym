@@ -44,14 +44,15 @@
         <div class="form-group"><label>Usuario *</label><input type="text" id="u-name" class="form-control" required></div>
         <div class="form-group"><label>Email *</label><input type="email" id="u-email" class="form-control" required></div>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Rol</label>
-          <select id="u-role" class="form-control">
-            <option value="recepcionista">Recepcionista</option>
-            <option value="admin">Admin</option>
-          </select>
-        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Rol</label>
+            <select id="u-role" class="form-control">
+              <option value="recepcionista">Recepcionista</option>
+              <option value="admin">Admin</option>
+            </select>
+            <p id="role-hint" class="hidden" style="font-size:11px;color:var(--text-light);margin:4px 0 0">Último administrador activo: no se puede cambiar de rol ni desactivar.</p>
+          </div>
         <div class="form-group" id="pass-group">
           <label>Contraseña <span id="pass-hint" style="font-size:11px;color:var(--text-light)">(requerida)</span></label>
           <input type="password" id="u-password" class="form-control" autocomplete="new-password">
@@ -141,11 +142,16 @@
 
   function renderUsersTable() {
     if (!_pageActive()) return;
-    document.getElementById('users-table').innerHTML = allUsers.map(u => `
+    const sessionUser = JSON.parse(localStorage.getItem('gym_user') || '{}');
+    const sessionid = sessionUser.id ? String(sessionUser.id) : '';
+    document.getElementById('users-table').innerHTML = allUsers.map(u => {
+      const esAdmin   = u.role === 'admin';
+      const esMiCuenta = sessionid && String(u.id) === sessionid;
+      return `
       <tr>
         <td><div style="display:flex;align-items:center;gap:8px">
           <div style="width:32px;height:32px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:bold">${avatarInitials(u.name)}</div>
-          ${u.name}
+          ${u.name}${esMiCuenta ? ' <span class="badge badge-info" title="Tu cuenta">tú</span>' : ''}
         </div></td>
         <td>${u.email}</td>
         <td><span class="badge badge-info">${u.role}</span></td>
@@ -153,11 +159,14 @@
         <td>
           <button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center" onclick="editUser('${u.id}')">${icon('edit')}</button>
           <button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center;gap:4px" onclick="openPassword('${u.id}', '${u.name}')" title="Cambiar contraseña">${icon('lock')}</button>
-          ${u.role !== 'admin' ? `<button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center;gap:4px" onclick="openPermisos('${u.id}', '${u.name}', ${JSON.stringify(u.permisos || []).replace(/"/g, '&quot;')})">${icon('key')} Permisos</button>` : ''}
-          <button class="btn btn-sm btn-danger" style="display:inline-flex;align-items:center" onclick="withLoading(this, () => deleteUser('${u.id}', '${u.name}'), 'Eliminando...')">${icon('trash')}</button>
+          ${!esAdmin ? `<button class="btn btn-sm btn-outline" style="display:inline-flex;align-items:center;gap:4px" onclick="openPermisos('${u.id}', '${u.name}', ${JSON.stringify(u.permisos || []).replace(/"/g, '&quot;')})">${icon('key')} Permisos</button>` : ''}
+          ${(!esAdmin && !esMiCuenta)
+            ? `<button class="btn btn-sm btn-danger" style="display:inline-flex;align-items:center" onclick="withLoading(this, () => deleteUser('${u.id}', '${u.name}'), 'Eliminando...')">${icon('trash')}</button>`
+            : `<button class="btn btn-sm btn-danger" style="display:inline-flex;align-items:center;opacity:.4;cursor:not-allowed" disabled aria-disabled="true" title="${esAdmin ? 'Las cuentas administradoras no se pueden eliminar' : 'No puedes eliminar tu propia cuenta'}">${icon('trash')}</button>`}
         </td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
   }
 
   document.getElementById('btn-new') && (document.getElementById('btn-new').onclick = () => {
@@ -167,6 +176,9 @@
     document.getElementById('u-role').value = 'recepcionista';
     document.getElementById('u-password').value = '';
     document.getElementById('active-group').classList.add('hidden');
+    document.getElementById('u-role').disabled = false;
+    document.getElementById('u-active').disabled = false;
+    document.getElementById('role-hint').classList.add('hidden');
     document.getElementById('pass-hint').textContent = '(requerida)';
     document.getElementById('pass-group').classList.remove('hidden');
     document.getElementById('modal-title').textContent = 'Nuevo Usuario';
@@ -177,12 +189,18 @@
     const users = await api.get('/auth/users');
     const u = users.find(x => x.id === id);
     if (!u) return;
+    // Último admin activo: el servidor rechazaría el cambio, así que se bloquea aquí
+    const adminsActivos = users.filter(x => x.role === 'admin' && x.active).length;
+    const esUltimoAdmin = u.role === 'admin' && u.active && adminsActivos <= 1;
     document.getElementById('user-id').value = u.id;
     document.getElementById('u-name').value = u.name;
     document.getElementById('u-email').value = u.email;
     document.getElementById('u-role').value = u.role;
-    document.getElementById('u-password').value = '';
+    document.getElementById('u-role').disabled = esUltimoAdmin;
     document.getElementById('u-active').checked = u.active;
+    document.getElementById('u-active').disabled = esUltimoAdmin;
+    document.getElementById('role-hint').classList.toggle('hidden', !esUltimoAdmin);
+    document.getElementById('u-password').value = '';
     document.getElementById('active-group').classList.remove('hidden');
     document.getElementById('pass-group').classList.add('hidden'); // contraseña se cambia por separado
     document.getElementById('modal-title').textContent = 'Editar Usuario';
@@ -281,6 +299,8 @@
     { key: 'planes',     label: 'Planes' },
     { key: 'asistencia', label: 'Asistencia' },
     { key: 'productos',  label: 'Productos' },
+    { key: 'compras',    label: 'Compras y proveedores' },
+    { key: 'solicitudes', label: 'Solicitudes' },
     { key: 'caja',       label: 'Caja' },
     { key: 'reports',    label: 'Reportes' },
   ];
@@ -330,3 +350,6 @@
     const el = document.getElementById('icon-plus-usr');
     if (el) el.innerHTML = icon('plus');
   })();
+</script>
+</body>
+</html>

@@ -107,6 +107,13 @@ const requireRole = (...roles) => (req, res, next) => {
   next();
 };
 
+const requirePermission = permission => (req, res, next) => {
+  if (req.user.role === 'admin' || (req.user.role === 'recepcionista' && req.user.permisos?.includes(permission))) {
+    return next();
+  }
+  return res.status(403).json({ error: 'Acceso denegado' });
+};
+
 /**
  * Aplica headers HTTP que impiden al navegador cachear páginas protegidas.
  * Debe usarse en todas las rutas HTML del panel administrativo para que
@@ -125,6 +132,7 @@ const noCache = (_req, res, next) => {
 module.exports = { 
   verifyToken, 
   requireRole, 
+  requirePermission,
   noCache, 
   protectDeveloperUser,
   isDeveloperUser,

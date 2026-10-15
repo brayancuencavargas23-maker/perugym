@@ -5,8 +5,9 @@ const Plan = require('../models/Plan');
 const { verifyToken } = require('../middleware/auth');
 const { saveImage, deleteImage } = require('../config/storage');
 const { validators, handleValidationErrors } = require('../middleware/validation');
-const { param } = require('express-validator');
+const { param, body } = require('express-validator');
 const logger = require('../utils/logger');
+const { vistaMembresia, periodoActual } = require('../utils/membresiaPeriodos');
 
 router.use(verifyToken);
 
@@ -107,15 +108,15 @@ router.get('/', async (req, res) => {
         .sort({ fecha_fin: -1 });
 
       const priority = { activo: 0, pendiente: 1, vencido: 2, cancelado: 3 };
-      mems.sort((a, b) => (priority[a.estado] ?? 4) - (priority[b.estado] ?? 4));
-      const best = mems[0];
+      mems.sort((a, b) => (priority[vistaMembresia(a).estado] ?? 4) - (priority[vistaMembresia(b).estado] ?? 4));
+      const best = mems[0] ? vistaMembresia(mems[0]) : null;
 
       return {
         ...c.toObject(),
         id: String(c._id),
         membresia_estado: best?.estado || null,
         fecha_fin: best?.fecha_fin || null,
-        plan_nombre: best?.plan_id?.nombre || null,
+        plan_nombre: best?.plan_nombre || best?.plan_id?.nombre || null,
       };
     }));
 
@@ -135,13 +136,13 @@ router.get('/:id', [
       .sort({ fecha_fin: -1 });
 
     const priority = { activo: 0, pendiente: 1, vencido: 2, cancelado: 3 };
-    mems.sort((a, b) => (priority[a.estado] ?? 4) - (priority[b.estado] ?? 4));
+    mems.sort((a, b) => (priority[vistaMembresia(a).estado] ?? 4) - (priority[vistaMembresia(b).estado] ?? 4));
 
     const membresias = mems.map(m => ({
-      ...m.toObject(),
+      ...vistaMembresia(m),
       id: m._id,
-      plan_nombre: m.plan_id?.nombre,
-      precio: m.plan_id?.precio,
+      plan_nombre: vistaMembresia(m).plan_nombre || m.plan_id?.nombre,
+      precio: periodoActual(m)?.monto_total ?? m.monto_total ?? m.plan_id?.precio,
     }));
 
     res.json({ ...cliente.toObject(), id: cliente._id, membresias });
@@ -173,6 +174,7 @@ router.post('/', [
 
 router.put('/:id', [
   validators.mongoId('id', 'param'),
+  body('activo').optional().isBoolean().withMessage('Estado de cliente inválido.').toBoolean(),
   validators.telefono(false),
   validators.dni(),
   validators.email()
@@ -180,6 +182,7 @@ router.put('/:id', [
   const { nombre, apellido_paterno, apellido_materno, dni, email, telefono, notas, activo } = req.body;
   try {
     const current = await Cliente.findById(req.params.id);
+    if (!current) return res.status(404).json({ error: 'Cliente no encontrado' });
     let foto_url = current?.foto_url;
     if (req.files?.foto) {
       await deleteImage(foto_url);
@@ -188,15 +191,16 @@ router.put('/:id', [
     const cliente = await Cliente.findByIdAndUpdate(
       req.params.id,
       {
-        nombre,
-        apellido_paterno: apellido_paterno || null,
-        apellido_materno: apellido_materno || null,
-        dni:      dni      || null,
-        email:    email    || null,
-        telefono: telefono || null,
+        nombre: nombre !== undefined ? nombre : current.nombre,
+        apellido_paterno: apellido_paterno !== undefined ? apellido_paterno || null : current.apellido_paterno,
+        apellido_materno: apellido_materno !== undefined ? apellido_materno || null : current.apellido_materno,
+        dni: dni !== undefined ? dni || null : current.dni,
+        email: email !== undefined ? email || null : current.email,
+        telefono: telefono !== undefined ? telefono || null : current.telefono,
         foto_url,
-        notas:    notas    || null,
-        activo:   activo !== undefined ? activo : true,
+        notas: notas !== undefined ? notas || null : current.notas,
+        activo: activo !== undefined ? activo : current.activo,
+        ...(activo === true ? { eliminado_en: null, eliminado_por: null } : {}),
       },
       { new: true }
     );
@@ -208,10 +212,15 @@ router.delete('/:id', [
   validators.mongoId('id', 'param')
 ], handleValidationErrors, async (req, res) => {
   try {
-    const c = await Cliente.findById(req.params.id);
-    await deleteImage(c?.foto_url);
-    await Cliente.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Cliente eliminado' });
+    // Baja lógica: mantener identidad, fotografía y relaciones financieras.
+    let cliente = await Cliente.findOneAndUpdate(
+      { _id: req.params.id, eliminado_en: null },
+      { $set: { activo: false, eliminado_en: new Date(), eliminado_por: String(req.user.id) } },
+      { new: true }
+    );
+    if (!cliente) cliente = await Cliente.findById(req.params.id);
+    if (!cliente) return res.status(404).json({ error: 'Cliente no encontrado' });
+    res.json({ message: 'Cliente dado de baja; historial conservado.', cliente });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

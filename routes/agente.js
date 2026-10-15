@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const rateLimit = require('express-rate-limit');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken, requireRole } = require('../middleware/auth');
+const Operaciones = require('../services/AsistenteOperacionesService');
 const { chat, limpiarHistorial, obtenerHistorial } = require('../services/AgenteService');
 
 // Rate limiting para el agente: 30 consultas por 15 minutos por usuario
@@ -14,6 +15,16 @@ const agenteLimiter = rateLimit({
 });
 
 router.use(verifyToken);
+
+// Accesos directos: funcionan también cuando el proveedor IA no está disponible.
+const operacion = fn => async (req, res) => {
+  try { res.set('Cache-Control', 'no-store').json(await fn(req)); }
+  catch (err) { res.status(err.status || 500).json({ error: err.status ? err.message : 'No se pudo completar la operación. Intenta de nuevo.' }); }
+};
+router.get('/reporte', requireRole('admin', 'recepcionista'), operacion(req => Operaciones.generarReporte(req.query)));
+router.get('/recomendaciones', requireRole('admin', 'recepcionista'), operacion(req => Operaciones.recomendaciones(req.query)));
+router.get('/clientes', requireRole('admin', 'recepcionista'), operacion(req => Operaciones.buscarClientes(req.query.q)));
+router.post('/mensaje', requireRole('admin', 'recepcionista'), operacion(req => Operaciones.prepararMensaje(req.body)));
 
 // POST /api/agente/chat
 router.post('/chat', agenteLimiter, async (req, res) => {
@@ -29,7 +40,7 @@ router.post('/chat', agenteLimiter, async (req, res) => {
     }
 
     const usuarioId = req.user.id;
-    const resultado = await chat(mensaje.trim(), usuarioId);
+    const resultado = await chat(mensaje.trim(), usuarioId, req.user);
 
     res.json(resultado);
   } catch (error) {

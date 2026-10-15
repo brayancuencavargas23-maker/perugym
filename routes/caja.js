@@ -175,12 +175,7 @@ router.get('/:id/detalle', async (req, res) => {
       .populate('usuario_id', 'usuario')
       .sort({ fecha: -1 });
 
-    const pagosData = pagos.map(p => ({
-      ...p.toObject(),
-      id: p._id,
-      cliente_nombre: [p.cliente_id?.nombre, p.cliente_id?.apellido_paterno, p.cliente_id?.apellido_materno].filter(Boolean).join(' ') || null,
-      plan_nombre: p.membresia_id?.plan_id?.nombre,
-    }));
+    const pagosData = pagos.map(p => require('../services/MembresiaPagosService').presentarPago(p));
 
     // Aplanar ventas por item (igual que el original)
     const ventasData = [];

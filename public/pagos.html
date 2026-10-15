@@ -229,6 +229,7 @@
   let allPagos = [];
   let tablePaginator = null;
   let lastGroupedData = [];
+  const escapePago = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
 
   // Guard: devuelve true si la página de pagos sigue activa en el DOM.
   function _pageActive() {
@@ -254,14 +255,14 @@
     const memId = g.membresia_id?._id || g.membresia_id || '';
     const porcentaje = g.total_esperado > 0
       ? Math.min((g.total_pagado / g.total_esperado) * 100, 100).toFixed(0)
-      : 0;
-    const completado = g.total_esperado > 0 && g.total_pagado >= g.total_esperado;
+      : 100;
+    const completado = g.total_pagado >= g.total_esperado;
     const badgeClass = completado ? 'badge-success' : g.tiene_pendiente ? 'badge-warning' : 'badge-info';
     const badgeText = completado ? 'Pagado' : g.tiene_pendiente ? 'Pendiente' : 'Parcial';
     return `
     <tr>
-      <td data-label="Cliente">${g.cliente_nombre || '-'}</td>
-      <td data-label="Plan">${g.plan_nombre || '-'}</td>
+      <td data-label="Cliente">${escapePago(g.cliente_nombre || '-')}</td>
+      <td data-label="Plan">${escapePago(g.plan_nombre || '-')}${g.periodo_inicio ? `<div class="text-light" style="font-size:11px">${fmtDate(g.periodo_inicio)} — ${fmtDate(g.periodo_fin)}</div>` : ''}</td>
       <td data-label="Pagado" style="font-weight:600">${fmtMoney(g.total_pagado)} <span style="color:var(--text-light);font-weight:400;font-size:11px">/ ${fmtMoney(g.total_esperado)}</span></td>
       <td data-label="Método">${g.ultimo_metodo || '-'}</td>
       <td data-label="Último pago">${fmtDate(g.ultimo_pago)}</td>
@@ -277,9 +278,9 @@
       </td>
       <td data-label="Acciones" style="display:flex;gap:4px">
         ${!completado
-          ? `<button class="btn btn-sm btn-success" title="Registrar abono" onclick="abrirAbonoDesdePago('${memId}','${g.cliente_nombre || ''}',${g.total_esperado})">${icon('plus')}</button>`
+          ? `<button class="btn btn-sm btn-success" title="Registrar abono" onclick="abrirAbonoDesdePago('${memId}',null,${g.total_esperado},'${g.periodo_id || ''}')">${icon('plus')}</button>`
           : ''}
-        <button class="btn btn-sm btn-outline" title="Historial de pagos" onclick="verHistorialMembresia('${memId}')">${icon('money')}</button>
+        <button class="btn btn-sm btn-outline" title="Historial de pagos del periodo" onclick="verHistorialMembresia('${memId}','${g.periodo_id || ''}')">${icon('money')}</button>
       </td>
     </tr>
   `;
@@ -312,13 +313,17 @@
     allPagos.forEach(p => {
       const rawMemId = p.membresia_id?._id || p.membresia_id;
       const memId = typeof rawMemId === 'object' ? String(rawMemId) : rawMemId || 'sin-membresia';
-      if (!grouped[memId]) {
-        grouped[memId] = {
+      const groupId = `${memId}:${p.periodo_id || 'inicial'}`;
+      if (!grouped[groupId]) {
+        grouped[groupId] = {
           membresia_id: typeof rawMemId === 'object' ? rawMemId : p.membresia_id,
           cliente_nombre: p.cliente_nombre,
           plan_nombre: p.plan_nombre,
+          periodo_id: p.periodo_id,
+          periodo_inicio: p.periodo_inicio,
+          periodo_fin: p.periodo_fin,
           total_pagado: 0,
-          total_esperado: p.membresia_id?.monto_total || p.membresia_id?.plan_id?.precio || 0,
+          total_esperado: p.total_esperado ?? p.membresia_id?.monto_total ?? p.membresia_id?.plan_id?.precio ?? 0,
           abonos: 0,
           ultimo_pago: null,
           ultimo_metodo: null,
@@ -330,7 +335,7 @@
           pagos_ids: []
         };
       }
-      const g = grouped[memId];
+      const g = grouped[groupId];
       if (p.cliente_nombre && !g.cliente_nombre) g.cliente_nombre = p.cliente_nombre;
       if (p.plan_nombre && !g.plan_nombre) g.plan_nombre = p.plan_nombre;
       g.pagos_ids.push(p.id);
@@ -354,18 +359,6 @@
     });
 
     const groupedArr = Object.values(grouped);
-    if (groupedArr.length > 0 && groupedArr[0].total_esperado === 0) {
-      groupedArr.forEach(g => {
-        if (g.total_esperado === 0) {
-          const ref = allPagos.find(p => p.membresia_id?._id === (g.membresia_id?._id || g.membresia_id));
-          if (ref?.membresia_id?.monto_total) {
-            g.total_esperado = ref.membresia_id.monto_total;
-          } else if (ref?.membresia_id?.plan_id?.precio) {
-            g.total_esperado = ref.membresia_id.plan_id.precio;
-          }
-        }
-      });
-    }
 
     return groupedArr.filter(p => {
       if (cliente) {
@@ -491,12 +484,14 @@
   }
 
   // --- Registrar abono ---
-  function abrirAbonoDesdePago(memId, clienteNombre, precio) {
+  function abrirAbonoDesdePago(memId, clienteNombre, precio, periodoId = '') {
     if (!cajaActual) { toast('Abre la caja antes de registrar abonos', 'warning'); return; }
-    api.get(`/pagos/${memId}/estado-pago`).then(estado => {
+    api.get(`/pagos/${memId}/estado-pago${periodoId ? '?periodo_id=' + periodoId : ''}`, true).then(estado => {
       if (estado.completado) { toast('Esta membresía ya está pagada completamente', 'info'); return; }
       document.getElementById('abono-mem-id').value = memId;
-      document.getElementById('abono-info').innerHTML = `Cliente: <strong>${clienteNombre}</strong><br>Pendiente: <strong>${fmtMoney(estado.pendiente)}</strong> de ${fmtMoney(estado.total_plan)}`;
+      document.getElementById('abono-mem-id').dataset.periodoId = estado.periodo_id || '';
+      clienteNombre = clienteNombre || allPagos.find(p => (p.membresia_id?._id || p.membresia_id) === memId)?.cliente_nombre || 'Cliente';
+      document.getElementById('abono-info').textContent = `Cliente: ${clienteNombre}. Pendiente: ${fmtMoney(estado.pendiente)} de ${fmtMoney(estado.total_plan)}`;
       document.getElementById('abono-monto').value = '';
       document.getElementById('abono-monto').max = estado.pendiente;
       document.getElementById('abono-metodo').value = 'efectivo';
@@ -518,23 +513,13 @@
     try {
       const result = await api.post('/pagos/abono', {
         membresia_id: memId,
+        periodo_id: document.getElementById('abono-mem-id').dataset.periodoId || undefined,
         monto,
         metodo_pago: document.getElementById('abono-metodo').value,
         caja_id: cajaActual.id,
         notas: document.getElementById('abono-notas').value || null,
       }, false, { invalidate: ['membresias', 'pagos', 'caja'] });
-      if (result.pago) {
-        const existingPago = allPagos.find(p => {
-          const pid = p.membresia_id?._id || p.membresia_id;
-          return pid === memId || pid?._id === memId;
-        });
-        result.pago.cliente_nombre = existingPago?.cliente_nombre || result.pago.cliente_nombre;
-        result.pago.plan_nombre = existingPago?.plan_nombre || result.pago.plan_nombre;
-        if (existingPago?.membresia_id && typeof existingPago.membresia_id === 'object') {
-          result.pago.membresia_id = existingPago.membresia_id;
-        }
-        allPagos.unshift(result.pago);
-      }
+      await loadPagos();
       if (result.resumen?.completado) {
         toast('Abono registrado. ¡Membresía pagada completamente!');
       } else {
@@ -546,7 +531,7 @@
   }
 
   // --- Historial de pagos de una membresía ---
-  async function verHistorialMembresia(memId) {
+  async function verHistorialMembresia(memId, periodoId = '') {
     document.getElementById('historial-loading').classList.remove('hidden');
     document.getElementById('historial-lista').classList.add('hidden');
     document.getElementById('historial-empty').classList.add('hidden');
@@ -555,8 +540,8 @@
     openModal('modal-historial');
     try {
       const [pagos, estado] = await Promise.all([
-        api.get(`/membresias/${memId}/pagos`),
-        api.get(`/pagos/${memId}/estado-pago`).catch(() => null)
+        api.get(`/membresias/${memId}/pagos${periodoId ? '?periodo_id=' + periodoId : ''}`, true),
+        api.get(`/pagos/${memId}/estado-pago${periodoId ? '?periodo_id=' + periodoId : ''}`, true).catch(() => null)
       ]);
       document.getElementById('historial-loading').classList.add('hidden');
       if (!pagos.length) {
@@ -591,7 +576,7 @@
           if (btnAbono && cajaActual) {
             btnAbono.onclick = () => {
               closeModal('modal-historial');
-              abrirAbonoDesdePago(memId, '', estado.total_plan);
+              abrirAbonoDesdePago(memId, '', estado.total_plan, estado.periodo_id || '');
             };
             btnAbono.classList.remove('hidden');
           }

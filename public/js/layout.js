@@ -60,6 +60,7 @@ function initLayout(activePage, pageTitle) {
         { page: 'pagos',      key: 'pagos',      label: 'Pagos'      },
         { page: 'caja',       key: 'caja',       label: 'Caja'       },
         { page: 'productos',  key: 'productos',  label: 'Productos'  },
+        { page: 'compras',    key: 'compras',    label: 'Compras' },
       ],
     },
     {
@@ -137,23 +138,20 @@ function initLayout(activePage, pageTitle) {
   sessionStorage.setItem('_sidebar_html', document.getElementById('sidebar').innerHTML);
 
   // ── Badge solicitudes (sidebar) ──────────────────────────────────────────────
-  const cachedStats = gymCache.get('/solicitudes/stats');
-  if (cachedStats) {
+  const _pintarBadgeSolicitudes = stats => {
     const badge = document.getElementById('nav-badge-solicitudes');
-    if (badge && cachedStats.pendiente > 0) {
-      badge.textContent    = cachedStats.pendiente;
-      badge.style.display  = 'inline-block';
-    }
-  }
+    if (!badge) return;
+    const sinVer = stats.pendiente_no_leidas ?? stats.pendiente;
+    badge.textContent   = sinVer;
+    badge.style.display = sinVer > 0 ? 'inline-block' : 'none';
+  };
+  const cachedStats = gymCache.get('/solicitudes/stats');
+  if (cachedStats) _pintarBadgeSolicitudes(cachedStats);
   fetch('/api/solicitudes/stats', { headers: { Authorization: `Bearer ${localStorage.getItem('gym_token')}` } })
     .then(r => r.json())
     .then(stats => {
       gymCache.set('/solicitudes/stats', stats);
-      const badge = document.getElementById('nav-badge-solicitudes');
-      if (badge) {
-        badge.textContent   = stats.pendiente;
-        badge.style.display = stats.pendiente > 0 ? 'inline-block' : 'none';
-      }
+      _pintarBadgeSolicitudes(stats);
     })
     .catch(() => {});
 
@@ -283,6 +281,17 @@ function _setupTopbarData(user) {
 
   // Badge de notificaciones en la campanita
   _loadNotifBadge();
+  if (!window._notifPoll) {
+    window._notifPoll = setInterval(() => { if (!document.hidden) _loadNotifBadge(); }, 60000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      _loadNotifBadge();
+      const panel = document.getElementById('panel-body');
+      if (panel && document.getElementById('right-panel')?.classList.contains('open')) marcarNotificacionesVistas(panel);
+      const dashboard = document.getElementById('notif-content');
+      if (dashboard) observarNotificaciones(dashboard);
+    });
+  }
 }
 
 // Carga el conteo de notificaciones y actualiza el badge de la campanita
@@ -293,19 +302,104 @@ function _loadNotifBadge() {
   // Intentar desde caché primero (respuesta inmediata)
   const cached = gymCache.get('/dashboard/notifications');
   if (cached && cached.total != null) {
-    _updateNotifBadge(cached.total);
+    actualizarNotificaciones(cached);
   }
 
   fetch('/api/dashboard/notifications', { headers: { Authorization: 'Bearer ' + token } })
     .then(r => r.ok ? r.json() : Promise.reject())
     .then(data => {
-      gymCache.set('/dashboard/notifications', data);
-      _updateNotifBadge(data.total || 0);
+      actualizarNotificaciones(data);
     })
     .catch(() => {});
 }
 
+// Las claves reconocidas evitan que una respuesta GET anterior reactive el badge.
+const _notifSeen = new Set();
+const _notifPending = new Set();
+let _notifQueue = new Set();
+let _notifTimer;
+function actualizarNotificaciones(data) {
+  (data.items || []).forEach(n => {
+    if (n.leida) _notifSeen.add(n.clave);
+    if (_notifSeen.has(n.clave)) n.leida = true;
+  });
+  data.no_leidas = (data.items || []).filter(n => !n.leida).length;
+  gymCache.set('/dashboard/notifications', data);
+  _updateNotifBadge(data.no_leidas);
+  document.querySelectorAll('[data-notif-count]').forEach(el => {
+    el.textContent = data.no_leidas;
+    el.hidden = data.no_leidas === 0;
+  });
+  const solicitudes = (data.items || []).filter(n => n.tipo === 'nueva_solicitud' && !n.leida).length;
+  const solicitudesBadge = document.getElementById('nav-badge-solicitudes');
+  if (solicitudesBadge) {
+    solicitudesBadge.textContent = solicitudes;
+    solicitudesBadge.style.display = solicitudes ? 'inline-block' : 'none';
+  }
+  document.querySelectorAll('[data-notif-key]').forEach(el => {
+    const read = _notifSeen.has(el.dataset.notifKey);
+    el.classList.toggle('notification-read', read);
+    const label = el.querySelector('[data-notif-status]');
+    if (label) label.textContent = read ? 'Vista' : 'Nueva';
+  });
+}
+
+async function _flushNotifRead() {
+  const claves = [..._notifQueue].slice(0, 500);
+  claves.forEach(k => _notifQueue.delete(k));
+  if (!claves.length) return;
+  try {
+    const res = await fetch('/api/dashboard/notifications/read', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('gym_token') },
+      body: JSON.stringify({ claves }),
+    });
+    if (!res.ok) throw new Error('No se pudo guardar la lectura. Vuelve a abrir las notificaciones para reintentar.');
+    const data = await res.json();
+    claves.forEach(k => _notifSeen.add(k));
+    actualizarNotificaciones(data);
+  } catch (err) {
+    if (typeof toast === 'function') toast(err.message, 'error');
+  } finally {
+    claves.forEach(k => _notifPending.delete(k));
+    if (_notifQueue.size) _notifTimer = setTimeout(_flushNotifRead, 150);
+  }
+}
+
+function marcarNotificacionesVistas(container) {
+  if (document.hidden) return;
+  container.querySelectorAll('[data-notif-key]').forEach(el => {
+    const key = el.dataset.notifKey;
+    if (!key || _notifSeen.has(key) || _notifPending.has(key)) return;
+    _notifPending.add(key);
+    _notifQueue.add(key);
+  });
+  if (_notifQueue.size) {
+    clearTimeout(_notifTimer);
+    _notifTimer = setTimeout(_flushNotifRead, 150);
+  }
+}
+
+function observarNotificaciones(container) {
+  container._notifObserver?.disconnect();
+  if (!window.IntersectionObserver) return;
+  const observer = new IntersectionObserver(entries => {
+    if (document.hidden) return;
+    entries.forEach(entry => {
+      const key = entry.target.dataset.notifKey;
+      if (!entry.isIntersecting || entry.intersectionRatio < 0.6 || !key || _notifSeen.has(key) || _notifPending.has(key)) return;
+      _notifPending.add(key);
+      _notifQueue.add(key);
+      clearTimeout(_notifTimer);
+      _notifTimer = setTimeout(_flushNotifRead, 150);
+    });
+  }, { threshold: 0.6 });
+  container._notifObserver = observer;
+  container.querySelectorAll('[data-notif-key]').forEach(el => observer.observe(el));
+  window.__spaPageAbort?.signal.addEventListener('abort', () => observer.disconnect(), { once: true });
+}
+
 function _updateNotifBadge(count) {
+  document.getElementById('topbar-notif-btn')?.setAttribute('aria-label', count ? `Abrir notificaciones: ${count} sin leer` : 'Abrir notificaciones: todas vistas');
   const el = document.getElementById('topbar-notif-count');
   if (!el) return;
   if (count > 0) {
@@ -386,7 +480,11 @@ function attachTopbarListeners() {
   const checkinBtn = document.getElementById('topbar-checkin-btn');
   if (checkinBtn && !checkinBtn._checkinListener) {
     checkinBtn.addEventListener('click', () => {
-      window.location.href = '/asistencia.html?checkin=quick';
+      if (window.GymRouter) {
+        GymRouter.navigate('asistencia').then(() => document.getElementById('checkin-search')?.focus());
+      } else {
+        window.location.href = '/app.html?page=asistencia&checkin=quick';
+      }
     });
     checkinBtn._checkinListener = true;
   }
@@ -448,6 +546,7 @@ function openRightPanel() {
 }
 
 function closeRightPanel() {
+  document.getElementById('panel-body')?._notifObserver?.disconnect();
   document.getElementById('panel-overlay')?.classList.remove('open');
   document.getElementById('right-panel')?.classList.remove('open');
   document.body.style.overflow = '';
@@ -476,11 +575,12 @@ async function loadPanelData() {
   const headers = { Authorization: 'Bearer ' + token };
 
   try {
-    const [activityRes, productsRes, membresiaRes, lowStockRes] = await Promise.allSettled([
+    const [activityRes, productsRes, membresiaRes, lowStockRes, notifRes] = await Promise.allSettled([
       fetch('/api/dashboard/activity',      { headers }).then(r => r.ok ? r.json() : []),
       fetch('/api/dashboard/top-products',  { headers }).then(r => r.ok ? r.json() : {}),
       fetch('/api/dashboard?periodo=mes',   { headers }).then(r => r.ok ? r.json() : {}),
       fetch('/api/dashboard/low-stock',     { headers }).then(r => r.ok ? r.json() : { products: [] }),
+      fetch('/api/dashboard/notifications', { headers }).then(r => { if (!r.ok) throw new Error('Notificaciones no disponibles'); return r.json(); }),
     ]);
 
     const events     = activityRes.status  === 'fulfilled' ? activityRes.value  : [];
@@ -488,7 +588,12 @@ async function loadPanelData() {
     const memData    = membresiaRes.status === 'fulfilled' ? membresiaRes.value : {};
     const lowStockData = lowStockRes.status === 'fulfilled' ? lowStockRes.value : { products: [] };
 
-    let html = '';
+    const escNotif = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    let html = notifRes.status === 'fulfilled'
+      ? _panelSection('Alertas del gimnasio · sin leer', notifRes.value.no_leidas,
+        notifRes.value.items.map(n => `<div class="panel-item" data-notif-key="${escNotif(n.clave)}"><div class="panel-item-text"><strong>${escNotif(n.titulo)}</strong><span>${escNotif(n.detalle)}</span></div><span class="panel-item-badge info" data-notif-status>${n.leida ? 'Vista' : 'Nueva'}</span></div>`).join('') || '<div class="panel-empty">Sin alertas pendientes</div>')
+        .replace('class="count"', 'class="count" data-notif-count')
+      : '<div class="panel-empty">No se pudieron cargar las alertas. Vuelve a abrir el panel para reintentar.</div>';
 
     // ── Sección 1: Actividad Reciente ─────────────────────────────────────────
     const actItems = Array.isArray(events) ? events.slice(0, 8) : [];
@@ -532,6 +637,21 @@ async function loadPanelData() {
           }).join('')
     );
 
+    // ── Sección 2b: Lotes por vencer / vencidos ───────────────────────────────
+    const lotes = (lowStockData.lotes || []);
+    const loteIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>';
+    if (lotes.length) {
+      html += _panelSection(
+        loteIcon + ' Lotes por Vencer', lotes.length,
+        lotes.map(l => {
+          const sev = l.vencido || l.dias <= 3 ? 'danger' : l.dias <= 10 ? 'warning' : 'info';
+          const badge = l.vencido ? 'Vencido' : (l.dias === 0 ? 'Hoy' : l.dias + 'd');
+          const sub = `Lote ${l.numero_lote || 's/n'} · ${l.cantidad} u. · ${l.fecha_vencimiento}`;
+          return _panelItemSPA(loteIcon, sev, l.producto || 'Producto', sub, badge, sev, 'productos', null, null);
+        }).join('')
+      );
+    }
+
     // ── Sección 3: Membresías por Vencer ──────────────────────────────────────
     const vencen = (memData.membresiasVencenPronto || []);
     const clockIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
@@ -548,10 +668,9 @@ async function loadPanelData() {
     );
 
     body.innerHTML = html;
-
-    // Actualizar el badge después de cargar (datos frescos)
-    if (memData.membresiasVencenPronto != null || lowStock.length != null) {
-      _loadNotifBadge();
+    if (notifRes.status === 'fulfilled') {
+      actualizarNotificaciones(notifRes.value);
+      if (document.getElementById('right-panel')?.classList.contains('open')) marcarNotificacionesVistas(body);
     }
 
   } catch {

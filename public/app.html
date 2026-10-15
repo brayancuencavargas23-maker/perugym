@@ -44,6 +44,7 @@
       '/pagos.html':        'pagos',
       '/asistencia.html':   'asistencia',
       '/productos.html':    'productos',
+      '/compras.html':      'compras',
       '/caja.html':         'caja',
       '/reports.html':      'reports',
       '/users.html':        'users',
@@ -52,7 +53,10 @@
     };
 
     const currentPath = window.location.pathname;
-    const initialPage = PATH_MAP[currentPath] || 'dashboard';
+    const requestedPage = new URLSearchParams(window.location.search).get('page');
+    const quickCheckin = new URLSearchParams(window.location.search).get('checkin') === 'quick';
+    const initialPage = Object.values(PATH_MAP).includes(requestedPage)
+      ? requestedPage : PATH_MAP[currentPath] || 'dashboard';
 
     // Inicializar layout (sidebar + topbar) — solo ocurre UNA VEZ
     initLayout(initialPage, '');
@@ -61,7 +65,11 @@
     GymRouter.init(initialPage);
 
     // Cargar la página inicial
-    GymRouter.navigate(initialPage, false);
+    GymRouter.navigate(initialPage, false).then(() => {
+      if (initialPage === 'asistencia' && quickCheckin) {
+        document.getElementById('checkin-search')?.focus();
+      }
+    });
   })();
 </script>
 <div id="sidebar-overlay" class="sidebar-overlay"></div>

@@ -14,7 +14,6 @@ const api = {
     const opts = { method, headers: this.headers(isFormData) };
     if (body) opts.body = isFormData ? body : JSON.stringify(body);
 
-    console.log(`[API] ${method} ${API_BASE}${path}`);
     
     try {
       const res = await fetch(API_BASE + path, opts);
@@ -52,7 +51,6 @@ const api = {
         throw new Error(data.error || 'Error en la solicitud');
       }
       
-      console.log(`[API] ✅ ${method} ${path} - OK`, data);
       return data;
     } catch (err) {
       console.error(`[API] ❌ Error en ${method} ${path}:`, err);
@@ -72,17 +70,13 @@ const api = {
     if (!force) {
       const cached = gymCache.get(path);
       if (cached !== null) {
-        console.log(`[API] 💾 CACHÉ HIT: ${path}`);
         return cached;
       }
-      console.log(`[API] 🔍 CACHÉ MISS: ${path} - Fetching...`);
     } else {
-      console.log(`[API] 🔄 FORCE FETCH: ${path}`);
     }
     const data = await this.request('GET', path);
     if (data !== undefined) {
       gymCache.set(path, data);
-      console.log(`[API] 💾 Guardado en caché: ${path}`);
     }
     return data;
   },

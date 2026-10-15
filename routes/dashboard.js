@@ -5,18 +5,23 @@ const Asistencia = require('../models/Asistencia');
 const Membresia = require('../models/Membresia');
 const Plan = require('../models/Plan');
 const Producto = require('../models/Producto');
+const Lote = require('../models/Lote');
 const Venta = require('../models/Venta');
+const Caja = require('../models/Caja');
 const MovimientoCaja = require('../models/MovimientoCaja');
 const { verifyToken } = require('../middleware/auth');
+const { DAY, limaDate, parseDate, period: reportPeriod } = require('../utils/reportDates');
+const NotificacionesService = require('../services/NotificacionesService');
 
 router.use(verifyToken);
 
 router.get('/', async (req, res) => {
   try {
+    await require('../services/MembresiaService').autoVencer();
     const { periodo = 'mes' } = req.query;
     const now = new Date();
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    const today = parseDate(limaDate(now));
+    const tomorrow = new Date(+today + DAY);
     const in7 = new Date(today); in7.setDate(in7.getDate() + 7);
 
     let startOfPeriod, startOfPrevPeriod;
@@ -26,18 +31,17 @@ router.get('/', async (req, res) => {
         startOfPrevPeriod = new Date(today); startOfPrevPeriod.setDate(startOfPrevPeriod.getDate() - 1);
         break;
       case 'semana':
-        startOfPeriod = new Date(today); startOfPeriod.setDate(startOfPeriod.getDate() - 7);
-        startOfPrevPeriod = new Date(today); startOfPrevPeriod.setDate(startOfPrevPeriod.getDate() - 14);
+        startOfPeriod = new Date(+today - 6 * DAY);
         break;
       case 'mes':
       default:
-        startOfPeriod = new Date(now.getFullYear(), now.getMonth(), 1);
-        startOfPrevPeriod = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        startOfPeriod = parseDate(`${limaDate(now).slice(0, 7)}-01`);
         break;
     }
+    startOfPrevPeriod = reportPeriod({ from: limaDate(startOfPeriod), to: limaDate(today) }, now).previousStart;
 
     const [
-      clientesActivos,
+      clientesResumen,
       ingresosActuales,
       ingresosAnteriores,
       asistenciaActual,
@@ -47,9 +51,9 @@ router.get('/', async (req, res) => {
       membresiasVencenPronto,
       membresiasVencenManana,
     ] = await Promise.all([
-      Cliente.countDocuments({ activo: true }),
+      require('../services/DashboardClientesService').resumen(now),
       Pago.aggregate([
-        { $match: { estado: 'pagado', fecha_pago: { $gte: startOfPeriod } } },
+        { $match: { estado: 'pagado', fecha_pago: { $gte: startOfPeriod, $lt: tomorrow } } },
         { $group: { _id: null, total: { $sum: '$monto' } } },
       ]),
       Pago.aggregate([
@@ -70,17 +74,47 @@ router.get('/', async (req, res) => {
     ]);
 
     const calcTrend = (actual, anterior) => {
-      if (anterior === 0) return actual > 0 ? 100 : 0;
+      if (anterior === 0) return null;
       return Math.round(((actual - anterior) / anterior) * 100);
     };
 
     const ingresoActual = ingresosActuales[0]?.total || 0;
     const ingresoAnterior = ingresosAnteriores[0]?.total || 0;
 
+    // Total del turno actual (caja abierta): cobros de membresías (incluye
+    // abonos) + ventas de productos + ingresos manuales (rutinas y otros),
+    // sin importar el método de pago. Al cerrar la caja no hay turno y el
+    // contador vuelve a 0.
+    const cajaAbierta = await Caja.findOne({ estado: 'abierta' }).populate('usuario_id', 'usuario').sort({ apertura: -1 });
+    let ventasTurno = { total: 0, cajero: null, abierta: false };
+    if (cajaAbierta) {
+      const [pagosTurno, ventasProductos, ingresosManuales] = await Promise.all([
+        Pago.aggregate([
+          { $match: { caja_id: cajaAbierta._id, estado: 'pagado' } },
+          { $group: { _id: null, total: { $sum: '$monto' } } },
+        ]),
+        Venta.aggregate([
+          { $match: { caja_id: cajaAbierta._id, anulada: false } },
+          { $unwind: '$items' },
+          { $group: { _id: null, total: { $sum: '$items.subtotal' } } },
+        ]),
+        MovimientoCaja.aggregate([
+          { $match: { caja_id: cajaAbierta._id, tipo: 'ingreso' } },
+          { $group: { _id: null, total: { $sum: '$monto' } } },
+        ]),
+      ]);
+      ventasTurno = {
+        total: (pagosTurno[0]?.total || 0) + (ventasProductos[0]?.total || 0) + (ingresosManuales[0]?.total || 0),
+        cajero: cajaAbierta.usuario_id?.usuario || null,
+        abierta: true,
+      };
+    }
+
     res.json({
       stats: {
-        clientesActivos,
+        ...clientesResumen,
         ingresosDelMes: ingresoActual,
+        ventasTurno,
         asistenciaHoy: asistenciaActual,
         pagosPendientes,
         enElGym,
@@ -131,46 +165,18 @@ router.get('/charts', async (req, res) => {
 
 router.get('/notifications', async (req, res) => {
   try {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
-    const in7 = new Date(today); in7.setDate(in7.getDate() + 7);
-    const in3 = new Date(today); in3.setDate(in3.getDate() + 3);
-
-    const [vencenHoy, vencen3d, pagosPendientes, productosStockBajo] = await Promise.all([
-      Membresia.find({ estado: 'activo', fecha_fin: { $gte: today, $lt: tomorrow } })
-        .populate('cliente_id', 'nombre apellido_paterno')
-        .populate('plan_id', 'nombre'),
-      Membresia.find({ estado: 'activo', fecha_fin: { $gte: tomorrow, $lte: in3 } })
-        .populate('cliente_id', 'nombre apellido_paterno')
-        .populate('plan_id', 'nombre'),
-      Pago.countDocuments({ estado: 'pendiente' }),
-      Producto.find({ activo: true, stock: { $lte: 5 } })
-        .select('nombre stock precio_venta categoria')
-        .sort({ stock: 1 }),
-    ]);
-
-    const notifications = [];
-    vencenHoy.forEach(m => {
-      const name = [m.cliente_id?.nombre, m.cliente_id?.apellido_paterno].filter(Boolean).join(' ');
-      notifications.push({ tipo: 'vencimiento_hoy', titulo: `${name} — vence hoy`, detalle: m.plan_id?.nombre || '', prioridad: 'alta' });
-    });
-    vencen3d.forEach(m => {
-      const name = [m.cliente_id?.nombre, m.cliente_id?.apellido_paterno].filter(Boolean).join(' ');
-      const days = Math.ceil((new Date(m.fecha_fin) - today) / (1000 * 60 * 60 * 24));
-      notifications.push({ tipo: 'vencimiento_proximo', titulo: `${name} — vence en ${days}d`, detalle: m.plan_id?.nombre || '', prioridad: 'media' });
-    });
-    if (pagosPendientes > 0) notifications.push({ tipo: 'pagos_pendientes', titulo: `${pagosPendientes} pagos pendientes`, detalle: 'Requieren atención', prioridad: 'media' });
-    productosStockBajo.forEach(p => {
-      notifications.push({ tipo: 'stock_bajo', titulo: p.nombre, detalle: `Stock: ${p.stock} — S/.${(p.precio_venta || 0).toFixed(2)}`, prioridad: 'baja', producto: { _id: p._id, nombre: p.nombre, stock: p.stock, precio_venta: p.precio_venta, categoria: p.categoria } });
-    });
-
-    notifications.sort((a, b) => {
-      const order = { alta: 0, media: 1, baja: 2 };
-      return (order[a.prioridad] || 2) - (order[b.prioridad] || 2);
-    });
-
-    res.json({ total: notifications.length, items: notifications });
+    res.set('Cache-Control', 'no-store').json(await NotificacionesService.listar(req.user.id));
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/notifications/read', async (req, res) => {
+  const { claves } = req.body;
+  if (!Array.isArray(claves) || claves.length > 500 || claves.some(k => typeof k !== 'string' || !/^(?:[a-f0-9]{64}|solicitud:[a-f0-9]{24})$/.test(k))) {
+    return res.status(400).json({ error: 'Envía hasta 500 claves de notificaciones válidas.' });
+  }
+  try {
+    res.set('Cache-Control', 'no-store').json(await NotificacionesService.marcarLeidas(req.user.id, claves));
+  } catch (err) { res.status(500).json({ error: 'No se pudieron marcar las notificaciones como leídas.' }); }
 });
 
 router.get('/activity', async (req, res) => {
@@ -186,7 +192,7 @@ router.get('/activity', async (req, res) => {
         .sort({ fecha: -1 }).limit(5),
       Membresia.find().populate('cliente_id', 'nombre apellido_paterno')
         .populate('plan_id', 'nombre precio')
-        .sort({ createdAt: -1 }).limit(5),
+        .sort({ updatedAt: -1 }).limit(5),
       Venta.find({ anulada: { $ne: true } }).populate('cliente_id', 'nombre apellido_paterno')
         .sort({ fecha_venta: -1 }).limit(5),
     ]);
@@ -194,7 +200,8 @@ router.get('/activity', async (req, res) => {
     const events = [];
     ultimosPagos.forEach(p => {
       const name = [p.cliente_id?.nombre, p.cliente_id?.apellido_paterno].filter(Boolean).join(' ');
-      events.push({ tipo: 'pago', titulo: `Pago de ${name}`, detalle: `S/. ${p.monto} — ${p.membresia_id?.plan_id?.nombre || ''}`, fecha: p.fecha_pago, icono: 'pago', link: '/pagos.html' });
+      const pago = require('../services/MembresiaPagosService').presentarPago(p);
+      events.push({ tipo: 'pago', titulo: `Pago de ${name}`, detalle: `S/. ${p.monto} — ${pago.plan_nombre || ''}`, fecha: p.fecha_pago, icono: 'pago', link: '/pagos.html' });
     });
     ultimasAsistencias.forEach(a => {
       const name = [a.cliente_id?.nombre, a.cliente_id?.apellido_paterno].filter(Boolean).join(' ');
@@ -202,7 +209,10 @@ router.get('/activity', async (req, res) => {
     });
     ultimasMembresias.forEach(m => {
       const name = [m.cliente_id?.nombre, m.cliente_id?.apellido_paterno].filter(Boolean).join(' ');
-      events.push({ tipo: 'membresia', titulo: `Membresía — ${name}`, detalle: `${m.plan_id?.nombre || ''} — S/. ${m.monto_total || m.plan_id?.precio || 0}`, fecha: m.createdAt || m.fecha_inicio, icono: 'membresia', link: '/membresias.html' });
+      const periodo = m.periodos?.at(-1);
+      events.push({ tipo: 'membresia', titulo: `${periodo && !periodo.inicial ? 'Renovación' : 'Membresía'} — ${name}`,
+        detalle: `${periodo?.plan_nombre || m.plan_nombre || m.plan_id?.nombre || ''} — S/. ${periodo?.monto_total ?? m.monto_total ?? m.plan_id?.precio ?? 0}`,
+        fecha: periodo?.registrado_en || m.created_at || m.fecha_inicio, icono: 'membresia', link: '/membresias.html' });
     });
     ultimasVentas.forEach(v => {
       const name = v.cliente_id ? [v.cliente_id?.nombre, v.cliente_id?.apellido_paterno].filter(Boolean).join(' ') : 'Cliente general';
@@ -295,7 +305,22 @@ router.get('/low-stock', async (req, res) => {
     const products = await Producto.find({ activo: true, stock: { $lte: umbral } })
       .select('nombre stock precio_venta categoria')
       .sort({ stock: 1 });
-    res.json({ products: products.map(p => ({ _id: p._id, nombre: p.nombre, stock: p.stock, precio_venta: p.precio_venta, categoria: p.categoria })), total: products.length });
+    const today = parseDate(limaDate(new Date()));
+    const in30 = new Date(+today + 31 * DAY);
+    const lotes = await Lote.find({ fecha_vencimiento: { $lt: in30 } })
+      .populate('producto_id', 'nombre')
+      .select('numero_lote cantidad fecha_vencimiento producto_id')
+      .sort({ fecha_vencimiento: 1 }).limit(30).lean();
+    res.json({
+      products: products.map(p => ({ _id: p._id, nombre: p.nombre, stock: p.stock, precio_venta: p.precio_venta, categoria: p.categoria })),
+      total: products.length,
+      lotes: lotes.map(l => {
+        const dias = Math.round((parseDate(limaDate(l.fecha_vencimiento)) - today) / DAY);
+        return { _id: l._id, producto: l.producto_id?.nombre || 'Producto',
+          numero_lote: l.numero_lote, cantidad: l.cantidad,
+          fecha_vencimiento: limaDate(l.fecha_vencimiento), dias, vencido: dias < 0 };
+      }),
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

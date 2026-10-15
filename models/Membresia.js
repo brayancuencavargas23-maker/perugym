@@ -7,6 +7,13 @@ const membresiaSchema = new mongoose.Schema({
   fecha_fin:    { type: Date, required: true },
   estado:       { type: String, enum: ['activo', 'vencido', 'cancelado', 'pendiente'], default: 'activo' },
   monto_total:  { type: Number, default: null },
+  periodos: { type: [require('./PeriodoMembresia')], default: undefined },
+  precio_base: { type: Number, default: null },
+  plan_nombre: { type: String, default: null },
+  condiciones_asistencia: { type: new mongoose.Schema({
+    limite_semanal: { type: Number, default: null },
+    limite_diario: { type: Number, default: 1 },
+  }, { _id: false }), default: undefined },
 }, { timestamps: { createdAt: 'created_at' } });
 
 // Índices para consultas frecuentes

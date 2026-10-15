@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const pagoSchema = new mongoose.Schema({
   cliente_id:   { type: mongoose.Schema.Types.ObjectId, ref: 'Cliente' },
   membresia_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Membresia' },
+  periodo_id: { type: mongoose.Schema.Types.ObjectId, default: null },
   caja_id:      { type: mongoose.Schema.Types.ObjectId, ref: 'Caja', default: null },
   monto:        { type: Number, required: true },
   metodo_pago:  { type: String, enum: ['efectivo', 'yape', 'plin', 'transferencia'], default: 'efectivo' },
@@ -19,5 +20,6 @@ pagoSchema.index({ caja_id: 1, estado: 1 });
 pagoSchema.index({ cliente_id: 1 });
 pagoSchema.index({ fecha_pago: -1 });
 pagoSchema.index({ estado: 1 });
+pagoSchema.index({ membresia_id: 1, periodo_id: 1, estado: 1 });
 
 module.exports = mongoose.model('Pago', pagoSchema);

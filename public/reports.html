@@ -3,174 +3,64 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <title>Reportes - GymPro</title>
+  <title>Reportes y análisis - PeruGym</title>
   <link rel="stylesheet" href="/css/main.css">
-  <!-- SPA redirect: si se accede directamente, redirigir al shell -->
   <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
+  <style>
+    .reports{--report-accent:#b45309;display:grid;gap:20px;min-width:0}
+    .main-content{min-width:0}.reports>*{min-width:0}
+    .reports h2,.reports h3{margin:0}.reports h2{font-size:25px;letter-spacing:-.5px}.reports h3{font-size:16px}
+    .rep-muted{color:var(--text-light);font-size:13px;line-height:1.6}.rep-heading,.rep-toolbar,.rep-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.rep-heading{justify-content:space-between}
+    .rep-toolbar{align-items:end}.rep-toolbar label{display:grid;gap:6px;font-size:12px;font-weight:600}.rep-toolbar input,.rep-toolbar select{min-height:40px}.rep-toolbar .form-control{width:auto;max-width:100%}
+    .rep-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.rep-kpi{border:1px solid var(--border);border-radius:12px;background:var(--card-bg);color:var(--text);text-align:left;padding:20px;cursor:pointer}.rep-kpi strong{display:block;font-size:29px;font-variant-numeric:tabular-nums;margin:8px 0}.rep-kpi:hover{border-color:var(--report-accent)}
+    .rep-grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:20px}.rep-grid>.card{min-width:0}.rep-chart{height:270px;margin-top:16px}.rep-tabs{display:flex;gap:8px;flex-wrap:wrap}.rep-tabs button[aria-pressed="true"]{background:var(--primary);color:white}
+    .rep-table-wrap{overflow:auto;max-width:100%;margin-top:16px}.reports table{width:100%;border-collapse:collapse;font-size:13px}.reports th,.reports td{padding:12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}.reports th{color:var(--text-light);font-weight:600}.rep-heat td{text-align:center;min-width:34px;padding:9px 4px}.rep-heat th{padding:8px}.rep-heat caption{text-align:left;padding-bottom:10px;color:var(--text-light)}
+    .rep-notice{border-left:3px solid var(--report-accent);padding:12px 16px;background:var(--bg);margin-top:12px;border-radius:4px}.rep-error{color:var(--danger,#b91c1c)}.rep-status{min-height:22px}.rep-export{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:16px}.rep-export article{padding:16px;border:1px solid var(--border);border-radius:10px}.rep-export h3{margin-bottom:8px}.rep-pagination{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:16px}.reports button:focus-visible,.reports a:focus-visible{outline:3px solid var(--report-accent);outline-offset:3px}.reports [hidden]{display:none!important}.rep-follow{display:grid;gap:7px;white-space:normal;min-width:200px}.rep-follow small{color:var(--text-light)}
+    @media(max-width:1000px){.rep-grid{grid-template-columns:1fr}.rep-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:520px){.rep-kpis{grid-template-columns:1fr}.rep-toolbar label{width:100%}.rep-toolbar .form-control{width:100%}.rep-kpi strong{font-size:26px}.rep-chart{height:230px}.reports h2{font-size:22px}}
+    @media print{.sidebar,.topbar,.rep-toolbar,.rep-actions,.rep-tabs,#rep-exports,.rep-pagination{display:none!important}.rep-grid{display:block}.card{break-inside:avoid}.rep-table-wrap{overflow:visible}.rep-kpis{grid-template-columns:repeat(3,1fr)}}
+  </style>
 </head>
 <body>
 <div class="app-layout">
   <aside class="sidebar" id="sidebar"></aside>
-  <div class="main-content">
-    <div class="topbar" id="topbar"></div>
-    <div class="page-content">
-
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px">
-
-        <div class="card">
-          <h3 style="font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:6px" id="h-rep-pagos"></h3>
-          <div class="form-group"><label>Desde</label><input type="date" id="pay-from" class="form-control"></div>
-          <div class="form-group"><label>Hasta</label><input type="date" id="pay-to" class="form-control"></div>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button class="btn btn-success" style="display:inline-flex;align-items:center;gap:6px" onclick="downloadReport('pagos', 'excel')"><span id="icon-excel-pay"></span> Excel</button>
-            <button class="btn btn-danger"  style="display:inline-flex;align-items:center;gap:6px" onclick="downloadReport('pagos', 'pdf')"><span id="icon-pdf-pay"></span> PDF</button>
-          </div>
+  <div class="main-content"><div class="topbar" id="topbar"></div><div class="page-content">
+    <section class="reports" id="reports-root" aria-label="Reportes y análisis">
+      <header class="rep-heading"><div><h2>Reportes y análisis</h2><p class="rep-muted">Entiende tus resultados y prioriza el siguiente paso.</p></div><div class="rep-actions"><button class="btn btn-outline" id="rep-print">Imprimir / PDF</button><button class="btn btn-primary" id="rep-excel" disabled>Exportar análisis Excel</button></div></header>
+      <form id="rep-filters" class="card rep-toolbar">
+        <label>Período<select id="rep-preset" class="form-control"><option value="month">Este mes</option><option value="today">Hoy</option><option value="week">Últimos 7 días</option><option value="previous">Mes anterior</option><option value="custom">Personalizado</option></select></label>
+        <label>Desde<input type="date" id="rep-from" class="form-control" required></label>
+        <label>Hasta<input type="date" id="rep-to" class="form-control" required></label>
+        <label>Sin asistencia<select id="rep-inactive" class="form-control"><option value="7">7 días</option><option value="14" selected>14 días</option><option value="30">30 días</option></select></label>
+        <label><span>Gráfico de ingresos</span><span><input type="checkbox" id="rep-compare" checked> Comparar período anterior</span></label>
+        <button type="submit" class="btn btn-primary" id="rep-apply">Actualizar</button>
+      </form>
+      <div id="rep-status" class="rep-muted rep-status" role="status" aria-live="polite"></div>
+      <div id="rep-results" hidden>
+        <div class="rep-kpis" id="rep-kpis"></div>
+        <p id="rep-context" class="rep-muted"></p>
+        <div class="rep-grid">
+          <article class="card"><h3>Evolución de ingresos cobrados</h3><p class="rep-muted" id="rep-income-caption"></p><div class="rep-chart"><canvas id="rep-income" role="img" aria-label="Ingresos diarios y período anterior. Datos disponibles en el detalle de ingresos."></canvas></div></article>
+          <article class="card"><h3>Prioridades del gimnasio</h3><p class="rep-muted">Reglas explicables a partir de tus registros.</p><div id="rep-insights"></div></article>
+          <article class="card"><h3>Altas y contrataciones posteriores</h3><p class="rep-muted">Membresías iniciadas en el período, excluye pendientes y canceladas. Las posteriores incluyen renovaciones y reactivaciones.</p><div class="rep-chart"><canvas id="rep-memberships" role="img" aria-label="Altas y contrataciones posteriores por día. Valores disponibles en el detalle de ingresos."></canvas></div></article>
+          <article class="card"><h3>Origen de los ingresos</h3><div id="rep-sources"></div><h3 style="margin-top:20px">Planes contratados</h3><div id="rep-plans"></div></article>
         </div>
-
-        <div class="card">
-          <h3 style="font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:6px" id="h-rep-clientes"></h3>
-          <p style="font-size:13px;color:var(--text-light);margin-bottom:16px">Exporta el listado completo de clientes con su estado y plan.</p>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-success" style="display:inline-flex;align-items:center;gap:6px" onclick="downloadReport('clientes', 'excel')"><span id="icon-excel-mem"></span> Excel</button>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3 style="font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:6px" id="h-rep-asis"></h3>
-          <div class="form-group"><label>Desde</label><input type="date" id="att-from" class="form-control"></div>
-          <div class="form-group"><label>Hasta</label><input type="date" id="att-to" class="form-control"></div>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button class="btn btn-success" style="display:inline-flex;align-items:center;gap:6px" onclick="downloadReport('asistencia', 'excel')"><span id="icon-excel-att"></span> Excel</button>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3 style="font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:6px" id="h-rep-mem"></h3>
-          <div class="form-group">
-            <label>Filtrar por estado</label>
-            <select id="mem-estado" class="form-control">
-              <option value="">Todos</option>
-              <option value="activo">Activo</option>
-              <option value="vencido">Vencido</option>
-              <option value="pendiente">Pendiente</option>
-              <option value="cancelado">Cancelado</option>
-            </select>
-          </div>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button class="btn btn-success" style="display:inline-flex;align-items:center;gap:6px" onclick="downloadReport('membresias', 'excel')"><span id="icon-excel-memb"></span> Excel</button>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3 style="font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:6px" id="h-rep-pendientes"></h3>
-          <p style="font-size:13px;color:var(--text-light);margin-bottom:16px">Lista de clientes con pagos pendientes para hacer seguimiento.</p>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-success" style="display:inline-flex;align-items:center;gap:6px" onclick="downloadReport('pagos-pendientes', 'excel')"><span id="icon-excel-pend"></span> Excel</button>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3 style="font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:6px" id="h-rep-stock"></h3>
-          <p style="font-size:13px;color:var(--text-light);margin-bottom:16px">Inventario completo con precios y stock actual. Stock bajo marcado en rojo.</p>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-success" style="display:inline-flex;align-items:center;gap:6px" onclick="downloadReport('stock', 'excel')"><span id="icon-excel-stock"></span> Excel</button>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3 style="font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:6px" id="h-rep-ventas"></h3>
-          <div class="form-group"><label>Desde</label><input type="date" id="sale-from" class="form-control"></div>
-          <div class="form-group"><label>Hasta</label><input type="date" id="sale-to" class="form-control"></div>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button class="btn btn-success" style="display:inline-flex;align-items:center;gap:6px" onclick="downloadReport('ventas', 'excel')"><span id="icon-excel-ventas"></span> Excel</button>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3 style="font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:6px" id="h-rep-caja"></h3>
-          <div class="form-group"><label>Desde</label><input type="date" id="caja-from" class="form-control"></div>
-          <div class="form-group"><label>Hasta</label><input type="date" id="caja-to" class="form-control"></div>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button class="btn btn-success" style="display:inline-flex;align-items:center;gap:6px" onclick="downloadReport('caja', 'excel')"><span id="icon-excel-caja"></span> Excel</button>
-          </div>
-        </div>
-
+        <article class="card" style="margin-top:20px"><h3>Afluencia por día y hora</h3><p class="rep-muted" id="rep-attendance-caption"></p><div class="rep-table-wrap" id="rep-heatmap"></div></article>
+        <article class="card" style="margin-top:20px" id="rep-detail">
+          <div class="rep-heading"><h3>Explorar resultados</h3><label class="rep-muted">Buscar en esta vista <input type="search" id="rep-search" class="form-control" placeholder="Cliente, producto o fecha"></label></div>
+          <div class="rep-tabs" id="rep-tabs" aria-label="Vistas del detalle" style="margin-top:16px"><button class="btn btn-outline" data-view="daily" aria-pressed="true">Ingresos</button><button class="btn btn-outline" data-view="recommendations" aria-pressed="false">Seguimientos</button><button class="btn btn-outline" data-view="debts" aria-pressed="false">Saldos actuales</button><button class="btn btn-outline" data-view="renewals" aria-pressed="false">Renovación</button><button class="btn btn-outline" data-view="products" aria-pressed="false">Productos</button></div>
+          <p class="rep-muted" id="rep-detail-note"></p>
+          <label id="rep-follow-filter" class="rep-muted" hidden>Estado de seguimiento <select id="rep-follow-state" class="form-control"><option value="">Todos</option><option value="pendiente">Pendiente</option><option value="contactado">Contactado</option><option value="resuelto">Resuelto</option></select></label>
+          <div class="rep-table-wrap"><table><thead id="rep-head"></thead><tbody id="rep-body"></tbody></table></div>
+          <div class="rep-pagination"><button class="btn btn-outline" id="rep-prev">Anterior</button><span id="rep-page" class="rep-muted"></span><button class="btn btn-outline" id="rep-next">Siguiente</button></div>
+        </article>
       </div>
-    </div>
-  </div>
+      <section class="card" id="rep-exports"><h3>Reportes operativos</h3><p class="rep-muted">Pagos, asistencia, ventas e ingresos por cajero usan las fechas del filtro. Clientes, membresías, saldos y stock muestran el estado actual. Caja selecciona turnos por fecha de apertura.</p><div class="rep-export" id="rep-export-list"></div></section>
+    </section>
+  </div></div>
 </div>
-
-<script src="/js/cache.js"></script>
-<script src="/js/api.js"></script>
-<script src="/js/utils.js"></script>
-<script src="/js/icons.js"></script>
-<script src="/js/layout.js"></script>
-<script>
-  async function downloadReport(type, format) {
-    let qs = '?';
-    if (type === 'pagos') {
-      const from = document.getElementById('pay-from').value;
-      const to   = document.getElementById('pay-to').value;
-      if (from) qs += `from=${from}&`;
-      if (to)   qs += `to=${to}&`;
-    } else if (type === 'asistencia') {
-      const from = document.getElementById('att-from').value;
-      const to   = document.getElementById('att-to').value;
-      if (from) qs += `from=${from}&`;
-      if (to)   qs += `to=${to}&`;
-    } else if (type === 'membresias') {
-      const estado = document.getElementById('mem-estado').value;
-      if (estado) qs += `estado=${estado}&`;
-    } else if (type === 'ventas') {
-      const from = document.getElementById('sale-from').value;
-      const to   = document.getElementById('sale-to').value;
-      if (from) qs += `from=${from}&`;
-      if (to)   qs += `to=${to}&`;
-    } else if (type === 'caja') {
-      const from = document.getElementById('caja-from').value;
-      const to   = document.getElementById('caja-to').value;
-      if (from) qs += `from=${from}&`;
-      if (to)   qs += `to=${to}&`;
-    }
-
-    const ext = format === 'excel' ? 'xlsx' : 'pdf';
-    const endpoint = format === 'pdf' ? `/reports/${type}/pdf${qs}` : `/reports/${type}/excel${qs}`;
-    try {
-      await api.download(endpoint, `${type}.${ext}`);
-      toast('Descarga iniciada');
-    } catch (err) { toast(err.message, 'error'); }
-  }
-
-  // ── Inicialización ──────────────────────────────────────────────────────────
-  (function _initPage() {
-    initLayout('reports', 'Reportes');
-    const iconMap = {
-      'h-rep-pagos':      icon('pagos')      + ' Reporte de Pagos',
-      'h-rep-clientes':   icon('clientes')   + ' Reporte de Clientes',
-      'h-rep-asis':       icon('asistencia') + ' Reporte de Asistencia',
-      'h-rep-mem':        icon('membresias') + ' Reporte de Membresías',
-      'h-rep-pendientes': icon('warning')    + ' Pagos Pendientes',
-      'h-rep-stock':      icon('productos')  + ' Stock de Productos',
-      'h-rep-ventas':     icon('cart')       + ' Reporte de Ventas',
-      'h-rep-caja':       icon('caja')       + ' Resumen de Caja',
-    };
-    Object.entries(iconMap).forEach(([id, html]) => {
-      const el = document.getElementById(id);
-      if (el) el.innerHTML = html;
-    });
-    ['icon-excel-pay','icon-pdf-pay','icon-excel-mem','icon-excel-att',
-     'icon-excel-memb','icon-excel-pend','icon-excel-stock','icon-excel-ventas','icon-excel-caja']
-      .forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.innerHTML = icon('excel');
-      });
-  })();
-
-  // Exponer funciones al scope global para que los onclick funcionen en el SPA
-  window.downloadReport = downloadReport;
-</script>
+<script src="/js/cache.js"></script><script src="/js/api.js"></script><script src="/js/utils.js"></script><script src="/js/icons.js"></script><script src="/js/layout.js"></script>
+<script src="/js/reports.js"></script>
+<script>initLayout('reports', 'Reportes y análisis'); window.initReports();</script>
 </body>
 </html>

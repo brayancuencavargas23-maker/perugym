@@ -9,6 +9,9 @@ const Caja = require('../models/Caja');
 const MovimientoCaja = require('../models/MovimientoCaja');
 const Solicitud = require('../models/Solicitud');
 const MembresiaService = require('../services/MembresiaService');
+const AsistenciaService = require('../services/AsistenciaService');
+const AsistenteOperaciones = require('../services/AsistenteOperacionesService');
+const { periodosLima } = require('../utils/asistenciaPolicy');
 
 // Helper RENIEC
 async function consultarReniec(dni) {
@@ -72,6 +75,7 @@ async function buscar_cliente({ nombre, dni }) {
 }
 
 async function obtener_membresias({ cliente_id, estado }) {
+  await require('../services/MembresiaService').autoVencer();
   const filtro = {};
   if (cliente_id) filtro.cliente_id = cliente_id;
   if (estado) filtro.estado = estado;
@@ -84,12 +88,12 @@ async function obtener_membresias({ cliente_id, estado }) {
     .lean();
 
   return {
-    membresias: membresias.map(m => ({
+    membresias: membresias.map(m => require('../utils/membresiaPeriodos').vistaMembresia(m)).map(m => ({
       id: m._id,
       cliente: m.cliente_id ? [m.cliente_id.nombre, m.cliente_id.apellido_paterno, m.cliente_id.apellido_materno].filter(Boolean).join(' ') : 'N/A',
       dni: m.cliente_id?.dni,
-      plan: m.plan_id?.nombre,
-      precio: m.plan_id?.precio,
+      plan: m.plan_nombre || m.plan_id?.nombre,
+      precio: m.monto_periodo ?? m.monto_total ?? m.plan_id?.precio,
       fecha_inicio: m.fecha_inicio,
       fecha_fin: m.fecha_fin,
       estado: m.estado,
@@ -100,6 +104,7 @@ async function obtener_membresias({ cliente_id, estado }) {
 }
 
 async function listar_vencidas() {
+  await require('../services/MembresiaService').autoVencer();
   const membresias = await Membresia.find({ estado: 'vencido' })
     .populate('plan_id', 'nombre')
     .populate('cliente_id', 'nombre apellido_paterno apellido_materno dni telefono')
@@ -119,6 +124,7 @@ async function listar_vencidas() {
 }
 
 async function proximas_a_vencer({ dias = 7 } = {}) {
+  await require('../services/MembresiaService').autoVencer();
   const hoy = new Date();
   const limite = new Date();
   limite.setDate(hoy.getDate() + dias);
@@ -237,25 +243,12 @@ async function aforo_actual() {
 }
 
 async function estadisticas_generales() {
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
-
-  const [sociosActivos, membresiasVencidas, asistenciasHoy, pagosMes] = await Promise.all([
-    Cliente.countDocuments({ activo: true }),
-    Membresia.countDocuments({ estado: 'vencido' }),
-    Asistencia.countDocuments({ fecha: hoy }),
-    Pago.find({ fecha_pago: { $gte: hoy, $lte: finMes }, estado: 'pagado' })
-      .then(pagos => pagos.reduce((sum, p) => sum + p.monto, 0)),
-  ]);
-
-  return {
-    socios_activos: sociosActivos,
-    membresias_vencidas: membresiasVencidas,
-    asistencias_hoy: asistenciasHoy,
-    ingresos_mes: pagosMes,
-    fecha_consulta: hoy,
-  };
+  const reporte = await AsistenteOperaciones.generarReporte({ periodo: 'mes' });
+  const { inicioDia, finDia } = periodosLima();
+  const asistenciasHoy = await Asistencia.countDocuments({ entrada: { $gte: inicioDia, $lt: finDia } });
+  return { socios_activos: reporte.stats.activos, asistencias_hoy: asistenciasHoy,
+    ingresos_mes: reporte.stats.ingresos, saldo_actual: reporte.stats.saldo,
+    periodo: reporte.periodo, fecha_consulta: new Date() };
 }
 
 async function top_clientes({ limite = 10 } = {}) {
@@ -316,7 +309,10 @@ async function listar_categorias() {
 }
 
 async function listar_productos_bajo_stock({ limite = 5 } = {}) {
-  const productos = await Producto.find({ activo: true, stock: { $lte: limite } })
+  const productos = await Producto.find({
+    activo: true,
+    $expr: { $lte: ['$stock', { $min: [Number(limite) || 5, { $ifNull: ['$stock_minimo', Number(limite) || 5] }] }] }
+  })
     .sort({ stock: 1 })
     .limit(20)
     .lean();
@@ -326,6 +322,7 @@ async function listar_productos_bajo_stock({ limite = 5 } = {}) {
       nombre: p.nombre,
       categoria: p.categoria,
       stock: p.stock,
+      stock_minimo: p.stock_minimo ?? 5,
       precio: p.precio_venta,
     })),
     total: productos.length,
@@ -431,6 +428,8 @@ async function listar_planes() {
       nombre: p.nombre,
       precio: p.precio,
       duracion_dias: p.duracion_dias,
+      limite_semanal: p.limite_semanal ?? null,
+      limite_diario: 1,
       descripcion: p.descripcion,
       caracteristicas: p.caracteristicas,
       destacado: p.destacado,
@@ -666,7 +665,7 @@ async function insights_automaticos() {
   const [vencenPronto, vencidas, stockBajo, nuevosSocios, topClientes, pagosHoy] = await Promise.all([
     Membresia.countDocuments({ estado: 'activo', fecha_fin: { $gte: hoy, $lte: en7dias } }),
     Membresia.countDocuments({ estado: 'vencido' }),
-    Producto.countDocuments({ activo: true, stock: { $lte: 5 } }),
+    Producto.countDocuments({ activo: true, $expr: { $lte: ['$stock', { $ifNull: ['$stock_minimo', 5] }] } }),
     Cliente.countDocuments({ created_at: { $gte: hace7dias } }),
     Asistencia.aggregate([
       { $match: { fecha: { $gte: hace7dias } } },
@@ -688,7 +687,7 @@ async function insights_automaticos() {
 
   return {
     positivo: nuevosSocios > 0 ? `${nuevosSocios} nuevos socios esta semana` : null,
-    atencion: vencenPronto > 0 ? `${vencenPronto} membresías vencen en 3 días` : null,
+    atencion: vencenPronto > 0 ? `${vencenPronto} membresías vencen en 7 días` : null,
     vencidas: vencidas > 0 ? `${vencidas} membresías vencidas` : null,
     stock: stockBajo > 0 ? `${stockBajo} productos con stock bajo` : null,
     top_cliente: topClientes.length > 0 ? `${topClientes[0].nombre} (${topClientes[0].visitas} visitas)` : null,
@@ -821,10 +820,8 @@ async function preparar_pago({ membresia_id, monto, metodo_pago = 'efectivo' }) 
     .lean();
   if (!membresia) return { error: 'Membresía no encontrada.' };
 
-  const pagos = await Pago.find({ membresia_id, estado: 'pagado' }).lean();
-  const totalPagado = pagos.reduce((s, p) => s + p.monto, 0);
-  const totalEsperado = membresia.monto_total || membresia.plan_id?.precio || 0;
-  const saldo = totalEsperado - totalPagado;
+  const estado = await require('../services/MembresiaPagosService').resumen(membresia);
+  const saldo = estado.pendiente;
   const montoIngresado = parseFloat(monto);
 
   if (montoIngresado > saldo) return { error: `El monto (S/ ${montoIngresado}) excede el saldo pendiente (S/ ${saldo.toFixed(2)})` };
@@ -834,44 +831,27 @@ async function preparar_pago({ membresia_id, monto, metodo_pago = 'efectivo' }) 
 
   return {
     accion: 'pago',
-    datos: { membresia_id, monto: montoIngresado, metodo_pago },
+    datos: { membresia_id, periodo_id: estado.periodo_id, monto: montoIngresado, metodo_pago },
     preview: `📋 Pago:\n- Cliente: ${[membresia.cliente_id?.nombre, membresia.cliente_id?.apellido_paterno].filter(Boolean).join(' ')}\n- Plan: ${membresia.plan_id?.nombre}\n- Monto: S/ ${montoIngresado.toFixed(2)}\n- Método: ${metodo_pago}\n- Saldo anterior: S/ ${saldo.toFixed(2)}\n- Saldo nuevo: S/ ${(saldo - montoIngresado).toFixed(2)}`,
   };
 }
 
-async function ejecutar_pago({ membresia_id, monto, metodo_pago = 'efectivo' }) {
+async function ejecutar_pago({ membresia_id, periodo_id, monto, metodo_pago = 'efectivo' }) {
   const membresia = await Membresia.findById(membresia_id).lean();
   if (!membresia) return { error: 'Membresía no encontrada.' };
 
   const cajaAbierta = await Caja.findOne({ estado: 'abierta' }).lean();
   if (!cajaAbierta) return { error: 'No hay caja abierta.' };
 
-  const pagos = await Pago.find({ membresia_id, estado: 'pagado' }).lean();
-  const totalPagado = pagos.reduce((s, p) => s + p.monto, 0);
-  const totalEsperado = membresia.monto_total || 0;
-  const saldo = totalEsperado - totalPagado;
   const montoIngresado = parseFloat(monto);
-
-  const pago = await Pago.create({
-    cliente_id: membresia.cliente_id,
-    membresia_id,
-    caja_id: cajaAbierta._id,
-    monto: montoIngresado,
-    metodo_pago,
-    estado: 'pagado',
-    es_abono: true,
-    numero_abono: pagos.filter(p => p.es_abono).length + 1,
-    total_esperado: totalEsperado,
-  });
-
-  if (totalPagado + montoIngresado >= totalEsperado) {
-    await Membresia.findByIdAndUpdate(membresia_id, { estado: 'activo' });
-  }
+  const result = await require('../utils/membresiaTransaction')(session =>
+    require('../services/MembresiaPagosService').abonar({ membresia_id, periodo_id,
+      caja_id: cajaAbierta._id, monto: montoIngresado, metodo_pago }, session));
 
   return {
     exito: true,
-    pago_id: pago._id,
-    mensaje: `✅ Pago registrado: S/ ${montoIngresado.toFixed(2)} por ${metodo_pago}. Saldo: S/ ${(saldo - montoIngresado).toFixed(2)}`,
+    pago_id: result.pago._id,
+    mensaje: `✅ Pago registrado: S/ ${montoIngresado.toFixed(2)} por ${metodo_pago}. Saldo: S/ ${result.resumen.pendiente.toFixed(2)}`,
   };
 }
 
@@ -881,14 +861,7 @@ async function ejecutar_checkin({ cliente_id }) {
   const cliente = await Cliente.findById(cliente_id).lean();
   if (!cliente) return { error: 'Cliente no encontrado.' };
 
-  const yaPresente = await Asistencia.findOne({ cliente_id, salida: null }).lean();
-  if (yaPresente) return { error: `${cliente.nombre} ya tiene check-in registrado hoy.` };
-
-  const asistencia = await Asistencia.create({
-    cliente_id,
-    entrada: new Date(),
-    fecha: new Date(),
-  });
+  const asistencia = await AsistenciaService.registrar(cliente_id);
 
   return {
     exito: true,
@@ -948,6 +921,18 @@ async function ejecutar_estado_solicitud({ solicitud_id, estado, notas }) {
 
 // ── Definición de funciones para function calling ────────────────────────────
 const FUNCTIONS_DEFINITIONS = [
+  { name: 'generar_reporte', description: 'Prepara reporte real del gimnasio, resumen de métricas y botón de descarga Excel (o PDF para pagos). Usa esto para reportes y comparaciones de ingresos.', parameters: { type: 'object', properties: {
+    tipo: { type: 'string', enum: ['general', 'pagos', 'asistencia', 'membresias', 'ventas', 'stock', 'pagos-pendientes'] },
+    formato: { type: 'string', enum: ['excel', 'pdf'] }, periodo: { type: 'string', enum: ['hoy', 'semana', 'mes'] },
+    from: { type: 'string', description: 'Fecha inicial AAAA-MM-DD' }, to: { type: 'string', description: 'Fecha final AAAA-MM-DD, hasta hoy' },
+  } } },
+  { name: 'recomendar_acciones', description: 'Recomendaciones basadas en saldos, renovación, inasistencia, ingresos y stock reales. Devuelve botones para preparar mensajes individuales.', parameters: { type: 'object', properties: {
+    periodo: { type: 'string', enum: ['hoy', 'semana', 'mes'] }, inactiveDays: { type: 'integer', enum: [7, 14, 30] },
+  } } },
+  { name: 'preparar_mensaje_cliente', description: 'Prepara un mensaje editable para WhatsApp usando el teléfono del cliente. No lo envía: el usuario abre WhatsApp y pulsa enviar. Buscar primero al cliente; si hay homónimos pedir identificarlo.', parameters: { type: 'object', properties: {
+    cliente_id: { type: 'string' }, motivo: { type: 'string', enum: ['general', 'pago', 'renovacion', 'inasistencia'] }, mensaje: { type: 'string', maxLength: 1500 },
+  }, required: ['cliente_id'] } },
+  { name: 'consultar_cupos_asistencia', description: 'Consulta vigencia, cupos semanales y si el cliente puede ingresar hoy.', parameters: { type: 'object', properties: { cliente_id: { type: 'string' } }, required: ['cliente_id'] } },
   // ── LECTURA EXISTENTE ──
   { name: 'buscar_cliente', description: 'Busca clientes por nombre o DNI.', parameters: { type: 'object', properties: { nombre: { type: 'string' }, dni: { type: 'string' } } } },
   { name: 'obtener_membresias', description: 'Obtiene membresías de un cliente o filtra por estado.', parameters: { type: 'object', properties: { cliente_id: { type: 'string' }, estado: { type: 'string', enum: ['activo', 'vencido', 'cancelado', 'pendiente'] } } } },
@@ -991,6 +976,10 @@ const FUNCTIONS_DEFINITIONS = [
 
 // Mapa de funciones para ejecución
 const FUNCTIONS_MAP = {
+  generar_reporte: AsistenteOperaciones.generarReporte,
+  recomendar_acciones: AsistenteOperaciones.recomendaciones,
+  preparar_mensaje_cliente: AsistenteOperaciones.prepararMensaje,
+  consultar_cupos_asistencia: ({ cliente_id }) => AsistenciaService.disponibilidad(cliente_id),
   buscar_cliente, obtener_membresias, listar_vencidas, proximas_a_vencer,
   historial_pagos, estado_pago, asistencia_cliente, aforo_actual,
   estadisticas_generales, top_clientes, listar_productos, listar_categorias,

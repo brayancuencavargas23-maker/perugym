@@ -2,16 +2,90 @@ const router = require('express').Router();
 const Pago = require('../models/Pago');
 const Cliente = require('../models/Cliente');
 const Membresia = require('../models/Membresia');
+const { presentarPago } = require('../services/MembresiaPagosService');
 const Producto = require('../models/Producto');
 const Venta = require('../models/Venta');
 const Caja = require('../models/Caja');
-const { verifyToken, requireRole } = require('../middleware/auth');
+const Compra = require('../models/Compra');
+const { verifyToken, requireRole, requirePermission } = require('../middleware/auth');
 const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
+const { dateFilter, period, limaDate } = require('../utils/reportDates');
+const ReportesService = require('../services/ReportesService');
+const ReporteSeguimiento = require('../models/ReporteSeguimiento');
+const { categoriaProducto } = require('../utils/productoCategoria');
+
+const METODO_PAGO_ORDER = ['efectivo', 'yape', 'plin', 'transferencia'];
+const methodLabel = m => ({ efectivo: 'Efectivo', yape: 'Yape', plin: 'Plin', transferencia: 'Transferencia' }[m]
+  || String(m || 'sin método').replace(/^\w/, c => c.toUpperCase()));
+const sortMethods = methods => Object.entries(methods).sort((a, b) => {
+  const ia = METODO_PAGO_ORDER.indexOf(a[0]), ib = METODO_PAGO_ORDER.indexOf(b[0]);
+  if (ia !== -1 || ib !== -1) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  return b[1] - a[1];
+});
 
 router.use(verifyToken, requireRole('admin', 'recepcionista'));
+router.use((req, res, next) => {
+  try { dateFilter(req.query.from, req.query.to); next(); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+router.get('/analytics', async (req, res) => {
+  try {
+    period(req.query);
+    if (req.query.inactiveDays && !['7', '14', '30'].includes(req.query.inactiveDays)) return res.status(400).json({ error: 'Umbral inválido.' });
+  } catch (err) { return res.status(400).json({ error: err.message }); }
+  try { res.set('Cache-Control', 'no-store').json(await ReportesService.analytics(req.query)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/seguimiento', async (req, res) => {
+  const { clave, estado } = req.body;
+  if (typeof clave !== 'string' || !/^(saldo|vencimiento|inasistencia):[a-f0-9]{24}(:\d{4}-\d{2}-\d{2})?$/.test(clave) || !['pendiente', 'contactado', 'resuelto'].includes(estado)) {
+    return res.status(400).json({ error: 'Seguimiento inválido.' });
+  }
+  try {
+    const row = await ReporteSeguimiento.findOneAndUpdate({ clave }, { estado, responsable: String(req.user.name || req.user.email || req.user.id), actualizado: new Date() }, { upsert: true, returnDocument: 'after', runValidators: true });
+    res.json(row);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/analytics/excel', async (req, res) => {
+  try {
+    period(req.query);
+    if (req.query.inactiveDays && !['7', '14', '30'].includes(req.query.inactiveDays)) throw new Error('Umbral inválido.');
+  } catch (err) { return res.status(400).json({ error: err.message }); }
+  try {
+    const data = await ReportesService.analytics(req.query);
+    const wb = new ExcelJS.Workbook();
+    const summary = wb.addWorksheet('Resumen');
+    summary.addRows([['PeruGym — Reportes y análisis'], ['Período', data.periodo.from, data.periodo.to], ['Comparación', data.periodo.previousFrom, data.periodo.previousTo],
+      ['Generado', data.actualizado.toISOString()], ['Ingresos cobrados', data.stats.ingresos], ['Ingresos anteriores', data.stats.anterior],
+      ['Clientes vigentes hoy', data.stats.activos], ['Nuevos clientes de pago', data.stats.nuevos], ['Renovación (%) — ventana 7 días', data.stats.renovacion ?? 'Sin base'],
+      ['Oportunidades evaluadas', data.stats.elegibles], ['Saldo actual por cobrar', data.stats.saldo], ['Clientes sin asistencia reciente', data.stats.inactivos], ['Egresos registrados', data.stats.egresos]]);
+    const sheets = [
+      ['Ingresos diarios', ['Fecha', 'Cobrado', 'Fecha comparable', 'Anterior', 'Altas', 'Renovaciones'], data.daily.map(d => [d.fecha, d.actual, d.anteriorFecha, d.anterior, d.altas, d.renovaciones])],
+      ['Métodos de pago', ['Método', 'Cobrado (S/)', '% del total'], (() => {
+        const total = Object.values(data.methods).reduce((s, n) => s + n, 0);
+        return sortMethods(data.methods).map(([m, n]) => [methodLabel(m), n, total ? Math.round(n / total * 1000) / 10 : 0]);
+      })()],
+      ['Saldos actuales', ['Cliente', 'Plan', 'Acordado', 'Pagado', 'Saldo'], data.debts.map(d => [d.nombre, d.plan, d.acordado, d.pagado, d.saldo])],
+      ['Productos', ['Producto', 'Stock actual', 'Unidades vendidas', 'Ingresos', 'Días estimados de stock'], data.products.map(d => [d.nombre, d.stock, d.unidades, d.ingresos, d.diasStock ?? 'Sin ventas'])],
+      ['Seguimiento', ['Cliente', 'Tipo', 'Motivo', 'Acción', 'Estado', 'Responsable'], data.recommendations.map(d => [d.nombre, d.tipo, d.motivo, d.accion, d.seguimiento.estado, d.seguimiento.responsable || '-'])],
+      ['Renovaciones', ['Cliente', 'Plan', 'Vencimiento', 'Resultado'], data.renewals.map(d => [d.nombre, d.plan, d.fecha, d.resultado])],
+      ['Clientes vigentes', ['Cliente', 'Plan', 'Inicio', 'Fin'], data.activeClients.map(d => [d.nombre, d.plan, d.inicio, d.fin])],
+      ['Nuevos clientes', ['Cliente', 'Primer pago'], data.newClients.map(d => [d.nombre, d.fecha])],
+      ['Afluencia', ['Día (lunes=1)', 'Hora Lima', 'Entradas'], data.heatmap.flatMap((hours, day) => hours.map((n, hour) => [day + 1, hour, n]))]
+    ];
+    for (const [name, headers, rows] of sheets) { const ws = wb.addWorksheet(name); ws.addRow(headers); ws.addRows(rows); ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: rows.length + 1, column: headers.length } }; }
+    wb.eachSheet(ws => { ws.columns.forEach(c => { c.width = 28; }); ws.getRow(1).font = { bold: true }; ws.views = [{ state: 'frozen', ySplit: 1 }]; });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="analisis.xlsx"');
+    res.end(await wb.xlsx.writeBuffer());
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPER: construye workbook con estilo empresarial PeruGym
@@ -37,6 +111,16 @@ function buildStyledWorkbook(titulo, sheetName, headers, rows, extraInfo) {
   const ws = wb.addWorksheet(sheetName, {
     pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true }
   });
+
+  if (colCount < 4) {
+    ws.addRow([titulo]);
+    ws.addRow([extraInfo || 'PeruGym']);
+    ws.addRow(headers.map(h => h.header));
+    rows.forEach(r => ws.addRow(headers.map(h => r[h.key] ?? '-')));
+    ws.columns.forEach((c, i) => { c.width = headers[i].width || 30; });
+    ws.getRow(1).font = { bold: true, size: 14 };
+    return wb;
+  }
 
   ws.columns = headers.map(h => ({ key: h.key, width: h.width }));
 
@@ -120,7 +204,7 @@ function buildStyledWorkbook(titulo, sheetName, headers, rows, extraInfo) {
       const cell = ws.getCell(rowNum, idx + 1);
       let val = r[h.key];
       if (val === null || val === undefined) val = '-';
-      if (val instanceof Date) val = val.toISOString().split('T')[0];
+      if (val instanceof Date) val = val.toLocaleString('es-PE', { timeZone: 'America/Lima' });
 
       cell.value = h.key === '_num' ? i + 1 : val;
       cell.font  = { name: 'Calibri', size: 10 };
@@ -135,7 +219,7 @@ function buildStyledWorkbook(titulo, sheetName, headers, rows, extraInfo) {
       };
 
       if (h.colorFn) {
-        const color = h.colorFn(val);
+        const color = h.colorFn(val, r);
         if (color) cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: color } };
       }
     });
@@ -166,9 +250,7 @@ router.get('/pagos/excel', async (req, res) => {
     if (estado)      filter.estado = estado;
     if (metodo_pago) filter.metodo_pago = metodo_pago;
     if (from || to) {
-      filter.fecha_pago = {};
-      if (from) filter.fecha_pago.$gte = new Date(from);
-      if (to)   filter.fecha_pago.$lte = new Date(to);
+      filter.fecha_pago = dateFilter(from, to);
     }
 
     const pagos = await Pago.find(filter)
@@ -180,7 +262,7 @@ router.get('/pagos/excel', async (req, res) => {
     const rows = pagos.map(p => ({
       _num:        null,
       cliente:     p.cliente_id?.nombre || '-',
-      plan:        p.membresia_id?.plan_id?.nombre || '-',
+      plan:        presentarPago(p).plan_nombre || '-',
       monto:       p.monto,
       metodo_pago: p.metodo_pago,
       fecha_pago:  p.fecha_pago,
@@ -188,7 +270,7 @@ router.get('/pagos/excel', async (req, res) => {
       notas:       p.notas || '-',
     }));
 
-    const totalMonto = rows.reduce((s, r) => s + parseFloat(r.monto || 0), 0);
+    const totalMonto = rows.filter(r => r.estado === 'pagado').reduce((s, r) => s + parseFloat(r.monto || 0), 0);
     const extra = from && to
       ? `PeruGym - Período: ${from} al ${to}  |  Total recaudado: S/ ${totalMonto.toFixed(2)}`
       : `PeruGym - Centro de Entrenamiento y Fitness  |  Total recaudado: S/ ${totalMonto.toFixed(2)}`;
@@ -265,9 +347,7 @@ router.get('/asistencia/excel', async (req, res) => {
   try {
     const filter = {};
     if (from || to) {
-      filter.fecha = {};
-      if (from) filter.fecha.$gte = new Date(from);
-      if (to) { const t = new Date(to); t.setDate(t.getDate() + 1); filter.fecha.$lt = t; }
+      filter.entrada = dateFilter(from, to);
     }
 
     const asistencias = await require('../models/Asistencia').find(filter)
@@ -276,8 +356,8 @@ router.get('/asistencia/excel', async (req, res) => {
       .lean();
 
     const rows = asistencias.map(a => {
-      const entrada = a.entrada ? a.entrada.toTimeString().slice(0, 5) : '-';
-      const salida  = a.salida  ? a.salida.toTimeString().slice(0, 5)  : '-';
+      const entrada = a.entrada ? a.entrada.toLocaleTimeString('es-PE', { timeZone: 'America/Lima' }) : '-';
+      const salida  = a.salida ? a.salida.toLocaleTimeString('es-PE', { timeZone: 'America/Lima' }) : '-';
       let duracion = 'En curso';
       if (a.salida) {
         const secs = Math.round((a.salida - a.entrada) / 1000);
@@ -286,7 +366,7 @@ router.get('/asistencia/excel', async (req, res) => {
       return {
         _num:    null,
         cliente: a.cliente_id?.nombre || '-',
-        fecha:   a.fecha ? a.fecha.toISOString().split('T')[0] : a.entrada.toISOString().split('T')[0],
+        fecha: limaDate(a.entrada),
         entrada,
         salida,
         duracion,
@@ -375,22 +455,18 @@ router.get('/membresias/excel', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/pagos-pendientes/excel', async (req, res) => {
   try {
-    const pagos = await Pago.find({ estado: 'pendiente' })
-      .populate('cliente_id', 'nombre dni telefono email')
-      .populate({ path: 'membresia_id', populate: { path: 'plan_id', select: 'nombre' } })
-      .sort({ fecha_pago: 1 })
-      .lean();
+    const pagos = await ReportesService.balances();
 
     const rows = pagos.map(p => ({
       _num:      null,
-      cliente:   p.cliente_id?.nombre || '-',
-      dni:       p.cliente_id?.dni || '-',
-      telefono:  p.cliente_id?.telefono || '-',
-      email:     p.cliente_id?.email || '-',
-      plan:      p.membresia_id?.plan_id?.nombre || '-',
-      monto:     p.monto,
-      fecha_pago:p.fecha_pago,
-      notas:     p.notas || '-',
+      cliente: p.nombre,
+      dni: p.dni,
+      telefono: p.telefono,
+      email: p.email,
+      plan: p.plan,
+      monto: p.saldo,
+      fecha_pago: p.fecha,
+      notas: `Acordado: S/ ${p.acordado.toFixed(2)} | Pagado: S/ ${p.pagado.toFixed(2)}`,
     }));
 
     const totalMonto = rows.reduce((s, r) => s + parseFloat(r.monto || 0), 0);
@@ -426,9 +502,13 @@ router.get('/stock/excel', async (req, res) => {
     const rows = productos.map(p => ({
       _num:        null,
       nombre:      p.nombre,
-      categoria:   p.categoria || '-',
+      categoria:   categoriaProducto(p),
+      codigo:      p.codigo_barras || '-',
       precio_venta:p.precio_venta,
+      costo:       Math.round((p.costo || 0) * 100) / 100,
+      valorizado:  Math.round((p.costo || 0) * (p.stock || 0) * 100) / 100,
       stock:       p.stock,
+      stock_minimo:p.stock_minimo ?? 5,
       estado:      p.activo ? 'Activo' : 'Inactivo',
       descripcion: p.descripcion || '-',
     }));
@@ -437,8 +517,12 @@ router.get('/stock/excel', async (req, res) => {
       { header: '#',           key: '_num',        width: 8  },
       { header: 'Producto',    key: 'nombre',      width: 28, align: 'left' },
       { header: 'Categoría',   key: 'categoria',   width: 20 },
+      { header: 'Código',      key: 'codigo',      width: 20, align: 'left' },
       { header: 'Precio (S/)', key: 'precio_venta',width: 14, colorFn: () => 'FF16A34A' },
-      { header: 'Stock',       key: 'stock',       width: 12, colorFn: v => parseInt(v) <= 5 ? 'FFCC0000' : 'FF16A34A' },
+      { header: 'Costo (S/)',  key: 'costo',       width: 14 },
+      { header: 'Valorizado (S/)', key: 'valorizado', width: 16, colorFn: () => 'FF16A34A' },
+      { header: 'Stock',       key: 'stock',       width: 12, colorFn: (v, r) => parseInt(v) <= (r && r.stock_minimo != null ? r.stock_minimo : 5) ? 'FFCC0000' : 'FF16A34A' },
+      { header: 'Mínimo',      key: 'stock_minimo',width: 12 },
       { header: 'Estado',      key: 'estado',      width: 12, colorFn: v => v === 'Activo' ? 'FF16A34A' : 'FFCC0000' },
       { header: 'Descripción', key: 'descripcion', width: 36, align: 'left' },
     ];
@@ -452,6 +536,48 @@ router.get('/stock/excel', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// COMPRAS A PROVEEDORES Excel (solo admin: incluye costos)
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/compras/excel', requirePermission('compras'), async (req, res) => {
+  const { from, to } = req.query;
+  try {
+    const filter = {};
+    const range = dateFilter(from, to);
+    if (range.$gte || range.$lt) filter.fecha = range;
+
+    const compras = await Compra.find(filter).populate('proveedor_id', 'nombre').sort({ fecha: -1 }).lean();
+
+    const rows = compras.map(c => ({
+      _num:        null,
+      fecha:       c.fecha,
+      proveedor:   c.proveedor_id ? c.proveedor_id.nombre : (c.proveedor_nombre || 'Sin proveedor'),
+      productos:   c.items.reduce((s, it) => s + it.cantidad, 0),
+      items:       c.items.length,
+      costo_total: c.costo_total,
+      responsable: c.responsable,
+      notas:       c.notas || '-',
+    }));
+
+    const headers = [
+      { header: '#',            key: '_num',        width: 8  },
+      { header: 'Fecha',        key: 'fecha',       width: 20 },
+      { header: 'Proveedor',    key: 'proveedor',   width: 28, align: 'left' },
+      { header: 'Unidades',     key: 'productos',   width: 12 },
+      { header: 'Ítems',        key: 'items',       width: 10 },
+      { header: 'Costo total (S/)', key: 'costo_total', width: 18, colorFn: () => 'FF16A34A' },
+      { header: 'Registró',     key: 'responsable', width: 20, align: 'left' },
+      { header: 'Notas',        key: 'notas',       width: 36, align: 'left' },
+    ];
+
+    const wb = buildStyledWorkbook('REPORTE DE COMPRAS', 'Compras', headers, rows, 'PeruGym - Centro de Entrenamiento y Fitness');
+    const buffer = await wb.xlsx.writeBuffer();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="compras.xlsx"');
+    res.end(buffer);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // RESUMEN DE CAJA Excel
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/caja/excel', async (req, res) => {
@@ -459,9 +585,7 @@ router.get('/caja/excel', async (req, res) => {
   try {
     const filter = {};
     if (from || to) {
-      filter.apertura = {};
-      if (from) filter.apertura.$gte = new Date(from);
-      if (to)   filter.apertura.$lte = new Date(to);
+      filter.apertura = dateFilter(from, to);
     }
 
     const cajas = await Caja.find(filter)
@@ -530,15 +654,13 @@ router.get('/ventas/excel', async (req, res) => {
   try {
     const filter = { anulada: false };
     if (from || to) {
-      filter.fecha_venta = {};
-      if (from) filter.fecha_venta.$gte = new Date(from);
-      if (to)   filter.fecha_venta.$lte = new Date(to);
+      filter.fecha_venta = dateFilter(from, to);
     }
     if (caja_id) filter.caja_id = caja_id;
 
     const ventas = await Venta.find(filter)
       .populate('cliente_id', 'nombre')
-      .populate('items.producto_id', 'nombre')
+      .populate('items.producto_id', 'nombre categoria')
       .sort({ fecha_venta: -1 })
       .lean();
 
@@ -549,7 +671,8 @@ router.get('/ventas/excel', async (req, res) => {
           _num:        null,
           id:          v._id.toString().slice(-6).toUpperCase(),
           cliente:     v.cliente_id?.nombre || '-',
-          producto:    item.producto_id?.nombre || '-',
+          producto:    item.producto_id?.nombre || 'Producto no disponible',
+          categoria:   categoriaProducto(item.producto_id),
           cantidad:    item.cantidad,
           precio_unit: item.precio_unit,
           subtotal:    item.subtotal,
@@ -568,6 +691,7 @@ router.get('/ventas/excel', async (req, res) => {
       { header: 'Venta ID',     key: 'id',         width: 12 },
       { header: 'Cliente',      key: 'cliente',    width: 26, align: 'left' },
       { header: 'Producto',     key: 'producto',   width: 26, align: 'left' },
+      { header: 'Categoría',    key: 'categoria',  width: 22, align: 'left' },
       { header: 'Cantidad',     key: 'cantidad',   width: 12 },
       { header: 'Precio Unit.', key: 'precio_unit',width: 16, colorFn: () => 'FF374151' },
       { header: 'Subtotal',     key: 'subtotal',   width: 16, colorFn: () => 'FF16A34A' },
@@ -608,11 +732,6 @@ router.get('/ingresos-caja/excel', async (req, res) => {
   const BLUE = 'FF0070C0', TEAL = 'FF00B050', ORANGE = 'FFFF8C00', PURPLE = 'FF7030A0', PINK = 'FFF48FB1';
   const CAT_COLORS = [BLUE, TEAL, ORANGE, PURPLE, PINK, 'FF16A34A', 'FFA16207', 'FFDC2626', 'FF6D28D9', 'FF0D9488'];
   const CAT_ICONS  = { 'bebida':'🥤', 'bebida natural':'🍃', 'snacks':'🍫', 'suplementos':'💊', 'yogurt':'🥛' };
-
-  const normalizeCat = (cat) => {
-    if (!cat || !cat.trim()) return 'Sin categoría';
-    return cat.trim().replace(/\b\w/g, c => c.toUpperCase());
-  };
 
   const buildFechaFilter = (f, t) => {
     const r = {};
@@ -700,8 +819,8 @@ router.get('/ingresos-caja/excel', async (req, res) => {
       for (const [,cj] of cajeroMap) {
         if (cj.cajaIds.includes(id)) {
           for (const item of v.items) {
-            const cat = normalizeCat(item.producto_id?.categoria);
-            const r = { cliente: v.cliente_id?.nombre||'-', producto: item.producto_id?.nombre||'-', categoria: cat, cantidad: item.cantidad, precio_unit: item.precio_unit, subtotal: item.subtotal, metodo_pago: v.metodo_pago, fecha: v.fecha_venta };
+            const cat = categoriaProducto(item.producto_id);
+            const r = { cliente: v.cliente_id?.nombre||'-', producto: item.producto_id?.nombre||'Producto no disponible', categoria: cat, cantidad: item.cantidad, precio_unit: item.precio_unit, subtotal: item.subtotal, metodo_pago: v.metodo_pago, fecha: v.fecha_venta };
             if (!cj.categorias.has(cat)) cj.categorias.set(cat, []);
             cj.categorias.get(cat).push(r);
           }
@@ -745,7 +864,7 @@ router.get('/ingresos-caja/excel', async (req, res) => {
       const catKey = 'cat_' + i;
       resHeaders.push({ header: cat, key: catKey, width: 18, colorFn: () => CAT_COLORS[i % CAT_COLORS.length] });
     });
-    resHeaders.push({ header: 'Otros Ing.', key: 'otrM', width: 14, colorFn: () => AMBER });
+    resHeaders.push({ header: 'Otros ingresos manuales', key: 'otrM', width: 26, colorFn: () => AMBER });
     resHeaders.push({ header: 'TOTAL (S/)', key: 'total', width: 16, colorFn: () => GREEN });
 
     const resRows = cajeros.map(cj => {
@@ -886,7 +1005,7 @@ router.get('/ingresos-caja/excel', async (req, res) => {
           cell.value=val; cell.font={name:'Calibri',size:10}; cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
           cell.alignment={vertical:'middle',horizontal:(idx<=1||h.align==='left')?'left':(h.align||'center')};
           cell.border={bottom:{style:'hair',color:{argb:'FFE2E8F0'}},right:{style:'hair',color:{argb:'FFE2E8F0'}}};
-          if (h.colorFn) { const clr=h.colorFn(val); if(clr) cell.font={name:'Calibri',size:10,bold:true,color:{argb:clr}}; }
+          if (h.colorFn) { const clr=h.colorFn(val, r); if(clr) cell.font={name:'Calibri',size:10,bold:true,color:{argb:clr}}; }
         });
       });
       return startRow+rows.length;
@@ -957,7 +1076,7 @@ router.get('/ingresos-caja/excel', async (req, res) => {
         miniRows.push({ cat: `${icon} ${cat}`, n: items.length, total: `S/ ${ct.total.toFixed(2)}`, porc: cj.total ? ((ct.total / cj.total) * 100).toFixed(1) + '%' : '0%' });
         catIdx++;
       }
-      miniRows.push({ cat:'➕ Otros Ing.', n:cj.otrosMovs.length, total:`S/ ${cj.totalOtrM.toFixed(2)}`, porc:cj.total?((cj.totalOtrM/cj.total)*100).toFixed(1)+'%':'0%' });
+      miniRows.push({ cat:'Otros ingresos manuales', n:cj.otrosMovs.length, total:`S/ ${cj.totalOtrM.toFixed(2)}`, porc:cj.total?((cj.totalOtrM/cj.total)*100).toFixed(1)+'%':'0%' });
       let row = _writeDataRows(ws, 6, hMini, miniRows);
 
       // Fila total del mini-resumen
@@ -974,7 +1093,11 @@ router.get('/ingresos-caja/excel', async (req, res) => {
       // SECCIÓN 1 — MEMBRESÍAS
       row = _writeSectionTitle(ws, row, '💳  MEMBRESÍAS VENDIDAS', BLUE);
       _writeTableHeaders(ws, row, hMem, BLUE); row++;
-      const rMem = cj.pagos.map(p => ({ cliente:p.cliente_id?.nombre||'-', plan:p.membresia_id?.plan_id?.nombre||'-', monto:p.monto, metodo_pago:p.metodo_pago, fecha:p.fecha_pago, es_abono:p.es_abono?'Sí':'No', num_abono:p.numero_abono??'-', notas:p.notas||'-' }));
+      const rMem = cj.pagos.map(p => ({
+        cliente: p.cliente_id?.nombre || '-', plan: presentarPago(p).plan_nombre || '-',
+        monto: p.monto, metodo_pago: p.metodo_pago, fecha: p.fecha_pago,
+        es_abono: p.es_abono ? 'Sí' : 'No', num_abono: p.numero_abono ?? '-', notas: p.notas || '-',
+      }));
       row = _writeDataRows(ws, row, hMem, rMem);
       row = _writeSectionTotal(ws, row, hMem, `Total registros: ${rMem.length}`, cj.totalMem, BLUE);
 
@@ -1031,9 +1154,9 @@ router.get('/pagos/pdf', async (req, res) => {
   const { from, to } = req.query;
   try {
     const filter = {};
-    if (from && to) {
-      filter.fecha_pago = { $gte: new Date(from), $lte: new Date(to) };
-    }
+    if (from || to) filter.fecha_pago = dateFilter(from, to);
+    if (req.query.estado) filter.estado = req.query.estado;
+    if (req.query.metodo_pago) filter.metodo_pago = req.query.metodo_pago;
 
     const pagos = await Pago.find(filter)
       .populate('cliente_id', 'nombre')
@@ -1050,13 +1173,13 @@ router.get('/pagos/pdf', async (req, res) => {
     if (from && to) doc.fontSize(10).text(`Período: ${from} - ${to}`, { align: 'center' });
     doc.moveDown();
 
-    const total = pagos.reduce((sum, p) => sum + parseFloat(p.monto), 0);
-    doc.fontSize(12).text(`Total registros: ${pagos.length}  |  Total: S/. ${total.toFixed(2)}`);
+    const total = pagos.filter(p => p.estado === 'pagado').reduce((sum, p) => sum + parseFloat(p.monto), 0);
+    doc.fontSize(12).text(`Total registros: ${pagos.length}  |  Cobrado: S/. ${total.toFixed(2)}`);
     doc.moveDown();
 
     pagos.forEach(p => {
       doc.fontSize(10).text(
-        `${p.fecha_pago?.toISOString?.().split('T')[0] || p.fecha_pago} | ${p.cliente_id?.nombre || '-'} | ${p.membresia_id?.plan_id?.nombre || '-'} | S/. ${p.monto} | ${p.metodo_pago} | ${p.estado}`
+        `${limaDate(p.fecha_pago)} | ${p.cliente_id?.nombre || '-'} | ${presentarPago(p).plan_nombre || '-'} | S/. ${p.monto} | ${p.metodo_pago} | ${p.estado}`
       );
     });
 

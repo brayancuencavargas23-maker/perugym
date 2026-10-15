@@ -734,5 +734,3 @@ window.addEventListener('error', (event) => {
     }
   }
 }, true);
-
-console.log('✅ Interceptor de errores activado');

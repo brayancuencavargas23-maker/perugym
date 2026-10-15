@@ -1,5 +1,6 @@
 ﻿const router = require('express').Router();
 const Asistencia = require('../models/Asistencia');
+const AsistenciaService = require('../services/AsistenciaService');
 const { verifyToken } = require('../middleware/auth');
 
 router.use(verifyToken);
@@ -223,20 +224,18 @@ router.get('/export', async (req, res) => {
   }
 });
 
+router.get('/disponibilidad/:cliente_id', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    const { periodos, ...estado } = await AsistenciaService.disponibilidad(req.params.cliente_id);
+    res.json(estado);
+  } catch (err) { res.status(err.status || 500).json({ error: err.message }); }
+});
+
 router.post('/checkin', async (req, res) => {
   const { cliente_id } = req.body;
   try {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const existing = await Asistencia.findOne({
-      cliente_id,
-      fecha: { $gte: today, $lt: tomorrow },
-      salida: null,
-    });
-    if (existing) return res.status(400).json({ error: 'El cliente ya tiene un check-in activo hoy' });
-
-    const created = await Asistencia.create({ cliente_id });
+    const created = await AsistenciaService.registrar(cliente_id);
     // Populate para devolver el mismo shape que GET /asistencia
     const asistencia = await Asistencia.findById(created._id)
       .populate('cliente_id', 'nombre apellido_paterno apellido_materno foto_url');
@@ -247,7 +246,7 @@ router.post('/checkin', async (req, res) => {
       cliente_nombre: [asistencia.cliente_id?.nombre, asistencia.cliente_id?.apellido_paterno, asistencia.cliente_id?.apellido_materno].filter(Boolean).join(' ') || null,
       foto_url: asistencia.cliente_id?.foto_url,
     });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { res.status(err.status || 500).json({ error: err.message }); }
 });
 
 router.put('/checkout/:id', async (req, res) => {

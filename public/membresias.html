@@ -9,6 +9,7 @@
   <title>Membresías - PeruGym</title>
   <link rel="stylesheet" href="/css/main.css">
   <link rel="stylesheet" href="/css/styles-responsive.css">
+  <link rel="stylesheet" href="/css/membresias.css">
   <!-- SPA redirect: si se accede directamente, redirigir al shell -->
   <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
 </head>
@@ -326,18 +327,45 @@
 </div>
 
 <!-- Modal: Renovar -->
-<div class="modal-overlay hidden" id="modal-renovar">
+<div class="modal-overlay hidden" id="modal-renovar" role="dialog" aria-modal="true" aria-labelledby="renovar-title">
   <div class="modal">
     <div class="modal-header">
-      <h3>Renovar Membresía</h3>
-      <button class="btn btn-icon btn-outline" id="btn-close-renovar">✕</button>
+      <h3 id="renovar-title">Renovar Membresía</h3>
+      <button class="btn btn-icon btn-outline" id="btn-close-renovar" aria-label="Cerrar renovación">✕</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="renovar-mem-id">
-      <div id="renovar-info" style="background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px"></div>
-      <div class="form-row">
+      <div id="renovar-error" class="renewal-error hidden" role="alert" tabindex="-1"></div>
+      <div id="renovar-info" class="renewal-note"></div>
+      <div class="form-group">
+        <label for="renovar-plan">Plan del nuevo periodo *</label>
+        <select id="renovar-plan" class="form-control" required></select>
+        <small>El plan anterior se conserva hasta su vencimiento.</small>
+      </div>
+      <div class="renewal-grid">
         <div class="form-group">
-          <label>Método de pago</label>
+          <label for="renovar-precio">Precio acordado (S/) *</label>
+          <input id="renovar-precio" type="number" class="form-control" min="0" step="0.01" required>
+          <small id="renovar-precio-base"></small>
+        </div>
+        <div class="form-group">
+          <label for="renovar-descuento">Descuento sobre catálogo (S/)</label>
+          <input id="renovar-descuento" type="number" class="form-control" min="0" step="0.01" value="0">
+          <button type="button" class="btn btn-sm btn-outline" id="renovar-restaurar">Usar precio sin descuento</button>
+        </div>
+        <div class="form-group">
+          <label for="renovar-inicio">Inicio del nuevo periodo *</label>
+          <input id="renovar-inicio" type="date" class="form-control" required aria-describedby="renovar-fecha-ayuda">
+          <small id="renovar-fecha-ayuda"></small>
+        </div>
+        <div class="form-group">
+          <label for="renovar-fin">Nuevo vencimiento</label>
+          <input id="renovar-fin" type="date" class="form-control" readonly>
+        </div>
+      </div>
+      <div class="renewal-grid">
+        <div class="form-group">
+          <label for="renovar-metodo">Método de pago</label>
           <select id="renovar-metodo" class="form-control">
             <option value="efectivo">Efectivo</option>
             <option value="yape">Yape</option>
@@ -346,28 +374,32 @@
           </select>
         </div>
         <div class="form-group">
-          <label>Estado del pago</label>
+          <label for="renovar-estado-pago">Tipo de pago</label>
           <select id="renovar-estado-pago" class="form-control">
             <option value="pagado">Pagado ahora</option>
+            <option value="abono">Primer abono</option>
             <option value="pendiente">Pendiente (deuda)</option>
           </select>
         </div>
       </div>
-      <div class="form-group"><label>Notas</label><textarea id="renovar-notas" class="form-control" rows="2"></textarea></div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Descuento (S/)</label>
-          <input type="number" id="renovar-descuento" class="form-control" min="0" step="0.01" placeholder="0.00" value="0">
-        </div>
-        <div class="form-group" style="display:flex;align-items:flex-end">
-          <div id="renovar-monto-final" style="background:var(--bg);border-radius:8px;padding:10px 14px;font-size:13px;width:100%;text-align:center"></div>
-        </div>
+      <div class="form-group hidden" id="renovar-abono-group">
+        <label for="renovar-abono">Abono inicial (S/)</label>
+        <input id="renovar-abono" type="number" class="form-control" min="0.01" step="0.01">
       </div>
+      <div class="form-group"><label for="renovar-notas">Notas</label><textarea id="renovar-notas" class="form-control" rows="2" maxlength="1000"></textarea></div>
+      <div id="renovar-monto-final" class="renewal-note renewal-summary" aria-live="polite"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" id="btn-cancel-renovar">Cancelar</button>
       <button class="btn btn-primary" id="btn-confirmar-renovar">Confirmar Renovación</button>
     </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="modal-periodos" role="dialog" aria-modal="true" aria-labelledby="periodos-title">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header"><h3 id="periodos-title">Historial de periodos</h3><button id="btn-close-periodos" class="btn btn-icon btn-outline" aria-label="Cerrar historial">✕</button></div>
+    <div class="modal-body renewal-history" id="periodos-lista"></div>
   </div>
 </div>
 
@@ -425,6 +457,7 @@
 <script src="/js/utils.js"></script>
 <script src="/js/icons.js"></script>
 <script src="/js/layout.js"></script>
+<script src="/js/membresias-renovacion.js"></script>
 <script>
   let currentPage = 1;
   let vencenFilter = false;
@@ -433,6 +466,8 @@
   let allMembresias = []; // todos los datos para paginación client-side
   let tablePaginator = null; // instancia de paginación
   let lastFilteredData = [];
+  let renewalUI;
+  const escapeMem = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
 
   // Guard: devuelve true si la página de membresías sigue activa en el DOM.
   // Evita que promesas en vuelo escriban en elementos que ya no existen
@@ -673,8 +708,10 @@
     const estadoClass = { activo: 'badge-success', vencido: 'badge-danger', cancelado: 'badge-warning', pendiente: 'badge-warning' }[m.estado] || 'badge-info';
     const esActivo = m.estado === 'activo';
     const esPendiente = m.estado === 'pendiente';
-    const clientesConActiva = allMembresias.filter(x => (x.estado === 'activo' || x.estado === 'pendiente') && x.cliente_id === m.cliente_id);
-    const puedeRenovar = (m.estado === 'vencido' || m.estado === 'cancelado') && clientesConActiva.length === 0;
+    const clienteId = value => String(value?._id || value || '');
+    const otraActiva = allMembresias.some(x => (x.estado === 'activo' || x.estado === 'pendiente')
+      && x.id !== m.id && clienteId(x.cliente_id) === clienteId(m.cliente_id));
+    const puedeRenovar = ['activo', 'vencido'].includes(m.estado) && !otraActiva && !m.proxima_renovacion;
     const cajaBloqueado = !cajaActual;
     const disabledAttr = cajaBloqueado ? 'disabled title="Abre la caja primero"' : '';
 
@@ -687,7 +724,9 @@
       const totalPagado = m.total_pagado || 0;
       const precio = m.precio || 0;
       const abonos = m.cantidad_abonos || 0;
-      if (totalPagado === 0) {
+      if (precio === 0) {
+        pagoBadge = '<span class="badge badge-success">Sin saldo</span>';
+      } else if (totalPagado === 0) {
         pagoBadge = '<span class="badge badge-danger">Deuda</span>';
       } else if (totalPagado < precio) {
         const pct = Math.round((totalPagado / precio) * 100);
@@ -697,17 +736,21 @@
         pagoBadge = '<span class="badge badge-success">Pagado</span>';
       }
     }
+    const saldoActual = Math.max(0, (m.precio || 0) - (m.total_pagado || 0));
+    if (m.saldo_total > saldoActual) {
+      pagoBadge += `<div style="font-size:11px;color:var(--warning)">Otros periodos: ${fmtMoney(m.saldo_total - saldoActual)} pendiente</div>`;
+    }
 
     return `<tr>
       <td data-label="Cliente">
         <div class="member-cell">
           ${m.foto_url
-            ? `<img src="${m.foto_url}" class="member-avatar">`
+            ? `<img src="${escapeMem(m.foto_url)}" class="member-avatar" alt="">`
             : `<div class="member-avatar" style="display:flex;align-items:center;justify-content:center">${avatarInitials(m.cliente_nombre)}</div>`}
-          <div><div style="font-weight:600">${m.cliente_nombre}</div></div>
+          <div><div style="font-weight:600">${escapeMem(m.cliente_nombre)}</div></div>
         </div>
       </td>
-      <td data-label="Plan">${m.plan_nombre}<div style="font-size:11px;color:var(--text-light)">${m.precio_original && m.precio < m.precio_original ? `<span style="text-decoration:line-through">${fmtMoney(m.precio_original)}</span> ` : ''}${fmtMoney(m.precio)}</div></td>
+      <td data-label="Plan">${escapeMem(m.plan_nombre)}<div style="font-size:11px;color:var(--text-light)">${m.precio_original && m.precio < m.precio_original ? `<span style="text-decoration:line-through">${fmtMoney(m.precio_original)}</span> ` : ''}${fmtMoney(m.precio)}</div>${m.proxima_renovacion ? `<small>Próximo: ${escapeMem(m.proxima_renovacion.plan_nombre)} desde ${fmtDate(m.proxima_renovacion.fecha_inicio)}</small>` : ''}</td>
       <td data-label="Inicio">${fmtDate(m.fecha_inicio)}</td>
       <td data-label="Vencimiento"><span class="badge ${expClass}">${fmtDate(m.fecha_fin)}</span></td>
       <td data-label="Estado"><span class="badge ${estadoClass}">${m.estado}</span></td>
@@ -722,10 +765,10 @@
           const url = `https://wa.me/51${tel}?text=${encodeURIComponent(mensaje)}`;
           return `<a class="btn btn-sm btn-outline" href="${url}" target="_blank" title="WhatsApp" style="display:inline-flex;align-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></a>`;
         })() : ''}
-        ${esActivo ? `<button class="btn btn-sm btn-outline" title="Cambiar plan" ${disabledAttr} onclick="abrirCambioPlan('${m.id}','${m.plan_nombre}','${m.cliente_nombre}')">${icon('refresh')}</button>` : ''}
-        ${puedeRenovar ? `<button class="btn btn-sm btn-outline" title="Renovar" ${disabledAttr} onclick="abrirRenovar('${m.id}','${m.plan_nombre}','${m.cliente_nombre}',${m.precio})">${icon('renew')}</button>` : ''}
-        ${m.estado !== 'cancelado' ? `<button class="btn btn-sm btn-outline" title="Editar" onclick="abrirEditar('${m.id}','${m.estado}','${m.fecha_fin?.split('T')[0]}')">${icon('edit')}</button>` : ''}
-        ${(esActivo || esPendiente) ? `<button class="btn btn-sm btn-danger" title="Cancelar membresía" onclick="abrirCancelar('${m.id}','${m.cliente_nombre}','${m.plan_nombre}')">${icon('cancel')}</button>` : ''}
+        ${puedeRenovar ? `<button class="btn btn-sm btn-outline" title="Renovar o elegir el plan del siguiente periodo" data-renovar="${m.id}" ${disabledAttr} onclick="abrirRenovar('${m.id}')">${icon('renew')}</button>` : ''}
+        <button type="button" class="btn btn-sm btn-outline" title="Historial de periodos" aria-label="Ver historial de periodos" onclick="verPeriodos('${m.id}')">${icon('history')}</button>
+        ${m.estado !== 'cancelado' && !m.periodos?.length ? `<button class="btn btn-sm btn-outline" title="Editar" onclick="abrirEditar('${m.id}','${m.estado}','${m.fecha_fin?.split('T')[0]}')">${icon('edit')}</button>` : ''}
+        ${(esActivo || esPendiente) ? `<button class="btn btn-sm btn-danger" title="Cancelar membresía" onclick="abrirCancelar('${m.id}')">${icon('cancel')}</button>` : ''}
       </td>
     </tr>`;
   }
@@ -801,9 +844,12 @@
 
   // --- Cancelar membresía ---
   function abrirCancelar(id, cliente, plan) {
+    const mem = allMembresias.find(m => m.id === id || m._id === id);
+    cliente = cliente || mem?.cliente_nombre;
+    plan = plan || mem?.plan_nombre;
     document.getElementById('cancelar-mem-id').value = id;
     document.getElementById('cancelar-info').innerHTML =
-      `Cliente: <strong>${cliente}</strong> &nbsp;|&nbsp; Plan: <strong>${plan}</strong>`;
+      `Cliente: <strong>${escapeMem(cliente)}</strong> &nbsp;|&nbsp; Plan: <strong>${escapeMem(plan)}</strong>`;
     openModal('modal-cancelar');
   }
 
@@ -977,53 +1023,9 @@
   }
 
   // --- Renovar ---
-  function abrirRenovar(id, plan, cliente, precio) {
-    if (!cajaActual) { toast('Abre la caja antes de renovar membresías', 'warning'); return; }
-    document.getElementById('renovar-mem-id').value = id;
-    document.getElementById('renovar-info').innerHTML = `Cliente: <strong>${cliente}</strong> &nbsp;|&nbsp; Plan: <strong>${plan}</strong> &nbsp;|&nbsp; Precio: <strong>${fmtMoney(precio)}</strong>`;
-    document.getElementById('renovar-metodo').value = 'efectivo';
-    document.getElementById('renovar-estado-pago').value = 'pagado';
-    document.getElementById('renovar-notas').value = '';
-    const descEl = document.getElementById('renovar-descuento');
-    if (descEl) { descEl.value = '0'; descEl.dataset.precioBase = precio; }
-    actualizarMontoFinal('renovar', precio);
-    openModal('modal-renovar');
-  }
-
-  async function renovar() {
-    if (!cajaActual) { toast('No hay caja abierta', 'warning'); return; }
-    const id = document.getElementById('renovar-mem-id').value;
-    try {
-      const result = await api.post(`/membresias/${id}/renovar`, {
-        metodo_pago: document.getElementById('renovar-metodo').value,
-        estado_pago: document.getElementById('renovar-estado-pago').value,
-        descuento: parseFloat(document.getElementById('renovar-descuento').value) || 0,
-        caja_id: cajaActual.id,
-        notas: document.getElementById('renovar-notas').value || null,
-      }, false, {
-        invalidate: ['membresias', 'pagos'],
-      });
-      if (result?.membresia) {
-        const mem = result.membresia;
-        gymCache.patchItem('clientes', String(mem.cliente_id), (c) => ({
-          ...c,
-          membresia_estado: mem.estado,
-          fecha_fin: mem.fecha_fin,
-        }));
-      }
-      toast('Membresía renovada correctamente');
-      closeModal('modal-renovar');
-      if (result?.membresia) {
-        const idx = allMembresias.findIndex(m => m.id === id || m._id === id);
-        if (idx !== -1) {
-          allMembresias[idx] = { ...allMembresias[idx], ...result.membresia };
-        } else {
-          allMembresias.unshift(result.membresia);
-        }
-      }
-      refreshTable();
-    } catch (err) { toast(err.message, 'error'); }
-  }
+  function abrirRenovar(id) { return renewalUI.open(id); }
+  function renovar() { return renewalUI.save(); }
+  function verPeriodos(id) { return renewalUI.history(id); }
 
   // --- Editar estado manual ---
   function abrirEditar(id, estado, fecha_fin) {
@@ -1080,6 +1082,9 @@
   // algún elemento no existe en el DOM en el momento de ejecución.
   (function _initPage() {
     initLayout('membresias', 'Membresías');
+    renewalUI = MembresiasRenovacion.init({ getCaja: () => cajaActual,
+      setCaja: caja => { cajaActual = caja; }, reload: loadMembresias });
+    window.verPeriodos = verPeriodos;
 
     const elWarning = document.getElementById('icon-warning-mem');
     const elPlus    = document.getElementById('icon-plus-mem');
@@ -1112,8 +1117,8 @@
       ['btn-close-cambio',           () => closeModal('modal-cambio')],
       ['btn-cancel-cambio',          () => closeModal('modal-cambio')],
       ['btn-confirmar-cambio',       function() { withLoading(this, cambiarPlan, 'Guardando...'); }],
-      ['btn-close-renovar',          () => closeModal('modal-renovar')],
-      ['btn-cancel-renovar',         () => closeModal('modal-renovar')],
+      ['btn-close-renovar',          () => renewalUI.close()],
+      ['btn-cancel-renovar',         () => renewalUI.close()],
       ['btn-confirmar-renovar',      function() { withLoading(this, renovar, 'Renovando...'); }],
       ['btn-close-editar',           () => closeModal('modal-editar')],
       ['btn-cancel-editar',          () => closeModal('modal-editar')],
@@ -1163,13 +1168,6 @@
         const sel = document.getElementById('cambio-plan');
         const opt = sel ? sel.options[sel.selectedIndex] : null;
         actualizarMontoFinal('cambio', opt && opt.value ? parseFloat(opt.dataset.precio) : 0);
-      });
-    }
-    const elRenovarDescuento = document.getElementById('renovar-descuento');
-    if (elRenovarDescuento) {
-      elRenovarDescuento.addEventListener('input', () => {
-        const precioBase = parseFloat(elRenovarDescuento.dataset.precioBase) || 0;
-        actualizarMontoFinal('renovar', precioBase);
       });
     }
     const elMemMontoPago = document.getElementById('mem-monto-pago');
@@ -1256,14 +1254,7 @@
         openModal('modal-nueva');
       }
       if (renovarId) {
-        setTimeout(() => {
-          const btn = document.querySelector(`[data-renovar="${renovarId}"]`);
-          if (btn) btn.click();
-          else {
-            const allBtns = document.querySelectorAll('.btn-renovar');
-            allBtns.forEach(b => { if (b.dataset.memId === renovarId) b.click(); });
-          }
-        }, 500);
+        abrirRenovar(renovarId);
       }
     });
 

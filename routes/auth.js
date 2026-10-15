@@ -145,12 +145,30 @@ router.put('/users/:id', verifyToken, requireRole('admin'), [
   validators.email()
 ], handleValidationErrors, async (req, res) => {
   const { name, email, role, active } = req.body;
+  if (role !== undefined && !['admin', 'recepcionista'].includes(role)) {
+    return res.status(400).json({ error: 'Rol inválido' });
+  }
   try {
-    const target = await Usuario.findById(req.params.id).select('usuario').lean();
+    const target = await Usuario.findById(req.params.id).select('usuario rol activo').lean();
     if (target && target.usuario === process.env.DEV_USERNAME) {
       return res.status(403).json({ error: 'Este usuario no puede ser modificado' });
     }
-    const update = { usuario: name, email, rol: role, activo: active };
+    // Siempre debe quedar al menos un administrador activo: si la edición
+    // quita el rol admin o desactiva al único admin, el sistema quedaría
+    // sin nadie capaz de gestionarlo.
+    const nuevoRol    = role    !== undefined ? role    : target?.rol;
+    const nuevoActivo = active  !== undefined ? !!active : target?.activo;
+    if (target?.rol === 'admin' && (nuevoRol !== 'admin' || !nuevoActivo)) {
+      const otrosAdmins = await Usuario.countDocuments({ rol: 'admin', activo: true, _id: { $ne: target._id } });
+      if (!otrosAdmins) {
+        return res.status(403).json({ error: 'Debe quedar al menos un administrador activo. Crea otro admin antes de cambiar este.' });
+      }
+    }
+    const update = {};
+    if (name !== undefined)  update.usuario = name;
+    if (email !== undefined) update.email = email;
+    if (role !== undefined)  update.rol = role;
+    if (active !== undefined) update.activo = !!active;
     const user = await Usuario.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
     if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
     res.json({ id: user._id.toString(), name: user.usuario, email: user.email, role: user.rol, active: user.activo });
@@ -197,22 +215,36 @@ router.put('/users/:id/password', verifyToken, requireRole('admin'), async (req,
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.delete('/users/:id', verifyToken, requireRole('admin'), async (req, res) => {
+router.delete('/users/:id', verifyToken, requireRole('admin'), [
+  validators.mongoId('id', 'param'),
+], handleValidationErrors, async (req, res) => {
   try {
-    const target = await Usuario.findById(req.params.id).select('usuario').lean();
-    if (target && target.usuario === process.env.DEV_USERNAME) {
+    const target = await Usuario.findById(req.params.id).select('usuario rol activo').lean();
+    if (!target) return res.status(404).json({ error: 'Usuario no encontrado' });
+    if (target.usuario === process.env.DEV_USERNAME) {
       return res.status(403).json({ error: 'Este usuario no puede ser eliminado' });
     }
-    const user = await Usuario.findByIdAndDelete(req.params.id);
-    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+    if (String(req.user.id) === String(req.params.id)) {
+      return res.status(403).json({ error: 'No puedes eliminar tu propia cuenta' });
+    }
+    if (target.rol === 'admin') {
+      return res.status(403).json({ error: 'Las cuentas administradoras no se pueden eliminar. Si ya no la necesitas, desáctívala en Editar.' });
+    }
+    await Usuario.findByIdAndDelete(req.params.id);
     res.json({ message: 'Usuario eliminado' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.put('/users/:id/permisos', verifyToken, requireRole('admin'), async (req, res) => {
   const { permisos } = req.body;
+  const permitidos = ['dashboard', 'clientes', 'membresias', 'pagos', 'planes', 'asistencia', 'productos', 'compras', 'caja', 'reports', 'solicitudes'];
+  if (!Array.isArray(permisos) || permisos.length > permitidos.length || permisos.some(p => !permitidos.includes(p))) {
+    return res.status(400).json({ error: 'Envía una lista de permisos válidos.' });
+  }
+  if (!require('mongoose').isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Usuario inválido.' });
   try {
-    await Usuario.findByIdAndUpdate(req.params.id, { permisos });
+    const user = await Usuario.findByIdAndUpdate(req.params.id, { permisos: [...new Set(permisos)] }, { runValidators: true });
+    if (!user) return res.status(404).json({ error: 'Usuario no encontrado.' });
     res.json({ message: 'Permisos actualizados' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

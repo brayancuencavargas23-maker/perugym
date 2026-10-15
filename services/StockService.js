@@ -1,4 +1,5 @@
 const Producto = require('../models/Producto');
+const Inventario = require('./InventarioService');
 const { BusinessError } = require('../middleware/errors/ErrorTypes');
 
 /**
@@ -13,7 +14,7 @@ class StockService {
    * @returns {Promise<Producto>} - Updated product
    * @throws {BusinessError} - If insufficient stock or product not found
    */
-  static async descontarStock(productoId, cantidad, session) {
+  static async descontarStock(productoId, cantidad, session, context) {
     // Atomic operation: only update if stock is sufficient
     const producto = await Producto.findOneAndUpdate(
       {
@@ -40,6 +41,7 @@ class StockService {
       );
     }
 
+    if (context) await Inventario.registrar(producto, producto.stock + cantidad, context, session);
     return producto;
   }
 
@@ -50,12 +52,15 @@ class StockService {
    * @param {ClientSession} session - Transaction session
    * @returns {Promise<Producto>} - Updated product
    */
-  static async revertirStock(productoId, cantidad, session) {
-    return Producto.findByIdAndUpdate(
+  static async revertirStock(productoId, cantidad, session, context) {
+    const producto = await Producto.findByIdAndUpdate(
       productoId,
       { $inc: { stock: cantidad } },
       { new: true, session }
     );
+    if (!producto) throw new BusinessError('Producto no encontrado para devolver existencias.');
+    if (context) await Inventario.registrar(producto, producto.stock - cantidad, context, session);
+    return producto;
   }
 
   /**
@@ -64,14 +69,15 @@ class StockService {
    * @param {ClientSession} session - Transaction session
    * @returns {Promise<Array<{producto_id, cantidad, precio_unit, subtotal}>>}
    */
-  static async descontarMultiple(items, session) {
+  static async descontarMultiple(items, session, context) {
     const resultado = [];
 
     for (const item of items) {
       const producto = await this.descontarStock(
         item.producto_id,
         item.cantidad,
-        session
+        session,
+        context
       );
 
       resultado.push({
@@ -90,10 +96,8 @@ class StockService {
    * @param {Array<{producto_id, cantidad}>} items - Items to revert
    * @param {ClientSession} session - Transaction session
    */
-  static async revertirMultiple(items, session) {
-    await Promise.all(
-      items.map(item => this.revertirStock(item.producto_id, item.cantidad, session))
-    );
+  static async revertirMultiple(items, session, context) {
+    for (const item of items) await this.revertirStock(item.producto_id, item.cantidad, session, context);
   }
 }
 

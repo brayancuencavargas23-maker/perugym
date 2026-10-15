@@ -1,5 +1,6 @@
 const Membresia = require('../models/Membresia');
 const Plan = require('../models/Plan');
+const { condicionesPlan } = require('../utils/asistenciaPolicy');
 const { BusinessError, NotFoundError } = require('../middleware/errors/ErrorTypes');
 
 /**
@@ -11,6 +12,7 @@ class MembresiaService {
    * @returns {Promise<number>} - Number of memberships expired
    */
   static async autoVencer() {
+    await require('./MembresiaConsultaService').sincronizar();
     const result = await Membresia.updateMany(
       { fecha_fin: { $lt: new Date() }, estado: 'activo' },
       { $set: { estado: 'vencido' } }
@@ -56,6 +58,7 @@ class MembresiaService {
         'Cancélala o espera que venza antes de asignar una nueva.'
       );
     }
+    await require('./MembresiaRenovacionService').verificarDeuda(cliente_id, session);
 
     // Get plan details
     const plan = await Plan.findOne({ _id: plan_id, activo: true }).session(session);
@@ -82,9 +85,12 @@ class MembresiaService {
         cliente_id,
         plan_id,
         fecha_inicio: inicio,
+        condiciones_asistencia: condicionesPlan(plan),
         fecha_fin: fin,
         estado: estadoMembresia,
-        monto_total: monto_total != null ? monto_total : plan.precio
+        monto_total: monto_total != null ? monto_total : plan.precio,
+        precio_base: plan.precio,
+        plan_nombre: plan.nombre
       }],
       { session }
     );
@@ -111,6 +117,9 @@ class MembresiaService {
     const mem = await Membresia.findById(membresiaId).session(session);
     if (!mem) {
       throw new NotFoundError('Membresía no encontrada.');
+    }
+    if (mem.periodos?.length) {
+      throw new BusinessError('Usa Renovar para elegir el plan del siguiente periodo y conservar el historial.');
     }
 
     // Validate membership status
@@ -145,9 +154,12 @@ class MembresiaService {
         cliente_id: mem.cliente_id,
         plan_id,
         fecha_inicio: inicio,
+        condiciones_asistencia: condicionesPlan(plan),
         fecha_fin: fin,
         estado: estadoMembresia,
-        monto_total: monto_total != null ? monto_total : plan.precio
+        monto_total: monto_total != null ? monto_total : plan.precio,
+        precio_base: plan.precio,
+        plan_nombre: plan.nombre
       }],
       { session }
     );
@@ -183,61 +195,9 @@ class MembresiaService {
     return membresia;
   }
 
-  /**
-   * Renew expired membership (creates new membership with same plan)
-   * @param {ObjectId} membresiaId - Expired membership ID
-   * @param {string} estado_pago - Payment status ('pagado' or 'pendiente')
-   * @param {ClientSession} session - Transaction session
-   * @returns {Promise<Membresia>} - New membership
-   * @throws {NotFoundError} - If membership not found
-   * @throws {BusinessError} - If membership is still active or client has another active membership
-   */
-  static async renovar(membresiaId, estado_pago, session, monto_total = null) {
-    // Get expired membership
-    const mem = await Membresia.findById(membresiaId)
-      .populate('plan_id')
-      .session(session);
-    
-    if (!mem) {
-      throw new NotFoundError('Membresía no encontrada.');
-    }
-
-    if (mem.estado === 'activo') {
-      throw new BusinessError(
-        'La membresía aún está activa. No es necesario renovar.'
-      );
-    }
-
-    // Check if client has another active membership
-    const otraActiva = await Membresia.findOne({
-      cliente_id: mem.cliente_id,
-      estado: 'activo'
-    }).session(session);
-
-    if (otraActiva) {
-      throw new BusinessError('El cliente ya tiene una membresía activa.');
-    }
-
-    // Calculate dates for new membership
-    const inicio = new Date();
-    const fin = new Date(inicio);
-    fin.setDate(fin.getDate() + mem.plan_id.duracion_dias);
-    const estadoMembresia = estado_pago === 'pendiente' ? 'pendiente' : 'activo';
-
-    // Create new membership
-    const [nueva] = await Membresia.create(
-      [{
-        cliente_id: mem.cliente_id,
-        plan_id: mem.plan_id._id,
-        fecha_inicio: inicio,
-        fecha_fin: fin,
-        estado: estadoMembresia,
-        monto_total: monto_total != null ? monto_total : mem.plan_id.precio
-      }],
-      { session }
-    );
-
-    return nueva;
+  // Renovar conserva el contrato y registra un periodo y su cobro.
+  static async renovar(membresiaId, data, session) {
+    return require('./MembresiaRenovacionService').renovar(membresiaId, data, session);
   }
 }
 

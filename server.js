@@ -96,6 +96,7 @@ const PANEL_PAGES = [
   '/dashboard.html', '/clientes.html', '/membresias.html', '/pagos.html',
   '/planes.html', '/asistencia.html', '/productos.html', '/caja.html',
   '/reports.html', '/users.html', '/landing-admin.html', '/solicitudes.html',
+  '/compras.html',
 ];
 
 app.get(PANEL_PAGES, noCache, (req, res) => {
@@ -123,8 +124,11 @@ app.use('/api/membresias',   require('./routes/membresias'));
 app.use('/api/planes',       require('./routes/planes'));
 app.use('/api/pagos',        require('./routes/pagos'));
 app.use('/api/asistencia',   require('./routes/asistencia'));
-app.use('/api/productos',    require('./routes/productos'));
-app.use('/api/ventas',       require('./routes/ventas'));
+  app.use('/api/productos',    require('./routes/productos'));
+  app.use('/api/inventario',   require('./routes/inventario'));
+  app.use('/api/proveedores',  require('./routes/proveedores'));
+  app.use('/api/compras',      require('./routes/compras'));
+  app.use('/api/ventas',       require('./routes/ventas'));
 app.use('/api/caja',         require('./routes/caja'));
 app.use('/api/dashboard',    require('./routes/dashboard'));
 app.use('/api/reports',      require('./routes/reports'));
@@ -160,7 +164,6 @@ connectDB()
           password: hash,
           rol: 'admin',
         });
-        console.log('Usuario admin creado: usuario=admin / admin123');
       }
       const count = await Plan.countDocuments();
       if (count === 0) {
@@ -169,10 +172,9 @@ connectDB()
           { nombre: 'Pro', precio: 149, duracion_dias: 30, descripcion: 'Para resultados reales', caracteristicas: ['Acceso ilimitado a todas las áreas', 'Clases grupales ilimitadas', 'Evaluaciones físicas mensuales'], mostrar_landing: true, destacado: true },
           { nombre: 'Premium', precio: 199, duracion_dias: 30, descripcion: 'Máximo rendimiento', caracteristicas: ['Todo en plan PRO', 'Nutricionista incluido', 'Acceso a zonas exclusivas'], mostrar_landing: true, destacado: false },
         ]);
-        console.log('Planes de ejemplo creados');
       }
     }
-    app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));
+    app.listen(PORT, () => {});
   })
   .catch(err => { console.error('Error iniciando DB:', err); process.exit(1); });
 

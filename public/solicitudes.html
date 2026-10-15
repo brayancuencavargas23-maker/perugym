@@ -265,8 +265,24 @@
       if (cntDescartado) cntDescartado.textContent = stats.descartado;
       const badge = document.getElementById('nav-badge-solicitudes');
       if (badge) {
-        badge.textContent = stats.pendiente;
-        badge.style.display = stats.pendiente > 0 ? 'inline-block' : 'none';
+        const sinVer = stats.pendiente_no_leidas ?? stats.pendiente;
+        badge.textContent = sinVer;
+        badge.style.display = sinVer > 0 ? 'inline-block' : 'none';
+      }
+    } catch {}
+  }
+
+  // El usuario está viendo la página: marca las pendientes como vistas para que
+  // el badge/sidebar y las notificaciones no vuelvan a aparecer (cada solicitud
+  // nueva tiene su propia clave, así que una solicitud recién recibida sí se notifica).
+  async function marcarVistas() {
+    try {
+      const data = await api.post('/solicitudes/read', {});
+      const badge = document.getElementById('nav-badge-solicitudes');
+      if (badge) {
+        const sinVer = data.pendiente_no_leidas ?? 0;
+        badge.textContent = sinVer;
+        badge.style.display = sinVer > 0 ? 'inline-block' : 'none';
       }
     } catch {}
   }
@@ -510,6 +526,7 @@
         gymCache.invalidate('solicitudes');
         await loadSolicitudes(true);
         await loadStats(true);
+        await marcarVistas();   // ya las vio (toast + tabla recargada)
         toast(`🔔 ${diff} nueva${diff > 1 ? 's' : ''} solicitud${diff > 1 ? 'es' : ''} recibida${diff > 1 ? 's' : ''}`, 'success');
       }
 
@@ -559,6 +576,7 @@
       await checkCaja();
       await loadStats();
       await loadSolicitudes();
+      await marcarVistas();   // vio la lista: oculta badge y notificaciones de solicitudes
       
       try {
         const stats = await api.get('/solicitudes/stats', true);

@@ -407,6 +407,8 @@ body {
 .topbar-user-role { font-size: 11px; color: var(--text-light); font-weight: 500; }
 
 /* ── TOPBAR: badge de notificaciones con número ── */
+.notification-read .notif-dot { box-shadow: none; background: var(--text-light); }
+.notification-read [data-notif-status] { color: var(--text-light); }
 .topbar-notif-count {
   position: absolute; top: -4px; right: -4px;
   background: var(--danger); color: #fff;

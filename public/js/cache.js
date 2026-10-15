@@ -22,6 +22,8 @@ const gymCache = (() => {
     membresias:   3 * 60 * 1000,
     pagos:        2 * 60 * 1000,
     productos:    5 * 60 * 1000,
+    compras:      2 * 60 * 1000,
+    proveedores:  5 * 60 * 1000,
     asistencia:   1 * 60 * 1000,   // muy dinámico
     caja:         1 * 60 * 1000,
     dashboard:    2 * 60 * 1000,

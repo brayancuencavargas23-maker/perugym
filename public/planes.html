@@ -56,8 +56,17 @@
         <div class="form-group"><label>Precio (S/) *</label><input type="number" id="p-price" class="form-control" step="0.01" required></div>
         <div class="form-group"><label>Duración (días) *</label><input type="number" id="p-days" class="form-control" required></div>
       </div>
+        <div class="form-group">
+          <label for="p-weekly">Máximo de visitas por semana</label>
+          <input type="number" id="p-weekly" class="form-control" min="1" max="7" step="1" placeholder="Sin límite semanal" aria-describedby="p-weekly-help">
+          <p id="p-weekly-help" class="features-hint">Para Interdiario, escribe 3. Vacío: sin límite semanal. Todos los planes permiten una visita diaria. Semana de lunes a domingo, horario de Perú; visitas no acumulables.</p>
+        </div>
+        <div class="form-group hidden" id="apply-policy-group">
+          <label class="toggle-item"><input type="checkbox" id="p-apply-policy"> Aplicar también a membresías activas y pendientes de este plan</label>
+          <p class="features-hint">Sin marcar, conservan sus condiciones contratadas. Aplicar no borra las visitas ya consumidas.</p>
+        </div>
       <div class="form-group">
-        <label>Beneficios (uno por línea)</label>
+        <label for="p-features">Beneficios (uno por línea)</label>
         <textarea id="p-features" class="form-control features-textarea" rows="5"></textarea>
         <div class="features-hint">✏️ Un beneficio por línea. Aparecerán con ✓ en la landing.</div>
       </div>
@@ -115,6 +124,7 @@
         '<p style="font-size:12px;color:var(--text-light);margin-bottom:8px">' + (p.descripcion || '') + '</p>' +
         '<div class="price-display">S/ ' + parseFloat(p.precio).toFixed(2) + '<span style="font-size:14px;font-weight:400;color:var(--text-light)">/mes</span></div>' +
         '<div style="font-size:12px;color:var(--text-light);margin:6px 0 12px;display:flex;align-items:center;gap:4px">' + icon('calendar') + ' ' + p.duracion_dias + ' días</div>' +
+        '<p style="font-size:13px;margin-bottom:12px">' + (p.limite_semanal == null ? 'Sin límite semanal' : p.limite_semanal + ' visitas por semana') + ' · Máximo 1 al día</p>' +
         featHtml + editBtn + '</div>';
     }).join('');
   }
@@ -138,6 +148,9 @@
     document.getElementById('p-desc').value = p.descripcion || '';
     document.getElementById('p-price').value = p.precio;
     document.getElementById('p-days').value = p.duracion_dias;
+    document.getElementById('p-weekly').value = p.limite_semanal ?? '';
+    document.getElementById('p-apply-policy').checked = false;
+    document.getElementById('apply-policy-group').classList.remove('hidden');
     document.getElementById('p-features').value = (p.caracteristicas || []).join('\n');
     document.getElementById('p-show-landing').checked = p.mostrar_landing;
     document.getElementById('p-featured').checked = p.destacado;
@@ -153,6 +166,8 @@
       nombre: document.getElementById('p-name').value,
       precio: document.getElementById('p-price').value,
       duracion_dias: document.getElementById('p-days').value,
+      limite_semanal: document.getElementById('p-weekly').value === '' ? null : Number(document.getElementById('p-weekly').value),
+      aplicar_membresias: !!id && document.getElementById('p-apply-policy').checked,
       descripcion: document.getElementById('p-desc').value,
       caracteristicas: document.getElementById('p-features').value.split('\n').map(f => f.trim()).filter(Boolean),
       mostrar_landing: document.getElementById('p-show-landing').checked,
@@ -160,6 +175,10 @@
       activo: id ? document.getElementById('p-active').checked : true,
     };
     if (!body.nombre || !body.precio || !body.duracion_dias) return toast('Completa los campos requeridos', 'warning');
+    if (body.limite_semanal !== null && (!Number.isInteger(body.limite_semanal) || body.limite_semanal < 1 || body.limite_semanal > 7)) {
+      document.getElementById('p-weekly').focus();
+      return toast('Indica de 1 a 7 visitas semanales, o deja el campo vacío.', 'warning');
+    }
     try {
       if (id) {
         await api.put('/planes/' + id, body, { patch: { ns: 'planes', id } });
@@ -213,6 +232,9 @@
       document.getElementById('p-desc').value = '';
       document.getElementById('p-price').value = '';
       document.getElementById('p-days').value = 30;
+      document.getElementById('p-weekly').value = '';
+      document.getElementById('p-apply-policy').checked = false;
+      document.getElementById('apply-policy-group').classList.add('hidden');
       document.getElementById('p-features').value = '';
       document.getElementById('p-show-landing').checked = false;
       document.getElementById('p-featured').checked = false;

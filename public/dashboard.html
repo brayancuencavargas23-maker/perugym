@@ -262,15 +262,15 @@
           <div class="kpi-icon" id="si-members"></div>
           <div class="kpi-text">
             <div class="kpi-value" id="stat-members">-</div>
-            <div class="kpi-label">Clientes Activos</div>
+            <div class="kpi-label">Clientes con membresía vigente</div>
+            <div class="kpi-label" id="stat-members-total">De — clientes registrados</div>
           </div>
         </div>
         <div class="kpi-card">
           <div class="kpi-icon" id="si-income"></div>
           <div class="kpi-text">
             <div class="kpi-value" id="stat-income">-</div>
-            <div class="kpi-label">Ingresos del Mes</div>
-            <div id="trend-income"></div>
+            <div class="kpi-label">Ingresos del turno</div>
           </div>
         </div>
         <div class="kpi-card">
@@ -463,6 +463,7 @@
   function renderTrend(elementId, value) {
     const el = document.getElementById(elementId);
     if (!el) return;
+    if (value == null) { el.textContent = 'Sin base de comparación'; return; }
     if (value === 0) el.innerHTML = '<span class="trend-indicator trend-neutral">= 0%</span>';
     else if (value > 0) el.innerHTML = '<span class="trend-indicator trend-up"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg>+' + value + '%</span>';
     else el.innerHTML = '<span class="trend-indicator trend-down"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>' + value + '%</span>';
@@ -512,25 +513,27 @@
   }
 
   function renderNotifications(data) {
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const container = document.getElementById('notif-content');
     const toggleBtn = document.getElementById('notif-toggle-btn');
     if (!container) return;
     _notifData = data;
+    actualizarNotificaciones(data);
     if (!data.items || data.items.length === 0) { container.innerHTML = _emptyState('Sin notificaciones'); if (toggleBtn) toggleBtn.style.display = 'none'; return; }
     const shown = _notifExpanded ? data.items : data.items.slice(0, 6);
     container.innerHTML = shown.map(n => {
       const isStock = n.tipo === 'stock_bajo' && n.producto;
       const dataAttr = isStock ? ' data-producto="' + encodeURIComponent(JSON.stringify(n.producto)) + '"' : '';
       const cls = isStock ? ' notif-clickable' : '';
-      return '<div class="notif-item' + cls + '"' + dataAttr + '>' +
+      return '<div class="notif-item' + cls + '" data-notif-key="' + n.clave + '"' + dataAttr + '>' +
         '<span class="notif-dot ' + (n.prioridad || 'media') + '" aria-hidden="true"></span>' +
-        '<div class="notif-body"><div class="notif-title">' + n.titulo + '</div><div class="notif-sub">' + (n.detalle || '') + '</div></div>' +
+        '<div class="notif-body"><div class="notif-title">' + escapeHtml(n.titulo) + '</div><div class="notif-sub">' + escapeHtml(n.detalle || '') + '</div><small data-notif-status>' + (n.leida ? 'Vista' : 'Nueva') + '</small></div>' +
       '</div>';
     }).join('');
     if (toggleBtn && data.items.length > 6) { toggleBtn.style.display = ''; toggleBtn.textContent = _notifExpanded ? 'Ver menos' : 'Ver todas (' + data.items.length + ')'; }
     else if (toggleBtn) toggleBtn.style.display = 'none';
-    const badge = document.getElementById('nav-badge-notificaciones');
-    if (badge) { if (data.total > 0) { badge.textContent = data.total > 99 ? '99+' : data.total; badge.style.display = ''; } else badge.style.display = 'none'; }
+    actualizarNotificaciones(data);
+    observarNotificaciones(container);
   }
 
   function toggleNotifExpanded() { _notifExpanded = !_notifExpanded; renderNotifications(_notifData); }
@@ -581,14 +584,16 @@
     const labels = { hoy: 'Hoy', semana: 'Semana', mes: 'Mes' };
     const periodLabel = labels[_currentPeriod] || 'Mes';
     document.getElementById('stat-members').textContent = data.stats.clientesActivos;
-    document.getElementById('stat-income').textContent = fmtMoney(data.stats.ingresosDelMes);
+    document.getElementById('stat-members-total').textContent = `De ${data.stats.clientesRegistrados ?? '—'} clientes registrados`;
+    const turno = data.stats.ventasTurno || { total: 0 };
+    document.getElementById('stat-income').textContent = fmtMoney(turno.total || 0);
     document.getElementById('stat-attendance').textContent = data.stats.asistenciaHoy;
     document.getElementById('stat-pending').textContent = data.stats.pagosPendientes;
-    document.querySelector('#stat-income').closest('.kpi-card').querySelector('.kpi-label').textContent = 'Ingresos del ' + periodLabel;
+    document.querySelector('#stat-income').closest('.kpi-card').querySelector('.kpi-label').textContent =
+      turno.abierta && turno.cajero ? 'Ingresos del turno · ' + turno.cajero : 'Ingresos del turno · Caja cerrada';
     document.querySelector('#stat-attendance').closest('.kpi-card').querySelector('.kpi-label').textContent = 'Asistencia ' + periodLabel;
     if (data.stats.tendencias) {
-      renderTrend('trend-income', data.stats.tendencias.ingresos || 0);
-      renderTrend('trend-attendance', data.stats.tendencias.asistencia || 0);
+      renderTrend('trend-attendance', data.stats.tendencias.asistencia);
     }
     renderAlerts(data.alertas);
     const expiringEl = document.getElementById('expiring-list');
@@ -849,7 +854,7 @@
       'h-chart-asistencia': icon('asistencia') + ' Asistencia Semanal',
       'h-notificaciones': icon('warning') + ' Notificaciones',
       'h-activity': icon('checkin') + ' Actividad Reciente',
-      'h-ingresos-hoy': icon('caja') + ' Ingresos del Día',
+      'h-ingresos-hoy': icon('caja') + ' Ingresos manuales del día',
       'h-modal-register': icon('clientes') + ' Registro Rápido',
     };
     Object.entries(iconMap).forEach(([id, html]) => { const el = document.getElementById(id); if (el) el.innerHTML = html; });
