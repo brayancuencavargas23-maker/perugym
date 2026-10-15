@@ -139,7 +139,7 @@ describe('Membresia Race Conditions', () => {
     expect(membresiaActiva).toHaveLength(1);
   });
 
-  it('should allow multiple memberships for same client if not active', async () => {
+  it('should allow another contract after cancellation when the previous balance is paid', async () => {
     // Arrange: Create client and plan
     const cliente = await Cliente.create({
       nombre: 'Pedro López',
@@ -167,6 +167,8 @@ describe('Membresia Race Conditions', () => {
         },
         session1
       );
+      await require('../../models/Pago').create([{ cliente_id: cliente._id, membresia_id: membresia1._id,
+        monto: plan.precio, estado: 'pagado' }], { session: session1 });
       await session1.commitTransaction();
       expect(membresia1.estado).toBe('activo');
 

@@ -522,7 +522,7 @@ describe('MembresiaService', () => {
   });
 
   describe('renovar', () => {
-    it('should create new membership with same plan', async () => {
+    it('should preserve membership and register a period with the same plan', async () => {
       const cliente = await createCliente();
       const plan = await createPlan({ duracion_dias: 30 });
 
@@ -539,12 +539,14 @@ describe('MembresiaService', () => {
       session.startTransaction();
 
       try {
-        const nuevaMembresia = await MembresiaService.renovar(
+        const result = await MembresiaService.renovar(
           membresiaVencida._id,
-          'pagado',
+          { version: 0, plan_id: plan._id, estado_pago: 'pagado' },
           session
         );
-
+        const nuevaMembresia = result.membresia;
+        expect(String(nuevaMembresia._id)).toBe(String(membresiaVencida._id));
+        expect(nuevaMembresia.periodos).toHaveLength(2);
         expect(nuevaMembresia.plan_id.toString()).toBe(plan._id.toString());
         expect(nuevaMembresia.cliente_id.toString()).toBe(cliente._id.toString());
         expect(nuevaMembresia.estado).toBe('activo');
@@ -555,7 +557,7 @@ describe('MembresiaService', () => {
       }
     });
 
-    it('should reject if membership is still active', async () => {
+    it('should extend an active membership from its current end date', async () => {
       const cliente = await createCliente();
       const plan = await createPlan({ duracion_dias: 30 });
 
@@ -572,15 +574,11 @@ describe('MembresiaService', () => {
       session.startTransaction();
 
       try {
-        await expect(
-          MembresiaService.renovar(membresiaActiva._id, 'pagado', session)
-        ).rejects.toThrow(BusinessError);
-
-        await expect(
-          MembresiaService.renovar(membresiaActiva._id, 'pagado', session)
-        ).rejects.toThrow('La membresía aún está activa');
-
-        await session.abortTransaction();
+        const result = await MembresiaService.renovar(membresiaActiva._id,
+          { version: 0, plan_id: plan._id, estado_pago: 'pagado' }, session);
+        expect(+result.periodo.fecha_inicio).toBe(+membresiaActiva.fecha_fin);
+        expect(+result.periodo.fecha_fin - +membresiaActiva.fecha_fin).toBe(30 * 86400000);
+        await session.commitTransaction();
       } finally {
         session.endSession();
       }
@@ -613,12 +611,12 @@ describe('MembresiaService', () => {
 
       try {
         await expect(
-          MembresiaService.renovar(membresiaVencida._id, 'pagado', session)
+          MembresiaService.renovar(membresiaVencida._id, { version: 0 }, session)
         ).rejects.toThrow(BusinessError);
 
         await expect(
-          MembresiaService.renovar(membresiaVencida._id, 'pagado', session)
-        ).rejects.toThrow('El cliente ya tiene una membresía activa');
+          MembresiaService.renovar(membresiaVencida._id, { version: 0 }, session)
+        ).rejects.toThrow('otra membresía activa');
 
         await session.abortTransaction();
       } finally {
