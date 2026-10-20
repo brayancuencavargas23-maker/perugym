@@ -10,17 +10,6 @@
   <link rel="stylesheet" href="/css/main.css">
   <!-- SPA redirect: si se accede directamente, redirigir al shell -->
   <script>if(!window.__SPA_SHELL__){window.location.replace('/app.html');}</script>
-  <style>
-    .landing-badge { background: rgba(108,99,255,0.15); color: var(--primary); border: 1px solid var(--primary); font-size: 11px; padding: 2px 8px; border-radius: 20px; }
-    .featured-badge { background: rgba(255,193,7,0.15); color: #856404; border: 1px solid #ffc107; font-size: 11px; padding: 2px 8px; border-radius: 20px; }
-    .plan-card-admin { border-top: 4px solid var(--primary); transition: box-shadow 0.2s; }
-    .plan-card-admin.is-featured { border-top-color: #ffc107; }
-    .features-textarea { font-size: 13px; resize: vertical; }
-    .features-hint { font-size: 11px; color: var(--text-light); margin-top: 4px; }
-    .toggle-row { display: flex; gap: 20px; }
-    .toggle-item { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
-    .price-display { font-size: 28px; font-weight: 700; color: var(--primary); }
-  </style>
 </head>
 <body>
 <div class="app-layout">
@@ -28,62 +17,82 @@
   <div class="main-content">
     <div class="topbar" id="topbar"></div>
     <div class="page-content">
-      <div class="flex-between mb-2" style="margin-bottom:20px">
-        <p style="font-size:13px;color:var(--text-light)">Gestiona los planes y configura cuáles aparecen en la página principal.</p>
-        <div style="display:flex;gap:10px">
-          <a href="/" target="_blank" class="btn btn-outline btn-sm" style="display:inline-flex;align-items:center;gap:4px"><span id="icon-landing-pl"></span> Ver landing</a>
-          <button class="btn btn-primary" id="btn-new" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-plus-pl"></span> Nuevo Plan</button>
+      <div class="page-header mb-2">
+        <div>
+          <h1>Planes</h1>
+          <p class="page-subtitle">Gestiona los planes y configura cuáles aparecen en la página principal.</p>
+        </div>
+        <div class="page-actions">
+          <a href="/" target="_blank" class="btn btn-outline btn-sm"><span id="icon-landing-pl"></span> Ver landing</a>
+          <button type="button" class="btn btn-primary" id="btn-new"><span id="icon-plus-pl"></span> Nuevo Plan</button>
         </div>
       </div>
-      <div id="plans-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px"></div>
+      <div class="plans-toolbar">
+        <div class="plans-filters" id="plans-filters" role="group" aria-label="Filtrar planes"></div>
+        <select class="plans-sort" id="plans-sort" aria-label="Ordenar planes">
+          <option value="precio-asc">Precio: menor a mayor</option>
+          <option value="precio-desc">Precio: mayor a menor</option>
+          <option value="nombre">Nombre A–Z</option>
+        </select>
+      </div>
+      <div id="plans-grid" class="plans-grid"></div>
     </div>
   </div>
 </div>
 
 <div class="modal-overlay hidden" id="modal-overlay">
-  <div class="modal" style="max-width:620px">
+  <div class="modal modal-plan">
     <div class="modal-header">
       <h3 id="modal-title">Nuevo Plan</h3>
-      <button class="btn btn-icon btn-outline" onclick="closeModal('modal-overlay')">✕</button>
+      <button type="button" class="btn btn-icon btn-outline" aria-label="Cerrar" onclick="closeModal('modal-overlay')"><span id="icon-close-modal"></span></button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="plan-id">
-      <div class="form-row">
-        <div class="form-group"><label>Nombre *</label><input type="text" id="p-name" class="form-control" required></div>
-        <div class="form-group"><label>Subtítulo</label><input type="text" id="p-desc" class="form-control"></div>
+      <div class="form-section">
+        <p class="form-section-title">Identidad</p>
+        <div class="form-row">
+          <div class="form-group"><label for="p-name">Nombre *</label><input type="text" id="p-name" class="form-control" required></div>
+          <div class="form-group"><label for="p-desc">Subtítulo</label><input type="text" id="p-desc" class="form-control"></div>
+        </div>
       </div>
-      <div class="form-row">
-        <div class="form-group"><label>Precio (S/) *</label><input type="number" id="p-price" class="form-control" step="0.01" required></div>
-        <div class="form-group"><label>Duración (días) *</label><input type="number" id="p-days" class="form-control" required></div>
-      </div>
+      <div class="form-section">
+        <p class="form-section-title">Precio y duración</p>
+        <div class="form-row">
+          <div class="form-group"><label for="p-price">Precio (S/) *</label><input type="number" id="p-price" class="form-control" step="0.01" required></div>
+          <div class="form-group"><label for="p-days">Duración (días) *</label><input type="number" id="p-days" class="form-control" required></div>
+        </div>
         <div class="form-group">
           <label for="p-weekly">Máximo de visitas por semana</label>
           <input type="number" id="p-weekly" class="form-control" min="1" max="7" step="1" placeholder="Sin límite semanal" aria-describedby="p-weekly-help">
           <p id="p-weekly-help" class="features-hint">Para Interdiario, escribe 3. Vacío: sin límite semanal. Todos los planes permiten una visita diaria. Semana de lunes a domingo, horario de Perú; visitas no acumulables.</p>
         </div>
         <div class="form-group hidden" id="apply-policy-group">
-          <label class="toggle-item"><input type="checkbox" id="p-apply-policy"> Aplicar también a membresías activas y pendientes de este plan</label>
+          <label class="toggle-item" for="p-apply-policy"><input type="checkbox" id="p-apply-policy"> Aplicar también a membresías activas y pendientes de este plan</label>
           <p class="features-hint">Sin marcar, conservan sus condiciones contratadas. Aplicar no borra las visitas ya consumidas.</p>
         </div>
-      <div class="form-group">
-        <label for="p-features">Beneficios (uno por línea)</label>
-        <textarea id="p-features" class="form-control features-textarea" rows="5"></textarea>
-        <div class="features-hint">✏️ Un beneficio por línea. Aparecerán con ✓ en la landing.</div>
       </div>
-      <div class="form-group">
-        <label style="margin-bottom:10px;display:block">Landing</label>
-        <div class="toggle-row">
-          <label class="toggle-item"><input type="checkbox" id="p-show-landing"> <span style="display:inline-flex;align-items:center;gap:4px" id="icon-landing-toggle"></span> Mostrar en landing</label>
-          <label class="toggle-item"><input type="checkbox" id="p-featured"> <span>Popular</span></label>
+      <div class="form-section">
+        <p class="form-section-title">Beneficios</p>
+        <div class="form-group">
+          <label for="p-features">Beneficios (uno por línea)</label>
+          <textarea id="p-features" class="form-control features-textarea" rows="5"></textarea>
+          <div class="features-hint">Un beneficio por línea. Se muestran con ✓ en la landing.</div>
         </div>
       </div>
-      <div class="form-group hidden" id="active-group">
-        <label class="toggle-item"><input type="checkbox" id="p-active"> <span>Plan activo</span></label>
+      <div class="form-section">
+        <p class="form-section-title">Visibilidad</p>
+        <div class="toggle-row">
+          <label class="toggle-item" for="p-show-landing"><input type="checkbox" id="p-show-landing"> <span class="toggle-icon" id="icon-landing-toggle"></span> Mostrar en landing</label>
+          <label class="toggle-item" for="p-featured"><input type="checkbox" id="p-featured"> <span>Popular</span></label>
+        </div>
+        <div class="form-group hidden" id="active-group">
+          <label class="toggle-item" for="p-active"><input type="checkbox" id="p-active"> <span>Plan activo</span></label>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-overlay')">Cancelar</button>
-      <button class="btn btn-primary" id="btn-save-plan" onclick="withLoading(this, savePlan)">Guardar</button>
+      <button type="button" class="btn btn-outline" onclick="closeModal('modal-overlay')">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="btn-save-plan" onclick="withLoading(this, savePlan)">Guardar</button>
     </div>
   </div>
 </div>
@@ -96,36 +105,97 @@
 <script>
   const user = JSON.parse(localStorage.getItem('gym_user') || '{}');
   let allPlans = [];
+  let planFilter = 'todos';
+  let planSort = 'precio-asc';
 
   function _pageActive() {
     return !!document.getElementById('plans-grid');
   }
 
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function filtrarPlanes() {
+    let list = allPlans;
+    if (planFilter === 'activos') list = list.filter(p => p.activo);
+    else if (planFilter === 'inactivos') list = list.filter(p => !p.activo);
+    else if (planFilter === 'landing') list = list.filter(p => p.mostrar_landing);
+    else if (planFilter === 'populares') list = list.filter(p => p.destacado);
+    const sorted = [...list];
+    if (planSort === 'precio-asc') sorted.sort((a, b) => a.precio - b.precio);
+    else if (planSort === 'precio-desc') sorted.sort((a, b) => b.precio - a.precio);
+    else sorted.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+    return sorted;
+  }
+
+  function renderFilters() {
+    if (!_pageActive()) return;
+    const filters = [
+      { id: 'todos', label: 'Todos' },
+      { id: 'activos', label: 'Activos' },
+      { id: 'inactivos', label: 'Inactivos' },
+      { id: 'landing', label: 'En landing' },
+      { id: 'populares', label: 'Populares' },
+    ];
+    const wrap = document.getElementById('plans-filters');
+    wrap.innerHTML = filters.map(f =>
+      `<button type="button" class="filter-btn ${f.id === planFilter ? 'active' : ''}" data-filter="${f.id}">${f.label}</button>`
+    ).join('');
+    wrap.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.onclick = () => { planFilter = btn.dataset.filter; renderFilters(); renderPlans(); };
+    });
+  }
+
   function renderPlans() {
     if (!_pageActive()) return;
     const grid = document.getElementById('plans-grid');
-    if (!allPlans.length) { grid.innerHTML = '<p style="color:var(--text-light)">Sin planes registrados</p>'; return; }
-    grid.innerHTML = allPlans.map(p => {
+    if (!allPlans.length) {
+      grid.innerHTML =
+        '<div class="empty-state"><h3>Aún no hay planes</h3>' +
+        '<p>Crea tu primer plan para empezar a vender.</p>' +
+        '<button type="button" class="btn btn-primary" onclick="document.getElementById(\'btn-new\').click()">Crear plan</button></div>';
+      return;
+    }
+    const list = filtrarPlanes();
+    if (!list.length) {
+      grid.innerHTML =
+        '<div class="empty-state"><h3>Sin resultados</h3>' +
+        '<p>Ningún plan coincide con el filtro seleccionado.</p></div>';
+      return;
+    }
+    grid.innerHTML = list.map(p => {
       const feats = (p.caracteristicas || []);
       const featHtml = feats.length
-        ? '<ul style="list-style:none;margin-bottom:16px;display:flex;flex-direction:column;gap:5px">' +
-          feats.map(f => '<li style="font-size:12px;color:var(--text-light);display:flex;gap:6px"><span style="color:var(--primary);font-weight:700">✓</span>' + f + '</li>').join('') +
+        ? '<ul class="plan-features">' +
+          feats.map(f => `<li>${icon('check')}<span>${esc(f)}</span></li>`).join('') +
           '</ul>'
-        : '<p style="font-size:12px;color:var(--text-light);margin-bottom:16px">Sin beneficios definidos</p>';
+        : '<p class="plan-features-empty">Sin beneficios definidos</p>';
       const editBtn = user.role === 'admin'
-        ? '<div style="display:flex;gap:8px"><button class="btn btn-outline btn-sm" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:4px" onclick="editPlan(\'' + p._id + '\')">' + icon('edit') + ' Editar</button><button class="btn btn-danger btn-sm" style="display:inline-flex;align-items:center" onclick="withLoading(this, () => deletePlan(\'' + p._id + '\'), \'Eliminando...\')">'+icon('trash')+'</button></div>'
+        ? `<div class="plan-actions">
+            <button type="button" class="btn btn-outline btn-sm" onclick="editPlan('${p._id}')">${icon('edit')} Editar</button>
+            <button type="button" class="btn btn-outline btn-sm btn-icon-danger" aria-label="Eliminar plan ${esc(p.nombre)}" title="Eliminar" onclick="withLoading(this, () => deletePlan('${p._id}'), 'Eliminando...')">${icon('trash')}</button>
+          </div>`
         : '';
-      return '<div class="card plan-card-admin ' + (p.destacado ? 'is-featured' : '') + '">' +
-        '<div class="flex-between mb-1"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
-        '<h3 style="font-size:18px;text-transform:uppercase">' + p.nombre + '</h3>' +
-        (p.mostrar_landing ? '<span class="landing-badge" style="display:inline-flex;align-items:center;gap:3px">' + icon('landing') + ' Landing</span>' : '') +
-        (p.destacado ? '<span class="featured-badge">Popular</span>' : '') +
-        '</div><span class="badge ' + (p.activo ? 'badge-success' : 'badge-danger') + '">' + (p.activo ? 'Activo' : 'Inactivo') + '</span></div>' +
-        '<p style="font-size:12px;color:var(--text-light);margin-bottom:8px">' + (p.descripcion || '') + '</p>' +
-        '<div class="price-display">S/ ' + parseFloat(p.precio).toFixed(2) + '<span style="font-size:14px;font-weight:400;color:var(--text-light)">/mes</span></div>' +
-        '<div style="font-size:12px;color:var(--text-light);margin:6px 0 12px;display:flex;align-items:center;gap:4px">' + icon('calendar') + ' ' + p.duracion_dias + ' días</div>' +
-        '<p style="font-size:13px;margin-bottom:12px">' + (p.limite_semanal == null ? 'Sin límite semanal' : p.limite_semanal + ' visitas por semana') + ' · Máximo 1 al día</p>' +
-        featHtml + editBtn + '</div>';
+      const sufijo = p.duracion_dias === 30 ? '/mes' : `/${p.duracion_dias} días`;
+      return `<article class="card plan-card-admin ${p.destacado ? 'is-featured' : ''}">
+        <div class="flex-between mb-1">
+          <div class="plan-badges">
+            <h3 class="plan-name">${esc(p.nombre)}</h3>
+            ${p.mostrar_landing ? `<span class="landing-badge">${icon('landing')} Landing</span>` : ''}
+            ${p.destacado ? '<span class="featured-badge">Popular</span>' : ''}
+          </div>
+          <span class="badge ${p.activo ? 'badge-success' : 'badge-danger'}">${p.activo ? 'Activo' : 'Inactivo'}</span>
+        </div>
+        <p class="plan-desc">${esc(p.descripcion || '')}</p>
+        <div class="price-display">S/ ${parseFloat(p.precio).toFixed(2)}<span class="price-period">${sufijo}</span></div>
+        <div class="plan-meta">${icon('calendar')} ${p.duracion_dias} días</div>
+        <p class="plan-limits">${p.limite_semanal == null ? 'Sin límite semanal' : p.limite_semanal + ' visitas por semana'} · Máximo 1 al día</p>
+        ${featHtml}
+        ${editBtn}
+      </article>`;
     }).join('');
   }
 
@@ -219,11 +289,15 @@
       'icon-landing-pl':     icon('landing'),
       'icon-plus-pl':        icon('plus'),
       'icon-landing-toggle': icon('landing'),
+      'icon-close-modal':    icon('close'),
     };
     Object.entries(iconMap).forEach(([id, html]) => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = html;
     });
+    renderFilters();
+    const sortSel = document.getElementById('plans-sort');
+    if (sortSel) sortSel.onchange = (e) => { planSort = e.target.value; renderPlans(); };
     const btnNew = document.getElementById('btn-new');
     if (btnNew) btnNew.onclick = () => {
       if (user.role !== 'admin') return toast('Solo administradores pueden crear planes', 'warning');
