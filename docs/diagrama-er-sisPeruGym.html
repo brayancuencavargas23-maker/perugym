@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>SisPeruGym - Diagrama Entidad-Relacion (Modelo Relacional)</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 24px 40px;
+    background: #eef2f7;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    color: #0f172a;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- HEADER ---------- */
+  .hdr {
+    max-width: 2340px; margin: 0 auto;
+    background: linear-gradient(90deg,#0b2545 0%,#13315c 55%,#134074 100%);
+    color: #fff; border-radius: 14px; padding: 22px 30px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 6px 18px rgba(11,37,69,.25);
+  }
+  .hdr h1 { margin: 0; font-size: 34px; letter-spacing: .3px; }
+  .hdr .sub { margin-top: 6px; font-size: 16px; color: #b9d0ee; }
+  .badges { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; max-width: 780px; }
+  .bg {
+    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.28);
+    padding: 7px 13px; border-radius: 999px; font-size: 14px; font-weight: 600;
+  }
+
+  /* ---------- STAGE ---------- */
+  #stage { position: relative; width: 2340px; margin: 22px auto 0; }
+  #lines { position: absolute; left: 0; top: 0; overflow: visible; }
+
+  .ent {
+    position: absolute; width: 360px; background: #fff;
+    border: 2px solid #cbd5e1; border-radius: 10px; overflow: hidden;
+    box-shadow: 0 4px 12px rgba(15,23,42,.10); z-index: 3;
+  }
+  .ent .th {
+    padding: 9px 12px; color: #fff; font-size: 17px; font-weight: 700;
+    display: flex; justify-content: space-between; align-items: center;
+    letter-spacing: .2px;
+  }
+  .ent .th .mod { font-size: 10.5px; font-weight: 600; opacity: .85; text-transform: uppercase; }
+  .ent .body { padding: 5px 0 6px; }
+
+  .fr { display: flex; justify-content: space-between; align-items: baseline;
+        padding: 3px 12px 0; gap: 8px; }
+  .fn { font-size: 13.5px; font-weight: 600; color: #1e293b; white-space: nowrap;
+        display: flex; align-items: center; gap: 6px; }
+  .ft { font-size: 12px; color: #475569; font-family: Consolas, monospace; white-space: nowrap; }
+  .kn { font-size: 9.5px; font-weight: 800; padding: 1px 5px; border-radius: 4px;
+        color: #fff; letter-spacing: .4px; }
+  .kn.pk { background: #b45309; }
+  .kn.fk { background: #1d4ed8; }
+  .note { font-size: 11px; color: #64748b; padding: 0 12px 2px; text-align: right;
+          font-family: Consolas, monospace; }
+  .idx {
+    margin-top: 6px; padding: 6px 12px; background: #f1f5f9;
+    border-top: 1px dashed #cbd5e1; font-size: 11.5px; color: #334155; line-height: 1.45;
+  }
+  .idx b { color: #0f172a; }
+
+  /* ---------- BOTTOM PANELS ---------- */
+  .panels { max-width: 2340px; margin: 26px auto 0; display: grid;
+            grid-template-columns: 1.05fr 1.35fr 1fr; gap: 18px; }
+  .card { background: #fff; border: 1px solid #dbe3ec; border-radius: 12px;
+          padding: 16px 18px; box-shadow: 0 3px 10px rgba(15,23,42,.06); }
+  .card h3 { margin: 0 0 10px; font-size: 16px; color: #0b2545;
+             border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
+  .card ul { margin: 0; padding-left: 18px; }
+  .card li { font-size: 13px; margin-bottom: 5px; line-height: 1.45; }
+  .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
+  .lg { display: flex; align-items: center; gap: 9px; font-size: 13px; }
+  .kbd { font-weight: 800; font-size: 11px; padding: 2px 7px; border-radius: 5px; color: #fff; }
+  table.rel { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.rel th { background: #0b2545; color: #fff; text-align: left; padding: 6px 8px; font-size: 12px; }
+  table.rel td { border-bottom: 1px solid #e8eef5; padding: 5px 8px; vertical-align: top; }
+  table.rel tr:nth-child(even) td { background: #f7fafd; }
+  .foot { max-width: 2340px; margin: 18px auto 0; font-size: 12.5px; color: #475569;
+          text-align: center; }
+  .chip { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11.5px;
+          font-weight: 700; color: #fff; margin-right: 6px; }
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div>
+    <h1>SisPeruGym &mdash; Diagrama Entidad-Relaci&oacute;n (Modelo Relacional)</h1>
+    <div class="sub">Sistema de Gesti&oacute;n de Gimnasio &middot; Conversi&oacute;n desde MongoDB + Mongoose &rarr; SQL (MySQL / PostgreSQL) &middot; Notaci&oacute;n Crow's Foot</div>
+  </div>
+  <div class="badges">
+    <span class="bg">15 tablas</span>
+    <span class="bg">18 relaciones</span>
+    <span class="bg">12 colecciones &rarr; 3 tablas derivadas</span>
+    <span class="bg">PK / FK / UNIQUE / CHECK / &Iacute;ndices</span>
+  </div>
+</div>
+
+<div id="stage">
+  <svg id="lines"></svg>
+</div>
+
+<div class="panels">
+
+  <div class="card">
+    <h3>Leyenda</h3>
+    <div class="legend">
+      <div class="lg"><span class="kbd" style="background:#b45309">PK</span> Clave primaria</div>
+      <div class="lg"><span class="kbd" style="background:#1d4ed8">FK</span> Clave for&aacute;nea</div>
+      <div class="lg"><span class="kbd" style="background:#64748b">UQ</span> &Uacute;nico / &iacute;ndice</div>
+      <div class="lg"><span class="kbd" style="background:#0f766e">NN</span> Not null</div>
+      <div class="lg"><svg width="46" height="16"><line x1="2" y1="8" x2="44" y2="8" stroke="#334155" stroke-width="2"/><line x1="44" y1="1" x2="44" y2="15" stroke="#334155" stroke-width="2"/></svg> Relaci&oacute;n "1"</div>
+      <div class="lg"><svg width="46" height="16"><line x1="2" y1="8" x2="44" y2="8" stroke="#334155" stroke-width="2"/><path d="M44 8 L30 1 M44 8 L30 8 M44 8 L30 15" stroke="#334155" stroke-width="2" fill="none"/></svg> Relaci&oacute;n "N"</div>
+      <div class="lg"><svg width="46" height="16"><line x1="2" y1="8" x2="34" y2="8" stroke="#334155" stroke-width="2"/><circle cx="38" cy="8" r="4" fill="#fff" stroke="#334155" stroke-width="2"/><path d="M44 8 L34 3 M44 8 L34 8 M44 8 L34 13" stroke="#334155" stroke-width="2" fill="none"/></svg> Opcional (FK anulable)</div>
+      <div class="lg"><span class="chip" style="background:#4f46e5">Acceso</span></div>
+      <div class="lg"><span class="chip" style="background:#059669">Clientes</span></div>
+      <div class="lg"><span class="chip" style="background:#d97706">Caja</span></div>
+      <div class="lg"><span class="chip" style="background:#e11d48">Ventas</span></div>
+      <div class="lg"><span class="chip" style="background:#7c3aed">Leads</span></div>
+      <div class="lg"><span class="chip" style="background:#0891b2">Derivada</span></div>
+    </div>
+    <h3 style="margin-top:16px">Transformaci&oacute;n MongoDB &rarr; SQL</h3>
+    <ul>
+      <li><b>ObjectId + ref &rarr;</b> FK <code>CHAR(24)</code> (o surrogate <code>BIGINT</code>).</li>
+      <li><b>Arreglo embebido <code>ventas.items[]</code> &rarr;</b> tabla <b>venta_detalle</b> (relaci&oacute;n N:M).</li>
+      <li><b><code>usuario.permisos[]</code> &rarr;</b> tabla uni&oacute;n <b>usuario_permisos</b>.</li>
+      <li><b><code>plan.caracteristicas[]</code> &rarr;</b> tabla uni&oacute;n <b>plan_caracteristicas</b>.</li>
+      <li><b><code>LandingConfig._id='singleton'</code> &rarr;</b> tabla de 1 fila.</li>
+      <li><b><code>enum</code> &rarr;</b> CHECK; <b><code>timestamps</code> &rarr;</b> <code>created_at</code> / <code>updated_at</code>.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Relaciones (18) &mdash; cardinalidad y FK responsable</h3>
+    <table class="rel">
+      <tr><th>#</th><th>Relaci&oacute;n</th><th>Card.</th><th>FK</th><th>Nota</th></tr>
+      <tr><td>1</td><td>clientes &rarr; membresias</td><td>1 : N</td><td>membresias.cliente_id</td><td>NOT NULL</td></tr>
+      <tr><td>2</td><td>planes &rarr; membresias</td><td>1 : N</td><td>membresias.plan_id</td><td>NOT NULL</td></tr>
+      <tr><td>3</td><td>clientes &rarr; pagos</td><td>1 : N</td><td>pagos.cliente_id</td><td>Historial de pagos</td></tr>
+      <tr><td>4</td><td>membresias &rarr; pagos</td><td>1 : N</td><td>pagos.membresia_id</td><td>Abonos (es_abono / numero_abono / total_esperado)</td></tr>
+      <tr><td>5</td><td>cajas &rarr; pagos</td><td>1 : 0..N</td><td>pagos.caja_id</td><td>FK anulable (pago fuera de caja)</td></tr>
+      <tr><td>6</td><td>clientes &rarr; asistencias</td><td>1 : N</td><td>asistencias.cliente_id</td><td>NOT NULL</td></tr>
+      <tr><td>7</td><td>usuarios &rarr; cajas</td><td>1 : N</td><td>cajas.usuario_id</td><td>Qui&eacute;n abre/cierra</td></tr>
+      <tr><td>8</td><td>cajas &rarr; movimientos_caja</td><td>1 : N</td><td>movimientos_caja.caja_id</td><td>NOT NULL</td></tr>
+      <tr><td>9</td><td>usuarios &rarr; movimientos_caja</td><td>1 : N</td><td>movimientos_caja.usuario_id</td><td>Auditor&iacute;a</td></tr>
+      <tr><td>10</td><td>cajas &rarr; ventas</td><td>1 : N</td><td>ventas.caja_id</td><td>NOT NULL</td></tr>
+      <tr><td>11</td><td>clientes &rarr; ventas</td><td>1 : 0..N</td><td>ventas.cliente_id</td><td>FK anulable (venta a mostrador)</td></tr>
+      <tr><td>12</td><td>ventas &rarr; venta_detalle</td><td>1 : N</td><td>venta_detalle.venta_id</td><td>ON DELETE CASCADE</td></tr>
+      <tr><td>13</td><td>productos &rarr; venta_detalle</td><td>1 : N</td><td>venta_detalle.producto_id</td><td>Descuenta stock (UNIQUE venta_id+producto_id)</td></tr>
+      <tr><td>14</td><td>planes &rarr; solicitudes</td><td>1 : N</td><td>solicitudes.plan_id</td><td>Lead interesado en el plan</td></tr>
+      <tr><td>15</td><td>usuarios &rarr; solicitudes</td><td>1 : 0..N</td><td>solicitudes.atendido_por</td><td>FK anulable (usuario que atiende)</td></tr>
+      <tr><td>16</td><td>clientes &rarr; solicitudes</td><td>1 : 0..1</td><td>solicitudes.cliente_id</td><td>Conversi&oacute;n lead &rarr; cliente</td></tr>
+      <tr><td>17</td><td>usuarios &rarr; usuario_permisos</td><td>1 : N</td><td>usuario_permisos.usuario_id</td><td>PK compuesta</td></tr>
+      <tr><td>18</td><td>planes &rarr; plan_caracteristicas</td><td>1 : N</td><td>plan_caracteristicas.plan_id</td><td>PK compuesta</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Reglas de negocio reflejadas en el modelo</h3>
+    <ul>
+      <li><b>Ciclo de caja:</b> <code>cajas</code> agrupa <b>pagos</b>, <b>ventas</b> y <b>movimientos_caja</b>; abre/cierra un <b>usuario</b> (apertura, cierre, monto_inicial, monto_final, total_ingresos).</li>
+      <li><b>Membres&iacute;a:</b> cliente + plan + (fecha_inicio, fecha_fin) + estado. &Iacute;ndice <code>(fecha_fin, estado)</code> soporta el auto-vencimiento.</li>
+      <li><b>Pagos fraccionados:</b> un pago puede ser abono de una membres&iacute;a; <code>numero_abono</code> y <code>total_esperado</code> validan que la suma de abonos = <code>monto_total</code>.</li>
+      <li><b>Inventario:</b> cada venta descuenta <code>productos.stock</code> en transacci&oacute;n at&oacute;mica.</li>
+      <li><b>Anulaci&oacute;n:</b> <code>ventas.anulada + anulada_at</code> marca sin borrar (auditor&iacute;a).</li>
+      <li><b>Lead &rarr; cliente:</b> <code>solicitudes.estado='convertido'</code> enlaza <code>cliente_id</code> y opcionalmente crea la membres&iacute;a con su <code>estado_pago</code>.</li>
+      <li><b>Movimiento r&aacute;pido:</b> <code>movimientos_caja.es_rutina=true</code> marca el ingreso expr&eacute;s de un cliente (no existe tabla de rutinas).</li>
+      <li><b>M&eacute;todo de pago:</b> uniforme en pagos, ventas y movimientos: efectivo | yape | plin | transferencia.</li>
+    </ul>
+    <h3 style="margin-top:16px">Advertencias de integridad</h3>
+    <ul>
+      <li>Todas las FK con <code>ON DELETE RESTRICT</code>, salvo <code>venta_detalle</code> (<code>CASCADE</code>).</li>
+      <li>&Uacute;nica caja abierta a la vez: <code>UNIQUE parcial WHERE estado='abierta'</code>.</li>
+      <li><code>asistencias.fecha</code> normalizada a medianoche; <code>salida &gt;= entrada</code>.</li>
+      <li><code>movimientos_caja.monto &gt;= 0.01</code> y <code>ventas.total</code> = suma de <code>subtotal</code>.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="foot">
+  SisPeruGym &middot; Diagrama ER generado a partir de los 12 modelos Mongoose reales (<code>models/*.js</code>) + 3 tablas derivadas por desnormalizaci&oacute;n (venta_detalle, usuario_permisos, plan_caracteristicas).
+</div>
+
+<script>
+/* ================= DATOS (fiel a models/*.js) ================= */
+const COLS = [60, 520, 980, 1440, 1900];
+const ROWS = [210, 830, 1450];
+const BW = 360;
+
+const MOD = {
+  acceso:  { c: '#4f46e5', n: 'Acceso / Config' },
+  personas:{ c: '#059669', n: 'Clientes / Planes' },
+  caja:    { c: '#d97706', n: 'Caja / Finanzas' },
+  ventas:  { c: '#e11d48', n: 'Ventas / Inventario' },
+  leads:   { c: '#7c3aed', n: 'Marketing / Leads' },
+  deriv:   { c: '#0891b2', n: 'Tabla derivada' }
+};
+
+/* f: [tipo, nombre, key, nota]  key: 'PK' | 'FK' | 'PK,FK' | '' */
+const ENT = [
+  { t:'landing_config', m:'acceso', c:0, r:0, f:[
+      ['VARCHAR(10)','id','PK',"'singleton' (1 sola fila)"],
+      ['VARCHAR(500)','logo_url','','NULL'],
+      ['VARCHAR(500)','about_logo_url','','NULL'],
+      ['VARCHAR(500)','hero_bg_url','','NULL'],
+      ['VARCHAR(500)','about_img_url','','NULL']
+    ], i:'Tabla de configuraci&oacute;n visual de la landing (sin relaciones FK).' },
+
+  { t:'planes', m:'personas', c:1, r:0, f:[
+      ['CHAR(24)','plan_id','PK',''],
+      ['VARCHAR(100)','nombre','','NOT NULL'],
+      ['DECIMAL(10,2)','precio','','NOT NULL'],
+      ['INTEGER','duracion_dias','','NOT NULL'],
+      ['TEXT','descripcion','','NULL'],
+      ['BOOLEAN','mostrar_landing','','DEFAULT false'],
+      ['BOOLEAN','destacado','','DEFAULT false'],
+      ['BOOLEAN','activo','','DEFAULT true'],
+      ['TIMESTAMP','created_at','','DEFAULT now']
+    ], i:'&Iacute;ndices: <b>nombre</b>, <b>activo</b> &middot; <b>caracteristicas[]</b> &rarr; tabla <b>plan_caracteristicas</b>' },
+
+  { t:'usuarios', m:'acceso', c:2, r:0, f:[
+      ['CHAR(24)','usuario_id','PK',''],
+      ['VARCHAR(50)','usuario','','NOT NULL &middot; UNIQUE'],
+      ['VARCHAR(150)','email','','NOT NULL &middot; UNIQUE'],
+      ['VARCHAR(255)','password','','NOT NULL (hash bcrypt)'],
+      ['VARCHAR(20)','rol','',"DEFAULT 'recepcionista'"],
+      ['BOOLEAN','activo','','DEFAULT true'],
+      ['TIMESTAMP','created_at','','DEFAULT now']
+    ], i:'CHECK <b>(rol IN (\'admin\',\'recepcionista\'))</b> &middot; <b>permisos[]</b> &rarr; tabla <b>usuario_permisos</b>' },
+
+  { t:'cajas', m:'caja', c:3, r:0, f:[
+      ['CHAR(24)','caja_id','PK',''],
+      ['CHAR(24)','usuario_id','FK','&rarr; usuarios &middot; NOT NULL'],
+      ['TIMESTAMP','apertura','','DEFAULT now'],
+      ['TIMESTAMP','cierre','','NULL (al cerrar)'],
+      ['DECIMAL(10,2)','monto_inicial','','DEFAULT 0'],
+      ['DECIMAL(10,2)','monto_final','','NULL'],
+      ['DECIMAL(10,2)','total_ingresos','','DEFAULT 0'],
+      ['VARCHAR(10)','estado','',"DEFAULT 'abierta'"],
+      ['TEXT','notas','','NULL']
+    ], i:'CHECK <b>(estado IN (\'abierta\',\'cerrada\'))</b> &middot; &Iacute;ndice: <b>usuario_id, estado</b> &middot; <b>UNIQUE parcial: solo 1 caja \'abierta\'</b>' },
+
+  { t:'productos', m:'ventas', c:4, r:0, f:[
+      ['CHAR(24)','producto_id','PK',''],
+      ['VARCHAR(150)','nombre','','NOT NULL'],
+      ['VARCHAR(50)','categoria','','NULL'],
+      ['DECIMAL(10,2)','precio_venta','','NOT NULL'],
+      ['INTEGER','stock','','DEFAULT 0'],
+      ['TEXT','descripcion','','NULL'],
+      ['VARCHAR(500)','foto_url','','NULL'],
+      ['BOOLEAN','activo','','DEFAULT true'],
+      ['TIMESTAMP','created_at','','DEFAULT now']
+    ], i:'&Iacute;ndice: <b>activo</b> &middot; el stock se descuenta al facturar una venta' },
+
+  { t:'solicitudes', m:'leads', c:0, r:1, f:[
+      ['CHAR(24)','solicitud_id','PK',''],
+      ['VARCHAR(100)','nombre','','NOT NULL'],
+      ['VARCHAR(100)','apellido_paterno','','NULL'],
+      ['VARCHAR(100)','apellido_materno','','NULL'],
+      ['CHAR(8)','dni','','NULL'],
+      ['VARCHAR(20)','telefono','','NOT NULL'],
+      ['VARCHAR(150)','email','','NULL'],
+      ['CHAR(24)','plan_id','FK','&rarr; planes &middot; NOT NULL'],
+      ['VARCHAR(15)','estado','',"DEFAULT 'pendiente'"],
+      ['TEXT','notas','','NULL'],
+      ['CHAR(24)','atendido_por','FK','&rarr; usuarios &middot; NULL'],
+      ['CHAR(24)','cliente_id','FK','&rarr; clientes &middot; NULL (conversi&oacute;n)'],
+      ['TIMESTAMP','created_at','','DEFAULT now'],
+      ['TIMESTAMP','updated_at','','DEFAULT now']
+    ], i:'CHECK <b>(estado IN (\'pendiente\',\'contactado\',\'convertido\',\'descartado\'))</b> &middot; &Iacute;ndices: <b>(estado, created_at)</b>, <b>plan_id</b>, <b>created_at</b>' },
+
+  { t:'plan_caracteristicas', m:'deriv', c:1, r:1, f:[
+      ['CHAR(24)','plan_id','PK,FK','&rarr; planes'],
+      ['INTEGER','orden','PK',''],
+      ['VARCHAR(200)','caracteristica','','NOT NULL']
+    ], i:'Derivada de <b>plan.caracteristicas[]</b> (arreglo en Mongo) &middot; PK compuesta <b>(plan_id, orden)</b>' },
+
+  { t:'usuario_permisos', m:'deriv', c:2, r:1, f:[
+      ['CHAR(24)','usuario_id','PK,FK','&rarr; usuarios'],
+      ['VARCHAR(50)','permiso','PK',''],
+      ['TIMESTAMP','created_at','','DEFAULT now']
+    ], i:'Derivada de <b>usuario.permisos[]</b> (arreglo en Mongo) &middot; PK compuesta <b>(usuario_id, permiso)</b>' },
+
+  { t:'movimientos_caja', m:'caja', c:3, r:1, f:[
+      ['CHAR(24)','movimiento_caja_id','PK',''],
+      ['CHAR(24)','caja_id','FK','&rarr; cajas &middot; NOT NULL'],
+      ['CHAR(24)','usuario_id','FK','&rarr; usuarios &middot; NOT NULL'],
+      ['VARCHAR(10)','tipo','','NOT NULL'],
+      ['DECIMAL(10,2)','monto','','NOT NULL'],
+      ['VARCHAR(200)','concepto','','NOT NULL'],
+      ['VARCHAR(15)','metodo_pago','',"DEFAULT 'efectivo'"],
+      ['BOOLEAN','es_rutina','','DEFAULT false (ingreso expr&eacute;s)'],
+      ['TIMESTAMP','fecha','','DEFAULT now']
+    ], i:'CHECK <b>(tipo IN (\'ingreso\',\'egreso\'))</b>, <b>monto &gt;= 0.01</b>, <b>(metodo_pago IN (\'efectivo\',\'yape\',\'plin\',\'transferencia\'))</b> &middot; &Iacute;ndice: <b>(caja_id, fecha)</b>' },
+
+  { t:'venta_detalle', m:'deriv', c:4, r:1, f:[
+      ['CHAR(24)','venta_detalle_id','PK',''],
+      ['CHAR(24)','venta_id','FK','&rarr; ventas &middot; NOT NULL &middot; CASCADE'],
+      ['CHAR(24)','producto_id','FK','&rarr; productos &middot; NOT NULL'],
+      ['INTEGER','cantidad','','NOT NULL DEFAULT 1'],
+      ['DECIMAL(10,2)','precio_unit','','NOT NULL (historial)'],
+      ['DECIMAL(10,2)','subtotal','','NOT NULL']
+    ], i:'Derivada de <b>ventas.items[]</b> &middot; resuelve la relaci&oacute;n <b>N:M ventas &harr; productos</b> &middot; <b>UNIQUE (venta_id, producto_id)</b>' },
+
+  { t:'asistencias', m:'personas', c:0, r:2, f:[
+      ['CHAR(24)','asistencia_id','PK',''],
+      ['CHAR(24)','cliente_id','FK','&rarr; clientes &middot; NOT NULL'],
+      ['TIMESTAMP','entrada','','DEFAULT now'],
+      ['TIMESTAMP','salida','','NULL (check-out)'],
+      ['DATE','fecha','','DEFAULT hoy (00:00:00)']
+    ], i:'CHECK <b>salida &gt;= entrada</b> &middot; &Iacute;ndice: <b>(cliente_id, fecha)</b>' },
+
+  { t:'membresias', m:'personas', c:1, r:2, f:[
+      ['CHAR(24)','membresia_id','PK',''],
+      ['CHAR(24)','cliente_id','FK','&rarr; clientes &middot; NOT NULL'],
+      ['CHAR(24)','plan_id','FK','&rarr; planes &middot; NOT NULL'],
+      ['TIMESTAMP','fecha_inicio','','NOT NULL'],
+      ['TIMESTAMP','fecha_fin','','NOT NULL'],
+      ['VARCHAR(15)','estado','',"DEFAULT 'activo'"],
+      ['DECIMAL(10,2)','monto_total','','NULL'],
+      ['TIMESTAMP','created_at','','DEFAULT now']
+    ], i:'CHECK <b>(estado IN (\'activo\',\'vencido\',\'cancelado\',\'pendiente\'))</b> &middot; &Iacute;ndices: <b>(cliente_id, estado)</b>, <b>(fecha_fin, estado)</b> &larr; auto-vencimiento, <b>estado</b>' },
+
+  { t:'clientes', m:'personas', c:2, r:2, f:[
+      ['CHAR(24)','cliente_id','PK',''],
+      ['VARCHAR(100)','nombre','','NOT NULL'],
+      ['VARCHAR(100)','apellido_paterno','','NULL'],
+      ['VARCHAR(100)','apellido_materno','','NULL'],
+      ['CHAR(8)','dni','','UNIQUE (sparse)'],
+      ['VARCHAR(150)','email','','NULL'],
+      ['VARCHAR(20)','telefono','','NULL'],
+      ['VARCHAR(500)','foto_url','','NULL'],
+      ['TEXT','notas','','NULL'],
+      ['BOOLEAN','activo','','DEFAULT true'],
+      ['TIMESTAMP','created_at','','DEFAULT now']
+    ], i:'&Iacute;ndice <b>TEXTO</b>: nombre, apellido_paterno, apellido_materno, dni, email &middot; &Iacute;ndice: <b>activo</b>, <b>dni (sparse)</b>' },
+
+  { t:'pagos', m:'caja', c:3, r:2, f:[
+      ['CHAR(24)','pago_id','PK',''],
+      ['CHAR(24)','cliente_id','FK','&rarr; clientes'],
+      ['CHAR(24)','membresia_id','FK','&rarr; membresias'],
+      ['CHAR(24)','caja_id','FK','&rarr; cajas &middot; NULL'],
+      ['DECIMAL(10,2)','monto','','NOT NULL'],
+      ['VARCHAR(15)','metodo_pago','',"DEFAULT 'efectivo'"],
+      ['VARCHAR(10)','estado','',"DEFAULT 'pagado'"],
+      ['TIMESTAMP','fecha_pago','','DEFAULT now'],
+      ['TEXT','notas','','NULL'],
+      ['BOOLEAN','es_abono','','DEFAULT false'],
+      ['INTEGER','numero_abono','','NULL'],
+      ['DECIMAL(10,2)','total_esperado','','NULL (control de abonos)']
+    ], i:'CHECK <b>(metodo_pago IN (\'efectivo\',\'yape\',\'plin\',\'transferencia\'))</b>, <b>(estado IN (\'pagado\',\'pendiente\'))</b> &middot; &Iacute;ndices: <b>(caja_id, estado)</b>, <b>cliente_id</b>, <b>fecha_pago DESC</b>, <b>estado</b>' },
+
+  { t:'ventas', m:'ventas', c:4, r:2, f:[
+      ['CHAR(24)','venta_id','PK',''],
+      ['CHAR(24)','caja_id','FK','&rarr; cajas &middot; NOT NULL'],
+      ['CHAR(24)','cliente_id','FK','&rarr; clientes &middot; NULL'],
+      ['VARCHAR(15)','metodo_pago','',"DEFAULT 'efectivo'"],
+      ['TIMESTAMP','fecha_venta','','DEFAULT now'],
+      ['BOOLEAN','anulada','','DEFAULT false'],
+      ['TIMESTAMP','anulada_at','','NULL']
+    ], i:'CHECK <b>(metodo_pago IN (\'efectivo\',\'yape\',\'plin\',\'transferencia\'))</b> &middot; &Iacute;ndices: <b>caja_id</b>, <b>fecha_venta DESC</b>, <b>anulada</b> &middot; los &iacute;tems viven en <b>venta_detalle</b>' }
+];
+
+/* Rutas: side = lado de salida/entrada; field = fila exacta (FK); off = desplazamiento */
+const REL = [
+  { a:{e:'clientes',   s:'left',  f:'cliente_id'},  b:{e:'membresias', s:'right', f:'cliente_id'}, mid:'g23',  ca:'1', cb:'N', lb:'tiene' },
+  { a:{e:'planes',     s:'left',  off:-14},          b:{e:'membresias', s:'left',  f:'plan_id'},     mid:'g12b', ca:'1', cb:'N', lb:'define' },
+  { a:{e:'clientes',   s:'right', f:'cliente_id'},  b:{e:'pagos',      s:'left',  f:'cliente_id'},  mid:'g34a', ca:'1', cb:'N', lb:'genera' },
+  { a:{e:'membresias', s:'bottom'},                   b:{e:'pagos',      s:'bottom',f:'membresia_id'},band:'b3a', ca:'1', cb:'N', lb:'se paga en' },
+  { a:{e:'cajas',      s:'left',  off:14},            b:{e:'pagos',      s:'left',  f:'caja_id'},     mid:'g34b', ca:'1', cb:'0..N', opt:'b', lb:'contiene' },
+  { a:{e:'clientes',   s:'bottom', off:-55},          b:{e:'asistencias',s:'bottom',f:'cliente_id'},  band:'b3b', ca:'1', cb:'N', lb:'asiste' },
+  { a:{e:'usuarios',   s:'right', off:-14},           b:{e:'cajas',      s:'left',  f:'usuario_id'},  mid:'g34c', ca:'1', cb:'N', lb:'opera' },
+  { a:{e:'cajas',      s:'bottom'},                   b:{e:'movimientos_caja', s:'top', f:'caja_id'},  straight:true, ca:'1', cb:'N', lb:'registra' },
+  { a:{e:'usuarios',   s:'right', off:14},            b:{e:'movimientos_caja', s:'left', f:'usuario_id'}, mid:'g34d', ca:'1', cb:'N', lb:'autoriza' },
+  { a:{e:'cajas',      s:'right'},                    b:{e:'ventas',     s:'left',  f:'caja_id'},     mid:'g45',  ca:'1', cb:'N', lb:'contiene' },
+  { a:{e:'clientes',   s:'bottom', off:55},           b:{e:'ventas',     s:'bottom',f:'cliente_id'},  band:'b3c', ca:'1', cb:'0..N', opt:'b', lb:'compra en' },
+  { a:{e:'ventas',     s:'top'},                     b:{e:'venta_detalle', s:'bottom', f:'venta_id'}, straight:true, ca:'1', cb:'N', lb:'detalla' },
+  { a:{e:'productos',  s:'bottom'},                   b:{e:'venta_detalle', s:'top', f:'producto_id'}, straight:true, ca:'1', cb:'N', lb:'se vende' },
+  { a:{e:'planes',     s:'left',  off:14},            b:{e:'solicitudes',s:'right', f:'plan_id'},     mid:'g12a', ca:'1', cb:'N', lb:'genera lead' },
+  { a:{e:'usuarios',   s:'bottom', off:-50},          b:{e:'solicitudes',s:'top',   f:'atendido_por'},band:'b12', ca:'1', cb:'0..N', opt:'b', lb:'atiende' },
+  { a:{e:'solicitudes',s:'bottom'},                   b:{e:'clientes',   s:'top',   f:'cliente_id'},  band:'b23', ca:'1', cb:'0..1', opt:'b', lb:'convierte en' },
+  { a:{e:'usuarios',   s:'bottom', off:50},           b:{e:'usuario_permisos', s:'top', f:'usuario_id'}, straight:true, ca:'1', cb:'N', lb:'otorga' },
+  { a:{e:'planes',     s:'bottom'},                   b:{e:'plan_caracteristicas', s:'top', f:'plan_id'}, straight:true, ca:'1', cb:'N', lb:' describe' }
+];
+
+/* ================= RENDER CAJAS ================= */
+const stage = document.getElementById('stage');
+ENT.forEach(e => {
+  const color = MOD[e.m].c;
+  const d = document.createElement('div');
+  d.className = 'ent';
+  d.id = 'e_' + e.t;
+  d.style.left = COLS[e.c] + 'px';
+  d.style.top  = ROWS[e.r] + 'px';
+  let html = '<div class="th" style="background:' + color + '">' +
+             '<span>' + e.t + '</span><span class="mod">' + MOD[e.m].n + '</span></div><div class="body">';
+  e.f.forEach(f => {
+    const [type, name, key, note] = f;
+    let badge = '';
+    if (key) {
+      key.split(',').forEach(k => {
+        badge += '<span class="kn ' + (k === 'PK' ? 'pk' : 'fk') + '">' + k + '</span>';
+      });
+    }
+    html += '<div class="fr" data-field="' + e.t + '.' + name + '">' +
+              '<span class="fn">' + badge + name + '</span>' +
+              '<span class="ft">' + type + '</span></div>';
+    if (note) html += '<div class="note">' + note + '</div>';
+  });
+  html += '</div>';
+  if (e.i) html += '<div class="idx"><b>&Iacute;ndices / CHECKs:</b> ' + e.i + '</div>';
+  d.innerHTML = html;
+  stage.appendChild(d);
+});
+
+/* ================= GEOMETRÍA ================= */
+/* Fila 3 se desplaza para dejar banda de enrutado entre filas */
+(function () {
+  const stTop = stage.getBoundingClientRect().top;
+  const maxR1 = Math.max(...ENT.filter(e => e.r === 1)
+                     .map(e => document.getElementById('e_' + e.t).getBoundingClientRect().bottom));
+  const newTop = (maxR1 - stTop) + 110;
+  ENT.filter(e => e.r === 2).forEach(e => {
+    document.getElementById('e_' + e.t).style.top = newTop + 'px';
+  });
+})();
+
+const G = { g12a:470, g12b:443, g23:930, g34a:1368, g34b:1415, g34c:1352, g34d:1400, g45:1850 };
+const st = stage.getBoundingClientRect();
+const OX = st.left + scrollX, OY = st.top + scrollY;
+const rects = {};
+ENT.forEach(e => {
+  const el = document.getElementById('e_' + e.t);
+  const r = el.getBoundingClientRect();
+  const x = r.left + scrollX - OX, y = r.top + scrollY - OY;
+  rects[e.t] = { x: x, y: y, w: r.width, h: r.height,
+                 cx: x + r.width / 2, cy: y + r.height / 2,
+                 get right(){ return this.x + this.w; },
+                 get bottom(){ return this.y + this.h; } };
+});
+
+function fieldY(ent, field) {
+  const el = document.querySelector('[data-field="' + ent + '.' + field + '"]');
+  if (!el) return rects[ent].cy;
+  const r = el.getBoundingClientRect();
+  return r.top + scrollY - OY + r.height / 2;
+}
+function anchor(a) {
+  const R = rects[a.e];
+  const off = a.off || 0;
+  let x, y;
+  if (a.s === 'left')  { x = R.x;      y = a.f ? fieldY(a.e, a.f) : R.cy; y += off; }
+  if (a.s === 'right') { x = R.right;  y = a.f ? fieldY(a.e, a.f) : R.cy; y += off; }
+  if (a.s === 'top')   { y = R.y;      x = a.f ? (R.x + R.w * 0.5) : R.cx; x += off; }
+  if (a.s === 'bottom'){ y = R.bottom; x = a.f ? (R.x + R.w * 0.5) : R.cx; x += off; }
+  return { x, y, side: a.s };
+}
+function dirTo(side) { // dirección hacia fuera de la caja
+  return { left:{dx:-1,dy:0}, right:{dx:1,dy:0}, top:{dx:0,dy:-1}, bottom:{dx:0,dy:1} }[side];
+}
+
+const maxB1 = Math.max(...ENT.filter(e=>e.r===0).map(e=>rects[e.t].bottom));
+const maxB2 = Math.max(...ENT.filter(e=>e.r===1).map(e=>rects[e.t].bottom));
+const maxB3 = Math.max(...ENT.filter(e=>e.r===2).map(e=>rects[e.t].bottom));
+const BAND = { b12: maxB1 + 34, b23: maxB2 + 34, b3a: maxB3 + 34, b3b: maxB3 + 74, b3c: maxB3 + 114 };
+const stageH = maxB3 + 165;
+stage.style.height = stageH + 'px';
+
+const svg = document.getElementById('lines');
+svg.setAttribute('width', 2340);
+svg.setAttribute('height', stageH);
+const NS = 'http://www.w3.org/2000/svg';
+
+function ptsToPath(p) { return p.map((q,i) => (i ? 'L' : 'M') + q.x.toFixed(1) + ' ' + q.y.toFixed(1)).join(' '); }
+
+function buildPath(rel) {
+  const A = anchor(rel.a), B = anchor(rel.b);
+  const p = [A];
+  if (rel.straight) { p.push({ x: B.x, y: B.y }); }
+  else if (rel.mid) {
+    const gx = G[rel.mid];
+    p.push({ x: gx, y: A.y });
+    p.push({ x: gx, y: B.y });
+    p.push(B);
+  } else if (rel.band) {
+    const by = BAND[rel.band];
+    const band = { x: A.x, y: by };
+    if (A.side === 'bottom') { p.push(band); p.push({ x: B.x, y: by }); }
+    else { p.push({ x: A.x, y: by }); p.push({ x: B.x, y: by }); }
+    p.push(B);
+  }
+  return p;
+}
+
+function marker(p0, p, end, color, label) {
+  const g = document.createElementNS(NS, 'g');
+  const dx = p.x - p0.x, dy = p.y - p0.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  const nx = -uy, ny = ux;
+  const mk = (x1,y1,x2,y2) => {
+    const l = document.createElementNS(NS, 'line');
+    l.setAttribute('x1',x1); l.setAttribute('y1',y1);
+    l.setAttribute('x2',x2); l.setAttribute('y2',y2);
+    l.setAttribute('stroke', color); l.setAttribute('stroke-width', 2.4);
+    l.setAttribute('stroke-linecap','round');
+    g.appendChild(l);
+  };
+  const many = end === 'N' || end === '0..N' || end === '0..1';
+  if (many) {
+    if (end === '0..1' || end === '0..N') {           // círculo = opcional
+      const c = document.createElementNS(NS, 'circle');
+      c.setAttribute('cx', p.x - ux*26); c.setAttribute('cy', p.y - uy*26);
+      c.setAttribute('r', 5); c.setAttribute('fill', '#fff');
+      c.setAttribute('stroke', color); c.setAttribute('stroke-width', 2.2);
+      g.appendChild(c);
+    }
+    const bx = p.x - ux*17, by = p.y - uy*17;
+    mk(p.x, p.y, bx + nx*10, by + ny*10);
+    mk(p.x, p.y, bx, by);
+    mk(p.x, p.y, bx - nx*10, by - ny*10);
+  } else {
+    mk(p.x + nx*8, p.y + ny*8, p.x - nx*8, p.y - ny*8);
+    if (end === '0' || end === '0..1') {
+      const c = document.createElementNS(NS, 'circle');
+      c.setAttribute('cx', p.x - ux*18); c.setAttribute('cy', p.y - uy*18);
+      c.setAttribute('r', 5); c.setAttribute('fill', '#fff');
+      c.setAttribute('stroke', color); c.setAttribute('stroke-width', 2.2);
+      g.appendChild(c);
+    }
+  }
+  if (label) {                                 // texto "1" / "N"
+    const t = document.createElementNS(NS, 'text');
+    t.setAttribute('x', p.x - ux*34 + nx*15);
+    t.setAttribute('y', p.y - uy*34 + ny*15);
+    t.setAttribute('font-size', 15); t.setAttribute('font-weight', 800);
+    t.setAttribute('fill', color); t.setAttribute('text-anchor', 'middle');
+    t.setAttribute('font-family', 'Segoe UI, sans-serif');
+    t.textContent = label;
+    g.appendChild(t);
+  }
+  return g;
+}
+
+function midLabel(pts, text) {
+  let total = 0; const segs = [];
+  for (let i = 1; i < pts.length; i++) {
+    const d = Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y);
+    segs.push(d); total += d;
+  }
+  let acc = 0, target = total / 2, x = pts[0].x, y = pts[0].y;
+  for (let i = 0; i < segs.length; i++) {
+    if (acc + segs[i] >= target) {
+      const t = segs[i] ? (target - acc) / segs[i] : 0;
+      x = pts[i].x + (pts[i+1].x - pts[i].x) * t;
+      y = pts[i].y + (pts[i+1].y - pts[i].y) * t;
+      break;
+    }
+    acc += segs[i];
+  }
+  const g = document.createElementNS(NS, 'g');
+  const w = text.length * 7.2 + 14;
+  const r = document.createElementNS(NS, 'rect');
+  r.setAttribute('x', x - w/2); r.setAttribute('y', y - 11);
+  r.setAttribute('width', w); r.setAttribute('height', 22);
+  r.setAttribute('rx', 11); r.setAttribute('fill', '#ffffff');
+  r.setAttribute('stroke', '#cbd5e1'); r.setAttribute('stroke-width', 1);
+  g.appendChild(r);
+  const t = document.createElementNS(NS, 'text');
+  t.setAttribute('x', x); t.setAttribute('y', y + 5);
+  t.setAttribute('text-anchor', 'middle'); t.setAttribute('font-size', 12.5);
+  t.setAttribute('font-weight', 700); t.setAttribute('fill', '#334155');
+  t.setAttribute('font-family', 'Segoe UI, sans-serif');
+  t.textContent = text;
+  g.appendChild(t);
+  return g;
+}
+
+/* Altura total del documento + detector de colisiones (línea vs caja) */
+function segHits(x1,y1,x2,y2, r) {           // Liang-Barsky
+  let t0 = 0, t1 = 1;
+  const dx = x2 - x1, dy = y2 - y1;
+  const p = [-dx, dx, -dy, dy];
+  const q = [x1 - r.x, r.x + r.w - x1, y1 - r.y, r.y + r.h - y1];
+  for (let i = 0; i < 4; i++) {
+    if (p[i] === 0) { if (q[i] < 0) return false; }
+    else {
+      const t = q[i] / p[i];
+      if (p[i] < 0) { if (t > t1) return false; if (t > t0) t0 = t; }
+      else { if (t < t0) return false; if (t < t1) t1 = t; }
+    }
+  }
+  return true;
+}
+function detectCollisions() {
+  const bad = [];
+  REL.forEach(rel => {
+    const pts = buildPath(rel);
+    for (let i = 1; i < pts.length; i++) {
+      ENT.forEach(e => {
+        const R = rects[e.t];
+        const inner = { x: R.x + 5, y: R.y + 5, w: R.w - 10, h: R.h - 10 };
+        if (segHits(pts[i-1].x, pts[i-1].y, pts[i].x, pts[i].y, inner)) {
+          bad.push(rel.lb.trim() + '>' + e.t);
+        }
+      });
+    }
+  });
+  return [...new Set(bad)];
+}
+setTimeout(() => {
+  const c = detectCollisions();
+  document.title = 'H:' + Math.ceil(document.body.scrollHeight) +
+                   '|X:' + (c.length ? c.join(',') : 'ninguna');
+}, 80);
+
+REL.forEach(rel => {
+  const pts = buildPath(rel);
+  const color = MOD[ENT.find(e => e.t === rel.a.e).m].c;
+  const path = document.createElementNS(NS, 'path');
+  path.setAttribute('d', ptsToPath(pts));
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', color);
+  path.setAttribute('stroke-width', 2.6);
+  path.setAttribute('stroke-linejoin', 'round');
+  svg.appendChild(path);
+  svg.appendChild(marker(pts[pts.length-2], pts[pts.length-1], rel.cb, color, rel.cb));
+  svg.appendChild(marker(pts[1], pts[0], rel.ca, color, rel.ca));
+  svg.appendChild(midLabel(pts, rel.lb));
+});
+</script>
+</body>
+</html>
