@@ -64,6 +64,7 @@ const verifyToken = async (req, res, next) => {
   let decoded;
   try {
     decoded = jwt.verify(token, process.env.JWT_SECRET || 'test-secret');
+    if (decoded.purpose) throw new Error('El token no corresponde a una sesión');
   } catch (jwtError) {
     // Token inválido o expirado → 401 SIEMPRE (antes era 403).
     // El cliente (api.js) solo cierra sesión ante un 401; con un 403 mostraba
@@ -84,8 +85,8 @@ const verifyToken = async (req, res, next) => {
       return res.status(401).json({ error: 'Usuario inactivo o eliminado' });
     }
 
-    // Rol y permisos frescos desde la BD: el token puede llevar datos de hace
-    // hasta 7 días. Así, si a un usuario le quitan permisos, el cambio surte
+    // Rol y permisos frescos desde la BD: el token puede llevar datos antiguos.
+    // Así, si a un usuario le quitan permisos, el cambio surte
     // efecto en la siguiente petición y no cuando venza su token.
     req.user = {
       ...decoded,

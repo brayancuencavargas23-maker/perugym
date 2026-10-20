@@ -23,7 +23,7 @@ const api = {
         // no sesión expirada — dejar que el catch normal maneje el error
         if (path === '/auth/login') {
           const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || 'Usuario o contraseña incorrectos');
+          throw new Error(errData.error || 'Correo o contraseña incorrectos');
         }
         // Cualquier otro 401 → token inválido/expirado o usuario desactivado
         // → forzar logout. Limpiamos TODO el sessionStorage (gym_cache y

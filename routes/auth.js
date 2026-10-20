@@ -5,6 +5,13 @@ const Usuario = require('../models/Usuario');
 const { verifyToken, requireRole, isDeveloperUser } = require('../middleware/auth');
 const { validators, handleValidationErrors } = require('../middleware/validation');
 const { param } = require('express-validator');
+const rateLimit = require('express-rate-limit');
+
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30,
+  skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Demasiados intentos. Intenta nuevamente en 15 minutos.' } });
+router.use('/login', authLimiter);
+router.use('/google', authLimiter, require('./googleAuth'));
 
 /**
  * Logout: aunque JWT es stateless, este endpoint permite al cliente
@@ -22,27 +29,29 @@ router.post('/logout', verifyToken, (req, res) => {
 });
 
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
+  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const { password } = req.body;
+  if (!email || typeof password !== 'string' || !password) return res.status(400).json({ error: 'Correo y contraseña son requeridos' });
   try {
     // Verificar usuario desarrollador (definido en .env, invisible en la BD)
     const devUsername = process.env.DEV_USERNAME;
     const devEmail    = process.env.DEV_EMAIL;
     const devHash     = process.env.DEV_PASSWORD_HASH;
 
-    if (devUsername && devHash && username === devUsername) {
+    if (devEmail && devHash && email === devEmail.trim().toLowerCase()) {
       const match = await bcrypt.compare(password, devHash);
       if (!match) return res.status(401).json({ error: 'Credenciales inválidas' });
 
       const token = jwt.sign(
         { id: 'dev', name: devUsername, email: devEmail, role: 'admin', permisos: [] },
         process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        { expiresIn: process.env.JWT_EXPIRES_IN || '12h' }
       );
       return res.json({ token, user: { id: 'dev', name: devUsername, email: devEmail, role: 'admin', permisos: [] } });
     }
 
     // Flujo normal para usuarios de la BD
-    const user = await Usuario.findOne({ usuario: username, activo: true });
+    const user = await Usuario.findOne({ email, activo: true });
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
@@ -50,7 +59,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { id: user._id, name: user.usuario, email: user.email, role: user.rol, permisos },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      { expiresIn: process.env.JWT_EXPIRES_IN || '12h' }
     );
     res.json({ token, user: { id: user._id, name: user.usuario, email: user.email, role: user.rol, permisos } });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -59,9 +68,8 @@ router.post('/login', async (req, res) => {
 /**
  * Renovación deslizante de sesión.
  * Mientras el token actual siga siendo válido, emitimos uno nuevo con los
- * datos frescos de la BD. Así la sesión se extiende mientras haya actividad
- * y ya no se corta en seco a los 7 días exactos (el usuario solo pierde la
- * sesión si pasa 7 días sin usar el sistema o si lo desactivan).
+ * datos frescos de la BD. La vigencia se toma de JWT_EXPIRES_IN (12h por
+ * defecto); el navegador debe renovar antes de que venza el token actual.
  */
 const noStore = {
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -96,7 +104,7 @@ router.post('/refresh', verifyToken, async (req, res) => {
     const token = jwt.sign(
       payload,
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      { expiresIn: process.env.JWT_EXPIRES_IN || '12h' }
     );
     res.json({
       token,

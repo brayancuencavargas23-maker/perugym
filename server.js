@@ -76,7 +76,7 @@ const loginUserLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
-    const user = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
+    const user = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     return user ? `user:${user}` : `ip:${req.ip}`;
   },
   message: { error: 'Demasiados intentos fallidos para esta cuenta. Intenta de nuevo en 15 minutos.' },
@@ -151,20 +151,10 @@ const PORT = process.env.PORT || 3000;
 connectDB()
   .then(async () => {
     if (process.env.DB_MODE !== 'json') {
-      const bcrypt = require('bcryptjs');
-      const Usuario = require('./models/Usuario');
       const Plan = require('./models/Plan');
-
-      const existing = await Usuario.findOne({ email: 'admin@gym.com' });
-      if (!existing) {
-        const hash = await bcrypt.hash('admin123', 10);
-        await Usuario.create({
-          usuario: 'admin',
-          email: 'admin@gym.com',
-          password: hash,
-          rol: 'admin',
-        });
-      }
+      // Las cuentas se administran explícitamente desde el sistema. No crear
+      // un admin por correo al arrancar: el admin existente puede haber cambiado
+      // su dirección y su nombre único impediría iniciar el servidor.
       const count = await Plan.countDocuments();
       if (count === 0) {
         await Plan.insertMany([
