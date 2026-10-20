@@ -1,4 +1,4 @@
-// Datos compartidos por Productos y Compras, sin conservar copias del catálogo.
+// Datos compartidos por los módulos del catálogo (Productos, Inventario), sin conservar copias del catálogo.
 window.GymCatalogo = (() => {
   async function listar(path, signal) {
     const [base, query = ''] = path.split('?');
@@ -20,7 +20,7 @@ window.GymCatalogo = (() => {
   }
 
   function invalidar() {
-    gymCache.invalidateMany(['productos', 'compras', 'inventario', 'dashboard', 'reports']);
+    gymCache.invalidateMany(['productos', 'inventario', 'dashboard', 'reports']);
   }
 
   function hoy() {

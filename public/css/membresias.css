@@ -1,3 +1,181 @@
+/* ── TOOLBAR DE FILTROS (módulo membresías) ── */
+.mem-toolbar { margin-bottom: 16px; padding: 14px 16px; }
+
+/* Fila 1: búsqueda + selects + CTA */
+.mem-toolbar-main {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mem-search {
+  position: relative;
+  flex: 2 1 220px;
+  min-width: 180px;
+}
+.mem-search .form-control { padding-left: 36px; }
+.mem-search .search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-light);
+  display: inline-flex;
+}
+
+.mem-filter-select {
+  flex: 1 1 130px;
+  min-width: 120px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.mem-toolbar-cta {
+  flex: 0 0 auto;
+  margin-left: auto;      /* empuja el CTA al extremo derecho */
+  white-space: nowrap;
+}
+
+/* Fila 2: chips + meta */
+.mem-toolbar-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.mem-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.mem-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-height: 34px;
+}
+.mem-chip:hover { background: var(--bg); border-color: var(--text-light); }
+
+.mem-chip.is-active {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+  font-weight: 600;
+}
+
+.mem-chip-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mem-chip-clear {
+  color: var(--danger);
+  border-color: transparent;
+}
+.mem-chip-clear:hover { background: rgba(239, 68, 68, 0.08); border-color: var(--danger); }
+
+.mem-toolbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.mem-count {
+  font-size: 12px;
+  color: var(--text-light);
+  white-space: nowrap;
+}
+
+/* Fila 3: filtros avanzados colapsables (transición suave) */
+.mem-advanced {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition: grid-template-rows 0.25s ease, opacity 0.25s ease, margin-top 0.25s ease, visibility 0s linear 0.25s;
+  margin-top: 0;
+}
+.mem-advanced.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  transition: grid-template-rows 0.25s ease, opacity 0.25s ease, margin-top 0.25s ease, visibility 0s;
+  margin-top: 12px;
+}
+.mem-advanced-inner {
+  overflow: hidden;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.mem-advanced .form-group {
+  flex: 1 1 180px;
+  margin-bottom: 0;
+}
+.mem-advanced .form-group label { font-size: 12px; }
+
+/* ── RESPONSIVE: MÓVIL (≤767px) ── */
+@media (max-width: 767px) {
+  .mem-toolbar { padding: 12px; }
+
+  /* Fila 1: buscador full-width, selects en 2 columnas, CTA full-width */
+  .mem-toolbar-main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    align-items: stretch;
+  }
+  .mem-search { grid-column: 1 / -1; flex: none; width: 100%; }
+  .mem-filter-select { flex: none; width: 100%; min-height: 44px; font-size: 16px; }
+  /* El 3er select (Vencimiento) ocupa las 2 columnas */
+  .mem-filter-select:nth-of-type(3) { grid-column: 1 / -1; }
+  .mem-toolbar-cta { grid-column: 1 / -1; margin-left: 0; justify-content: center; min-height: 46px; }
+
+  /* Fila 2: chips primero, meta y exportar debajo */
+  .mem-toolbar-sub { flex-direction: column; align-items: stretch; gap: 10px; }
+  .mem-chips { gap: 8px; }
+  .mem-chip { flex: 1 1 auto; justify-content: center; min-height: 40px; font-size: 14px; }
+  .mem-toolbar-meta { margin-left: 0; flex-direction: column; align-items: stretch; gap: 8px; }
+  .mem-count { text-align: center; }
+  .mem-toolbar-meta .btn { width: 100%; justify-content: center; }
+
+  /* Filtros avanzados: apilados (flex-basis no debe aplicar al alto) */
+  .mem-advanced-inner { flex-direction: column; gap: 12px; }
+  .mem-advanced .form-group { flex: none; width: 100%; }
+}
+
+/* ── RESPONSIVE: TABLET (768–1023px) ── */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .mem-toolbar-main { gap: 8px; }
+  .mem-search { flex: 1 1 100%; }          /* buscador en su propia línea */
+  .mem-toolbar-cta { margin-left: auto; }
+}
+
 .renewal-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

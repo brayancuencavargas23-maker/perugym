@@ -15,6 +15,10 @@
     .product-img-placeholder { width:44px; height:44px; border-radius:8px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:20px; }
     .stock-low { color:var(--danger); font-weight:700; }
     .stock-ok  { color:var(--success); font-weight:600; }
+    .prod-margin { margin:-6px 0 14px; padding:9px 13px; border-radius:8px; font-size:13px; font-weight:600; background:var(--bg); border:1px solid var(--border); }
+    .prod-margin.ok    { color:var(--success); border-color:var(--success); }
+    .prod-margin.warn  { color:#b45309; border-color:#f59e0b; }
+    .prod-margin.bad   { color:var(--danger); border-color:var(--danger); }
   </style>
 </head>
 <body>
@@ -144,10 +148,14 @@
         </div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Precio (S/) *</label><input type="number" id="prod-price" class="form-control" step="0.01" required></div>
-        <div class="form-group"><label>Stock inicial</label><input type="number" id="prod-stock" class="form-control" value="0" min="0"><small id="prod-stock-hint" hidden>El stock se modifica con <strong>Entrada</strong> o <strong>Ajustar</strong> desde el inventario (requiere motivo).</small></div>
+        <div class="form-group"><label for="prod-cost">Precio de compra (S/)</label><input type="number" id="prod-cost" class="form-control" step="0.01" min="0"><small>Lo que te cuesta adquirirlo. define el costo y la valorización del inventario.</small></div>
+        <div class="form-group"><label for="prod-price">Precio de venta (S/) *</label><input type="number" id="prod-price" class="form-control" step="0.01" min="0" required></div>
       </div>
-      <div class="form-group"><label for="prod-minimo">Stock mínimo</label><input type="number" id="prod-minimo" class="form-control" value="5" min="0" step="1"><small>Se avisará cuando las existencias sean iguales o menores a este valor.</small></div>
+      <div id="prod-margin" class="prod-margin hidden" role="status"></div>
+      <div class="form-row">
+        <div class="form-group"><label for="prod-stock">Stock inicial</label><input type="number" id="prod-stock" class="form-control" value="0" min="0" step="1"><small id="prod-stock-hint" hidden>El stock se modifica con <strong>Entrada</strong> o <strong>Ajustar</strong> desde el inventario (requiere motivo).</small></div>
+        <div class="form-group"><label for="prod-minimo">Stock mínimo</label><input type="number" id="prod-minimo" class="form-control" value="5" min="0" step="1"><small>Se avisará cuando las existencias sean iguales o menores a este valor.</small></div>
+      </div>
       <div class="form-group"><label for="prod-code">Código de barras</label><input type="text" id="prod-code" class="form-control" maxlength="30" placeholder="Ej: 7750000123456"><small>Con el lector en foco, escanearlo lo busca en la tabla de productos.</small></div>
       <div class="form-group"><label>Descripción</label><textarea id="prod-desc" class="form-control" rows="2"></textarea></div>
       <div class="form-group hidden" id="prod-active-group">
@@ -171,6 +179,18 @@
       <form id="inv-form" hidden>
         <div class="form-group"><label for="inv-cantidad" id="inv-cantidad-label">Cantidad</label><input id="inv-cantidad" class="form-control" type="number" step="1" required></div>
         <div class="form-group"><label for="inv-motivo">Motivo</label><textarea id="inv-motivo" class="form-control" required maxlength="500" placeholder="Ej.: reposición, producto dañado o diferencia de conteo"></textarea></div>
+        <!-- Opcionales de entrada: precio de compra y lote con vencimiento -->
+        <div id="inv-extra-entrada" class="hidden">
+          <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px;background:var(--bg)">
+            <div style="font-size:11px;font-weight:600;margin-bottom:10px;color:var(--text-light);text-transform:uppercase;letter-spacing:0.5px">Opcional · Precio de compra y lote</div>
+            <div class="form-group"><label for="inv-costo">Precio de compra (S/)</label><input id="inv-costo" class="form-control" type="number" step="0.01" min="0" placeholder="Deja vacío si no cambia"><small>Si lo indicas, se actualiza el costo del producto en este registro.</small></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <div class="form-group" style="flex:1;min-width:130px;margin:0"><label for="inv-lote-vence" style="font-size:12px">Vencimiento</label><input id="inv-lote-vence" class="form-control" type="date"></div>
+              <div class="form-group" style="flex:1;min-width:130px;margin:0"><label for="inv-lote-numero" style="font-size:12px">N° de lote</label><input id="inv-lote-numero" class="form-control" maxlength="40" placeholder="Opcional"></div>
+            </div>
+            <small style="display:block;margin-top:6px;color:var(--text-light)">Con vencimiento se crea un lote con esta cantidad (trazabilidad).</small>
+          </div>
+        </div>
         <p id="inv-error" role="alert" tabindex="-1"></p>
         <button class="btn btn-primary" id="inv-save" type="submit">Registrar movimiento</button>
       </form>
@@ -254,6 +274,8 @@
     document.getElementById('inv-error').textContent = '';
     document.getElementById('inv-cantidad-label').textContent = type === 'ajuste' ? 'Stock físico contado (cantidad final)' : 'Unidades recibidas (se suman al stock)';
     document.getElementById('inv-cantidad').min = type === 'ajuste' ? 0 : 1;
+    // Los opcionales de precio de compra y lote solo aplican a entradas
+    document.getElementById('inv-extra-entrada').classList.toggle('hidden', type !== 'entrada');
     openModal('modal-inventario');
     loadInventoryHistory();
     loadLotes();
@@ -266,14 +288,28 @@
     const button = document.getElementById('inv-save'); button.disabled = true;
     try {
       const cantidad = Number(document.getElementById('inv-cantidad').value);
-      const p = await api.post(`/productos/${product._id || product.id}/movimientos`, { tipo: invType, cantidad, stock_nuevo: cantidad, stock_anterior: product.stock, motivo: document.getElementById('inv-motivo').value });
+      const body = { tipo: invType, cantidad, stock_nuevo: cantidad, stock_anterior: product.stock, motivo: document.getElementById('inv-motivo').value };
+      // Opcionales de entrada: precio de compra y lote
+      if (invType === 'entrada') {
+        const costo = document.getElementById('inv-costo').value;
+        if (costo !== '') body.costo = costo;
+        const vence = document.getElementById('inv-lote-vence').value;
+        if (vence) {
+          body.fecha_vencimiento = vence;
+          const num = document.getElementById('inv-lote-numero').value.trim();
+          if (num) body.numero_lote = num;
+        }
+      }
+      const p = await api.post(`/productos/${product._id || product.id}/movimientos`, body);
       GymCatalogo.invalidar();
       if (!_pageActive()) return;
       Object.assign(product, p); refreshTable(); loadProductSummary();
       if (invProduct !== product) return;
       document.getElementById('inv-stock').textContent = `Stock actual: ${p.stock} · Mínimo: ${p.stock_minimo ?? 5}`;
       document.getElementById('inv-form').reset(); document.getElementById('inv-error').textContent = '';
-      invPage = 1; loadInventoryHistory(); toast('Movimiento registrado');
+      invPage = 1; loadInventoryHistory();
+      if (p.lote_creado) loadLotes();
+      toast(p.lote_creado ? 'Entrada registrada con lote' : 'Movimiento registrado');
     } catch (err) {
       if (_pageActive()) { const el = document.getElementById('inv-error'); el.textContent = err.message; el.focus(); }
     } finally { if (_pageActive()) button.disabled = false; }
@@ -554,12 +590,32 @@
     if (user.role !== 'admin' || !_pageActive()) return;
     const ticket = ++summaryTicket;
     try {
-      const r = await api.get('/compras/resumen', true);
+      const r = await api.get('/productos/resumen', true);
       if (!_pageActive() || ticket !== summaryTicket) return;
       document.getElementById('kpi-val-prod').textContent = 'S/ ' + Number(r.valorizacion || 0).toFixed(2);
       document.getElementById('kpi-val-unidades').textContent = String(r.unidades ?? 0);
     } catch (err) { if (_pageActive()) toast(err.message, 'error'); }
   }
+
+  // ── Indicador de margen en vivo (precio de compra vs venta) ────────────────
+  function updateMargin() {
+    const box = document.getElementById('prod-margin');
+    if (!box) return;
+    const cost = parseFloat(document.getElementById('prod-cost').value);
+    const price = parseFloat(document.getElementById('prod-price').value);
+    if (!Number.isFinite(cost) || !Number.isFinite(price)) { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden', 'ok', 'warn', 'bad');
+    const ganancia = price - cost;
+    const margen = price > 0 ? (ganancia / price) * 100 : 0;
+    box.textContent = `Ganancia: S/ ${ganancia.toFixed(2)} · Margen: ${margen.toFixed(1)}%`;
+    if (ganancia < 0) box.classList.add('bad');
+    else if (margen < 20) box.classList.add('warn');
+    else box.classList.add('ok');
+  }
+  ['prod-cost', 'prod-price'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', updateMargin);
+  });
 
   document.getElementById('btn-new-prod') && (document.getElementById('btn-new-prod').onclick = () => {
     if (user.role !== 'admin') return toast('Solo administradores', 'warning');
@@ -567,6 +623,7 @@
     document.getElementById('prod-name').value = '';
     document.getElementById('prod-cat').value = '';
     document.getElementById('prod-price').value = '';
+    document.getElementById('prod-cost').value = '';
     document.getElementById('prod-stock').value = 0;
     document.getElementById('prod-stock').disabled = false;
     document.getElementById('prod-stock-hint').hidden = true;
@@ -574,6 +631,7 @@
     document.getElementById('prod-code').value = '';
     document.getElementById('prod-desc').value = '';
     document.getElementById('prod-active-group').classList.add('hidden');
+    document.getElementById('prod-margin').classList.add('hidden');
     document.getElementById('prod-photo-preview').style.display = 'none';
     document.getElementById('prod-photo-placeholder').style.display = '';
     document.getElementById('prod-modal-title').textContent = 'Nuevo Producto';
@@ -603,6 +661,7 @@
     document.getElementById('prod-name').value = p.nombre;
     document.getElementById('prod-cat').value = p.categoria || '';
     document.getElementById('prod-price').value = p.precio_venta;
+    document.getElementById('prod-cost').value = p.costo ?? '';
     document.getElementById('prod-stock').value = p.stock;
     document.getElementById('prod-stock').disabled = true;
     document.getElementById('prod-stock-hint').hidden = false;
@@ -612,6 +671,7 @@
     document.getElementById('prod-active').checked = p.activo;
     document.getElementById('prod-active-group').classList.remove('hidden');
     document.getElementById('prod-modal-title').textContent = 'Editar Producto';
+    updateMargin();
     if (p.foto_url) {
       document.getElementById('prod-photo-preview').src = p.foto_url;
       document.getElementById('prod-photo-preview').style.display = '';
@@ -626,6 +686,7 @@
     formData.append('nombre',      document.getElementById('prod-name').value);
     formData.append('categoria',   document.getElementById('prod-cat').value);
     formData.append('precio_venta',document.getElementById('prod-price').value);
+    formData.append('costo',       document.getElementById('prod-cost').value);
     if (!id) formData.append('stock', document.getElementById('prod-stock').value);
     formData.append('stock_minimo', document.getElementById('prod-minimo').value);
     formData.append('codigo_barras', document.getElementById('prod-code').value.trim());

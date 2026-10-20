@@ -1,5 +1,6 @@
 const Producto = require('../models/Producto');
 const Inventario = require('./InventarioService');
+const LoteService = require('./LoteService');
 const { BusinessError } = require('../middleware/errors/ErrorTypes');
 
 /**
@@ -80,11 +81,15 @@ class StockService {
         context
       );
 
+      // FEFO: consumir primero el lote más próximo a vencer
+      const lotes_consumidos = await LoteService.consumirFEFO(item.producto_id, item.cantidad, session);
+
       resultado.push({
         producto_id: item.producto_id,
         cantidad: item.cantidad,
         precio_unit: producto.precio_venta,
-        subtotal: producto.precio_venta * item.cantidad
+        subtotal: producto.precio_venta * item.cantidad,
+        lotes_consumidos
       });
     }
 
@@ -97,7 +102,11 @@ class StockService {
    * @param {ClientSession} session - Transaction session
    */
   static async revertirMultiple(items, session, context) {
-    for (const item of items) await this.revertirStock(item.producto_id, item.cantidad, session, context);
+    for (const item of items) {
+      await this.revertirStock(item.producto_id, item.cantidad, session, context);
+      // Devolver las unidades a los lotes exactos que se consumieron (FEFO)
+      if (item.lotes_consumidos?.length) await LoteService.devolverALotes(item.lotes_consumidos, session);
+    }
   }
 }
 

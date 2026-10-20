@@ -46,21 +46,24 @@
     .venta-layout { display:flex; gap:20px; align-items:flex-start; }
     .venta-layout > .card:first-child { flex:0 0 420px; min-width:0; }
     .quick-sales-card { flex:1; min-width:0; }
-    .quick-sales-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .quick-sales-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
     .quick-sale-btn {
-      display:flex; flex-direction:column; align-items:center; gap:6px;
-      padding:12px 8px; border-radius:10px; border:1.5px solid var(--border);
-      background:var(--card-bg); cursor:pointer; transition:all .2s; text-align:center;
+      display:flex; flex-direction:column; align-items:center; gap:0;
+      padding:0 0 14px; border-radius:14px; border:1.5px solid var(--border);
+      background:var(--card-bg); cursor:pointer; transition:all .2s; text-align:center; overflow:hidden;
     }
     .quick-sale-btn:hover { border-color:var(--primary); background:rgba(var(--primary-rgb),0.04); transform:translateY(-1px); box-shadow:var(--shadow); }
     .quick-sale-btn:active { transform:translateY(0); }
     .quick-sale-btn.disabled { opacity:0.4; cursor:not-allowed; pointer-events:none; }
-    .quick-sale-img { width:44px; height:44px; border-radius:8px; object-fit:cover; background:var(--bg); }
-    .quick-sale-img-ph { width:44px; height:44px; border-radius:8px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:20px; }
-    .quick-sale-name { font-size:12px; font-weight:600; color:var(--text); line-height:1.2; max-height:30px; overflow:hidden; }
-    .quick-sale-price { font-size:13px; font-weight:700; color:var(--success); }
-    .quick-sale-stock { font-size:10px; color:var(--text-light); }
-    .quick-sale-rank { position:absolute; top:4px; left:4px; background:var(--primary); color:#fff; font-size:9px; font-weight:700; width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+    .quick-sale-media { position:relative; width:100%; height:104px; background:var(--bg); display:flex; align-items:center; justify-content:center; overflow:hidden; flex:none; }
+    .quick-sale-img { max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; display:block; }
+    .quick-sale-img-ph { font-size:40px; }
+    .quick-sale-stock-badge { position:absolute; top:8px; right:8px; background:rgba(255,255,255,0.92); color:var(--text); font-size:10px; font-weight:700; padding:3px 8px; border-radius:20px; box-shadow:0 1px 4px rgba(0,0,0,0.12); }
+    .quick-sale-stock-badge.low { background:var(--danger); color:#fff; }
+    .quick-sale-body { padding:10px 10px 0; width:100%; }
+    .quick-sale-name { font-size:12px; font-weight:600; color:var(--text); line-height:1.25; max-height:30px; overflow:hidden; margin-bottom:5px; }
+    .quick-sale-price { font-size:17px; font-weight:800; color:var(--success); }
+    .quick-sale-rank { position:absolute; top:8px; left:8px; background:var(--primary); color:#fff; font-size:11px; font-weight:700; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 4px rgba(0,0,0,0.2); z-index:1; }
     .quick-sale-btn { position:relative; }
 
     /* Product search autocomplete */
@@ -92,7 +95,9 @@
       .venta-layout { flex-direction:column; }
       .venta-layout > .card:first-child { flex:none; width:100%; }
       .quick-sales-card { flex:none; width:100%; }
-      .quick-sales-grid { grid-template-columns:repeat(3,1fr); }
+      .quick-sales-grid { grid-template-columns:repeat(2,1fr); }
+      .quick-sale-media { height:110px; }
+      .quick-sale-img-ph { font-size:40px; }
       #section-movimientos > div > .card { flex:1 1 100% !important; min-width:0 !important; }
     }
   </style>
@@ -765,7 +770,7 @@
     const grid = document.getElementById('quick-sales-grid');
     if (!grid) return;
     try {
-      const top = await api.get('/productos/mas-vendidos?limit=9');
+      const top = await api.get('/productos/mas-vendidos?limit=8');
       if (!_pageActive()) return;
       if (!top || !top.length) {
         grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-light);font-size:12px">Sin ventas registradas aún</div>';
@@ -773,18 +778,26 @@
       }
       grid.innerHTML = top.map((p, i) => {
         const sinStock = p.stock <= 0;
+        const bajo = !sinStock && p.stock <= (p.stock_minimo ?? 5);
         const imgHtml = p.foto_url
           ? `<img src="${p.foto_url}" class="quick-sale-img" alt="">`
           : `<div class="quick-sale-img-ph">📦</div>`;
+        const stockBadge = sinStock
+          ? `<span class="quick-sale-stock-badge low">Sin stock</span>`
+          : `<span class="quick-sale-stock-badge ${bajo ? 'low' : ''}">${p.stock} u.</span>`;
         return `
           <button class="quick-sale-btn ${sinStock ? 'disabled' : ''}"
                   onclick="seleccionarVentaRapida('${p._id}', ${p.precio_venta}, ${p.stock})"
                   title="${p.nombre} — S/${parseFloat(p.precio_venta).toFixed(2)} (stock: ${p.stock})">
-            <span class="quick-sale-rank">${i + 1}</span>
-            ${imgHtml}
-            <div class="quick-sale-name">${p.nombre}</div>
-            <div class="quick-sale-price">S/ ${parseFloat(p.precio_venta).toFixed(2)}</div>
-            <div class="quick-sale-stock">${sinStock ? 'Sin stock' : 'Stock: ' + p.stock}</div>
+            <div class="quick-sale-media">
+              <span class="quick-sale-rank">${i + 1}</span>
+              ${imgHtml}
+              ${stockBadge}
+            </div>
+            <div class="quick-sale-body">
+              <div class="quick-sale-name">${p.nombre}</div>
+              <div class="quick-sale-price">S/ ${parseFloat(p.precio_venta).toFixed(2)}</div>
+            </div>
           </button>`;
       }).join('');
     } catch (err) {

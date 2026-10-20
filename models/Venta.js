@@ -5,6 +5,12 @@ const ventaDetalleSchema = new mongoose.Schema({
   cantidad:    { type: Number, required: true, default: 1 },
   precio_unit: { type: Number, required: true },
   subtotal:    { type: Number, required: true },
+  // Detalle FEFO: de qué lotes se descontó esta venta (para revertir al anular)
+  lotes_consumidos: [{
+    _id: false,
+    lote_id:  { type: mongoose.Schema.Types.ObjectId, ref: 'Lote' },
+    cantidad: { type: Number },
+  }],
 });
 
 const ventaSchema = new mongoose.Schema({

@@ -19,7 +19,6 @@ const GymRouter = (() => {
     pagos:           '/pagos.html',
     asistencia:      '/asistencia.html',
     productos:       '/productos.html',
-    compras:         '/compras.html',
     caja:            '/caja.html',
     reports:         '/reports.html',
     users:           '/users.html',

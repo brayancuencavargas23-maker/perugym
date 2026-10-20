@@ -60,7 +60,6 @@ function initLayout(activePage, pageTitle) {
         { page: 'pagos',      key: 'pagos',      label: 'Pagos'      },
         { page: 'caja',       key: 'caja',       label: 'Caja'       },
         { page: 'productos',  key: 'productos',  label: 'Productos'  },
-        { page: 'compras',    key: 'compras',    label: 'Compras' },
       ],
     },
     {

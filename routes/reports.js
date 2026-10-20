@@ -6,8 +6,7 @@ const { presentarPago } = require('../services/MembresiaPagosService');
 const Producto = require('../models/Producto');
 const Venta = require('../models/Venta');
 const Caja = require('../models/Caja');
-const Compra = require('../models/Compra');
-const { verifyToken, requireRole, requirePermission } = require('../middleware/auth');
+const { verifyToken, requireRole } = require('../middleware/auth');
 const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit');
 const path = require('path');
@@ -531,48 +530,6 @@ router.get('/stock/excel', async (req, res) => {
     const buffer = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="stock-productos.xlsx"');
-    res.end(buffer);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// COMPRAS A PROVEEDORES Excel (solo admin: incluye costos)
-// ─────────────────────────────────────────────────────────────────────────────
-router.get('/compras/excel', requirePermission('compras'), async (req, res) => {
-  const { from, to } = req.query;
-  try {
-    const filter = {};
-    const range = dateFilter(from, to);
-    if (range.$gte || range.$lt) filter.fecha = range;
-
-    const compras = await Compra.find(filter).populate('proveedor_id', 'nombre').sort({ fecha: -1 }).lean();
-
-    const rows = compras.map(c => ({
-      _num:        null,
-      fecha:       c.fecha,
-      proveedor:   c.proveedor_id ? c.proveedor_id.nombre : (c.proveedor_nombre || 'Sin proveedor'),
-      productos:   c.items.reduce((s, it) => s + it.cantidad, 0),
-      items:       c.items.length,
-      costo_total: c.costo_total,
-      responsable: c.responsable,
-      notas:       c.notas || '-',
-    }));
-
-    const headers = [
-      { header: '#',            key: '_num',        width: 8  },
-      { header: 'Fecha',        key: 'fecha',       width: 20 },
-      { header: 'Proveedor',    key: 'proveedor',   width: 28, align: 'left' },
-      { header: 'Unidades',     key: 'productos',   width: 12 },
-      { header: 'Ítems',        key: 'items',       width: 10 },
-      { header: 'Costo total (S/)', key: 'costo_total', width: 18, colorFn: () => 'FF16A34A' },
-      { header: 'Registró',     key: 'responsable', width: 20, align: 'left' },
-      { header: 'Notas',        key: 'notas',       width: 36, align: 'left' },
-    ];
-
-    const wb = buildStyledWorkbook('REPORTE DE COMPRAS', 'Compras', headers, rows, 'PeruGym - Centro de Entrenamiento y Fitness');
-    const buffer = await wb.xlsx.writeBuffer();
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="compras.xlsx"');
     res.end(buffer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

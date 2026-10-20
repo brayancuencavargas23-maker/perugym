@@ -12,6 +12,18 @@ const { parseDate } = require('../utils/reportDates');
 
 router.use(verifyToken);
 
+// KPIs de inventario (solo admin): valorización (Σ stock × costo) + unidades
+router.get('/resumen', requireRole('admin'), async (req, res) => {
+  try {
+    const [r] = await Producto.aggregate([
+      { $match: { activo: true } },
+      { $group: { _id: null, valor: { $sum: { $multiply: ['$stock', { $ifNull: ['$costo', 0] }] } }, unidades: { $sum: '$stock' } } },
+    ]);
+    const round2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
+    res.json({ valorizacion: round2(r ? r.valor : 0), unidades: r ? r.unidades : 0 });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.get('/', async (req, res) => {
   const { search, categoria, activo, page = 1, limit = 20 } = req.query;
   const filter = {};
@@ -62,7 +74,7 @@ router.get('/mas-vendidos', async (req, res) => {
           as: 'producto'
         }
       },
-      { $unwind: { path: '$producto', preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$producto' } },
       {
         $project: {
           _id: 1,
@@ -74,7 +86,7 @@ router.get('/mas-vendidos', async (req, res) => {
           activo: '$producto.activo',
         }
       },
-      { $match: { activo: { $ne: false } } },
+      { $match: { activo: true } },
     ]);
     res.json(top);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -149,7 +161,8 @@ router.delete('/:id/lotes/:loteId', requireRole('admin'), async (req, res) => {
 
 function validarProducto(body, crear) {
   if ((crear || body.nombre !== undefined) && (typeof body.nombre !== 'string' || !body.nombre.trim())) return 'Indica el nombre.';
-  if ((crear || body.precio_venta !== undefined) && (body.precio_venta === '' || !Number.isFinite(Number(body.precio_venta)) || Number(body.precio_venta) < 0)) return 'Precio inválido.';
+  if ((crear || body.precio_venta !== undefined) && (body.precio_venta === '' || !Number.isFinite(Number(body.precio_venta)) || Number(body.precio_venta) < 0)) return 'Precio de venta inválido.';
+  if (body.costo !== undefined && body.costo !== null && body.costo !== '' && (!Number.isFinite(Number(body.costo)) || Number(body.costo) < 0)) return 'Costo (precio de compra) inválido.';
   for (const key of ['stock', 'stock_minimo']) {
     if (body[key] !== undefined && (body[key] === '' || !Number.isSafeInteger(Number(body[key])) || Number(body[key]) < 0)) return 'Stock y mínimo deben ser enteros no negativos.';
   }
@@ -168,16 +181,17 @@ async function codigoDuplicado(codigo, excluirId) {
 }
 
 router.post('/', requireRole('admin'), async (req, res) => {
-  const { nombre, categoria, precio_venta, stock, stock_minimo, descripcion, codigo_barras } = req.body;
+  const { nombre, categoria, precio_venta, costo, stock, stock_minimo, descripcion, codigo_barras } = req.body;
   const invalid = validarProducto(req.body, true);
   if (invalid) return res.status(400).json({ error: invalid });
   const codigo = codigo_barras ? String(codigo_barras).trim() : null;
+  const costoNum = costo === '' || costo === undefined || costo === null ? 0 : Number(costo);
   try {
     if (await codigoDuplicado(codigo)) return res.status(400).json({ error: 'Ese código de barras ya está registrado en otro producto.' });
     let foto_url = null;
     if (req.files?.foto) foto_url = await saveImage(req.files.foto.data, 'productos', req.files.foto.name);
     const producto = await TransactionManager.execute(async session => {
-      const [p] = await Producto.create([{ nombre, categoria, precio_venta, stock: stock || 0, stock_minimo, descripcion, codigo_barras: codigo, foto_url }], { session });
+      const [p] = await Producto.create([{ nombre, categoria, precio_venta, costo: costoNum, stock: stock || 0, stock_minimo, descripcion, codigo_barras: codigo, foto_url }], { session });
       try { await Inventario.registrar(p, 0, { tipo: 'inicial', motivo: 'Stock inicial al crear el producto', user: req.user }, session); }
       catch (err) { if (!session) await Producto.deleteOne({ _id: p._id }); throw err; }
       return p;
@@ -203,6 +217,11 @@ router.put('/:id', requireRole('admin'), async (req, res) => {
     if (codigo !== (current.codigo_barras || null) && await codigoDuplicado(codigo, req.params.id)) {
       return res.status(400).json({ error: 'Ese código de barras ya está registrado en otro producto.' });
     }
+    // El costo solo se actualiza si viene definido en el body
+    const update = { nombre, categoria, precio_venta, stock_minimo, descripcion, activo, codigo_barras: codigo };
+    if (req.body.costo !== undefined) {
+      update.costo = req.body.costo === '' || req.body.costo === null ? 0 : Number(req.body.costo);
+    }
     let foto_url = current?.foto_url;
     if (req.files?.foto) {
       await deleteImage(foto_url);
@@ -210,7 +229,7 @@ router.put('/:id', requireRole('admin'), async (req, res) => {
     }
     const producto = await Producto.findByIdAndUpdate(
       req.params.id,
-      { nombre, categoria, precio_venta, stock_minimo, descripcion, foto_url, activo, codigo_barras: codigo },
+      { ...update, foto_url },
       { new: true, runValidators: true }
     );
     res.json(producto);

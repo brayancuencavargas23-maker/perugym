@@ -25,66 +25,66 @@
         <span>No hay caja abierta. Los botones de pago están deshabilitados. <a href="/caja.html" style="font-weight:700;color:var(--danger)">Abrir caja →</a></span>
       </div>
 
-      <!-- Filtros -->
-      <div class="card" style="margin-bottom:16px;padding:16px">
-        <!-- Fila 1: Buscar membresía -->
-        <div style="margin-bottom:12px">
-          <div style="position:relative;max-width:400px;width:100%">
-            <span class="search-icon" id="search-icon-el" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-light)"></span>
-            <input type="text" id="search-nombre" class="form-control" style="padding-left:36px" placeholder="Buscar por cliente...">
+      <!-- Toolbar: filtros + acciones -->
+      <div class="card mem-toolbar">
+        <!-- Fila 1: búsqueda + selects + acción principal -->
+        <div class="mem-toolbar-main">
+          <div class="mem-search">
+            <span class="search-icon" id="search-icon-el"></span>
+            <input type="text" id="search-nombre" class="form-control" placeholder="Buscar por cliente...">
+          </div>
+          <select id="filter-estado" class="form-control mem-filter-select" aria-label="Filtrar por estado">
+            <option value="">Todos los estados</option>
+            <option value="activo">Activo</option>
+            <option value="pendiente">Pendiente</option>
+            <option value="vencido">Vencido</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+          <select id="filter-plan" class="form-control mem-filter-select" aria-label="Filtrar por plan">
+            <option value="">Todos los planes</option>
+          </select>
+          <select id="filter-vence-mes" class="form-control mem-filter-select" aria-label="Filtrar por vencimiento">
+            <option value="">Vencimiento</option>
+            <option value="7">Vence en 7 días</option>
+            <option value="15">Vence en 15 días</option>
+            <option value="30">Vence en 30 días</option>
+            <option value="mes">Vence este mes</option>
+          </select>
+          <button class="btn btn-primary mem-toolbar-cta" id="btn-new"><span id="icon-plus-mem"></span> Nueva Membresía</button>
+        </div>
+
+        <!-- Fila 2: filtros rápidos (chips) + meta + exportar -->
+        <div class="mem-toolbar-sub">
+          <div class="mem-chips">
+            <button class="mem-chip" id="btn-vencen" aria-pressed="false">
+              <span id="icon-warning-mem"></span> Vencen pronto
+            </button>
+            <button class="mem-chip" id="btn-advanced" aria-pressed="false" aria-controls="advanced-filters">
+              <span id="icon-filter-mem"></span> Filtros avanzados
+              <span class="mem-chip-badge hidden" id="advanced-badge">0</span>
+            </button>
+            <button class="mem-chip mem-chip-clear hidden" id="btn-clear-filters">
+              <span id="icon-clear-mem"></span> Limpiar filtros
+            </button>
+          </div>
+          <div class="mem-toolbar-meta">
+            <span class="mem-count" id="mem-count"></span>
+            <button class="btn btn-success btn-sm" id="btn-exportar-mem"><span id="icon-excel-mem"></span> Exportar Excel</button>
           </div>
         </div>
 
-        <!-- Fila 2: Estado + Plan + Vencimiento + Fechas -->
-        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
-          <div class="form-group" style="margin:0;flex:1;min-width:140px">
-            <label style="font-size:12px">Estado</label>
-            <select id="filter-estado" class="form-control">
-              <option value="">Todos los estados</option>
-              <option value="activo">Activo</option>
-              <option value="pendiente">Pendiente</option>
-              <option value="vencido">Vencido</option>
-              <option value="cancelado">Cancelado</option>
-            </select>
-          </div>
-          <div class="form-group" style="margin:0;flex:1;min-width:150px">
-            <label style="font-size:12px">Plan</label>
-            <select id="filter-plan" class="form-control">
-              <option value="">Todos los planes</option>
-            </select>
-          </div>
-          <div class="form-group" style="margin:0;flex:1;min-width:140px">
-            <label style="font-size:12px">Vencimiento</label>
-            <select id="filter-vence-mes" class="form-control">
-              <option value="">Vencimiento</option>
-              <option value="7">Vence en 7 días</option>
-              <option value="15">Vence en 15 días</option>
-              <option value="30">Vence en 30 días</option>
-              <option value="mes">Vence este mes</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Fila 3: Fechas inicio (avanzado) -->
-        <div id="advanced-filters" style="display:none;margin-bottom:12px">
-          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
-            <div class="form-group" style="margin:0;flex:1;min-width:150px">
-              <label style="font-size:12px">Inicio desde</label>
+        <!-- Fila 3: filtros avanzados (colapsable) -->
+        <div id="advanced-filters" class="mem-advanced">
+          <div class="mem-advanced-inner">
+            <div class="form-group">
+              <label for="filter-inicio-desde">Inicio desde</label>
               <input type="date" id="filter-inicio-desde" class="form-control">
             </div>
-            <div class="form-group" style="margin:0;flex:1;min-width:150px">
-              <label style="font-size:12px">Inicio hasta</label>
+            <div class="form-group">
+              <label for="filter-inicio-hasta">Inicio hasta</label>
               <input type="date" id="filter-inicio-hasta" class="form-control">
             </div>
           </div>
-        </div>
-
-        <!-- Fila 4: Botones -->
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button class="btn btn-primary" id="btn-new" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-plus-mem"></span> Nueva Membresía</button>
-          <button class="btn btn-success" id="btn-exportar-mem" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-excel-mem"></span> Exportar Excel</button>
-          <button class="btn btn-outline" id="btn-vencen" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-warning-mem"></span> Vencen pronto</button>
-          <button class="btn btn-outline" onclick="document.getElementById('advanced-filters').style.display = document.getElementById('advanced-filters').style.display === 'none' ? 'block' : 'none'" style="display:inline-flex;align-items:center;gap:6px"><span id="icon-filter-mem"></span> Filtros avanzados</button>
         </div>
       </div>
       <div class="card">
@@ -821,6 +821,18 @@
     } else {
       tablePaginator = initTablePagination('pagination', 'membresias-table', lastFilteredData, 10, renderRow);
     }
+    updateMemCount();
+  }
+
+  // Contador de resultados en el toolbar
+  function updateMemCount() {
+    const el = document.getElementById('mem-count');
+    if (!el) return;
+    const total = lastFilteredData.length;
+    const activos = allMembresias.length;
+    el.textContent = total === activos
+      ? `${total} membresía${total !== 1 ? 's' : ''}`
+      : `${total} de ${activos} membresías`;
   }
 
   async function loadMembresias() {
@@ -1090,10 +1102,12 @@
     const elPlus    = document.getElementById('icon-plus-mem');
     const elExcel   = document.getElementById('icon-excel-mem');
     const elFilter  = document.getElementById('icon-filter-mem');
+    const elClear   = document.getElementById('icon-clear-mem');
     if (elWarning) elWarning.innerHTML = icon('warning');
     if (elPlus)    elPlus.innerHTML    = icon('plus');
     if (elExcel)   elExcel.innerHTML   = icon('excel');
     if (elFilter)  elFilter.innerHTML  = icon('filter');
+    if (elClear)   elClear.innerHTML   = icon('close');
     const elSearch = document.getElementById('search-icon-el');
     if (elSearch)  elSearch.innerHTML  = icon('search');
 
@@ -1205,28 +1219,88 @@
     if (elBtnVencen) {
       elBtnVencen.onclick = () => {
         vencenFilter = !vencenFilter;
-        elBtnVencen.classList.toggle('btn-warning', vencenFilter);
+        elBtnVencen.classList.toggle('is-active', vencenFilter);
+        elBtnVencen.setAttribute('aria-pressed', String(vencenFilter));
+        syncClearBtn();
         loadMembresias();
       };
     }
 
+    // Toggle de filtros avanzados (chip) con badge de cantidad activa
+    const elBtnAdvanced = document.getElementById('btn-advanced');
+    const elAdvanced = document.getElementById('advanced-filters');
+    const elAdvancedBadge = document.getElementById('advanced-badge');
+    if (elBtnAdvanced && elAdvanced) {
+      elBtnAdvanced.onclick = () => {
+        const open = elAdvanced.classList.toggle('is-open');
+        elBtnAdvanced.classList.toggle('is-active', open);
+        elBtnAdvanced.setAttribute('aria-pressed', String(open));
+      };
+    }
+
+    // Chip "Limpiar filtros": restablece todo
+    const elBtnClear = document.getElementById('btn-clear-filters');
+    if (elBtnClear) {
+      elBtnClear.onclick = () => {
+        document.getElementById('search-nombre').value = '';
+        ['filter-estado', 'filter-plan', 'filter-vence-mes', 'filter-inicio-desde', 'filter-inicio-hasta']
+          .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+        if (vencenFilter) {
+          vencenFilter = false;
+          elBtnVencen.classList.remove('is-active');
+          elBtnVencen.setAttribute('aria-pressed', 'false');
+        }
+        syncClearBtn();
+        updateAdvancedBadge();
+        loadMembresias();
+      };
+    }
+
+    // Sincroniza visibilidad del chip "Limpiar filtros" según filtros activos
+    function syncClearBtn() {
+      const hasFilters = vencenFilter ||
+        document.getElementById('search-nombre').value.trim() !== '' ||
+        ['filter-estado', 'filter-plan', 'filter-vence-mes', 'filter-inicio-desde', 'filter-inicio-hasta']
+          .some(id => { const el = document.getElementById(id); return el && el.value; });
+      const el = document.getElementById('btn-clear-filters');
+      if (el) el.classList.toggle('hidden', !hasFilters);
+    }
+
+    // Badge con nº de filtros avanzados activos
+    function updateAdvancedBadge() {
+      if (!elAdvancedBadge) return;
+      const n = ['filter-inicio-desde', 'filter-inicio-hasta']
+        .filter(id => { const el = document.getElementById(id); return el && el.value; }).length;
+      elAdvancedBadge.textContent = n;
+      elAdvancedBadge.classList.toggle('hidden', n === 0);
+      if (n > 0 && elAdvanced && !elAdvanced.classList.contains('is-open')) {
+        elAdvanced.classList.add('is-open');
+        if (elBtnAdvanced) {
+          elBtnAdvanced.classList.add('is-active');
+          elBtnAdvanced.setAttribute('aria-pressed', 'true');
+        }
+      }
+    }
+    window._memSyncClearBtn = syncClearBtn;
+    window._memUpdateAdvancedBadge = updateAdvancedBadge;
+
     const elFilterEstado = document.getElementById('filter-estado');
-    if (elFilterEstado) elFilterEstado.onchange = () => loadMembresias();
+    if (elFilterEstado) elFilterEstado.onchange = () => { syncClearBtn(); loadMembresias(); };
 
     const elFilterPlan = document.getElementById('filter-plan');
-    if (elFilterPlan) elFilterPlan.onchange = () => loadMembresias();
+    if (elFilterPlan) elFilterPlan.onchange = () => { syncClearBtn(); loadMembresias(); };
 
     const elFilterVenceMes = document.getElementById('filter-vence-mes');
-    if (elFilterVenceMes) elFilterVenceMes.onchange = () => loadMembresias();
+    if (elFilterVenceMes) elFilterVenceMes.onchange = () => { syncClearBtn(); loadMembresias(); };
 
     const elInicioDesde = document.getElementById('filter-inicio-desde');
-    if (elInicioDesde) elInicioDesde.onchange = () => loadMembresias();
+    if (elInicioDesde) elInicioDesde.onchange = () => { syncClearBtn(); updateAdvancedBadge(); loadMembresias(); };
 
     const elInicioHasta = document.getElementById('filter-inicio-hasta');
-    if (elInicioHasta) elInicioHasta.onchange = () => loadMembresias();
+    if (elInicioHasta) elInicioHasta.onchange = () => { syncClearBtn(); updateAdvancedBadge(); loadMembresias(); };
 
     const elSearchNombre = document.getElementById('search-nombre');
-    if (elSearchNombre) elSearchNombre.oninput = onSearchInput;
+    if (elSearchNombre) elSearchNombre.oninput = () => { if (window._memSyncClearBtn) window._memSyncClearBtn(); onSearchInput(); };
 
     loadSelects().then(() => {
       // Poblar select de planes para filtro

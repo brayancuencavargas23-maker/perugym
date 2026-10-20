@@ -96,7 +96,6 @@ const PANEL_PAGES = [
   '/dashboard.html', '/clientes.html', '/membresias.html', '/pagos.html',
   '/planes.html', '/asistencia.html', '/productos.html', '/caja.html',
   '/reports.html', '/users.html', '/landing-admin.html', '/solicitudes.html',
-  '/compras.html',
 ];
 
 app.get(PANEL_PAGES, noCache, (req, res) => {
@@ -126,8 +125,6 @@ app.use('/api/pagos',        require('./routes/pagos'));
 app.use('/api/asistencia',   require('./routes/asistencia'));
   app.use('/api/productos',    require('./routes/productos'));
   app.use('/api/inventario',   require('./routes/inventario'));
-  app.use('/api/proveedores',  require('./routes/proveedores'));
-  app.use('/api/compras',      require('./routes/compras'));
   app.use('/api/ventas',       require('./routes/ventas'));
 app.use('/api/caja',         require('./routes/caja'));
 app.use('/api/dashboard',    require('./routes/dashboard'));

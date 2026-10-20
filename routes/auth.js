@@ -245,7 +245,7 @@ router.delete('/users/:id', verifyToken, requireRole('admin'), [
 
 router.put('/users/:id/permisos', verifyToken, requireRole('admin'), async (req, res) => {
   const { permisos } = req.body;
-  const permitidos = ['dashboard', 'clientes', 'membresias', 'pagos', 'planes', 'asistencia', 'productos', 'compras', 'caja', 'reports', 'solicitudes'];
+  const permitidos = ['dashboard', 'clientes', 'membresias', 'pagos', 'planes', 'asistencia', 'productos', 'caja', 'reports', 'solicitudes'];
   if (!Array.isArray(permisos) || permisos.length > permitidos.length || permisos.some(p => !permitidos.includes(p))) {
     return res.status(400).json({ error: 'Envía una lista de permisos válidos.' });
   }

@@ -30,8 +30,6 @@ app.use('/api/pagos',        require('../../routes/pagos'));
 app.use('/api/asistencia',   require('../../routes/asistencia'));
   app.use('/api/productos',    require('../../routes/productos'));
   app.use('/api/inventario',   require('../../routes/inventario'));
-  app.use('/api/proveedores',  require('../../routes/proveedores'));
-  app.use('/api/compras',      require('../../routes/compras'));
   app.use('/api/ventas',       require('../../routes/ventas'));
 app.use('/api/caja',         require('../../routes/caja'));
 app.use('/api/dashboard',    require('../../routes/dashboard'));

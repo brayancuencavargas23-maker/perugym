@@ -27,7 +27,7 @@ window.fetch=async(url,opts={})=>{
  else if(p.pathname==='/api/solicitudes/stats')data={pendiente:0,contactado:0,pendiente_no_leidas:0};
  else if(p.pathname==='/api/auth/users')data=[{id:'u2',name:'Luis',email:'l@test.pe',role:'recepcionista',active:true,permisos:[]}];
  else if(p.pathname.endsWith('/permisos')){window.savedPermisos=JSON.parse(opts.body);data={message:'OK'};}
- else if(p.pathname==='/api/compras/resumen')data={valorizacion:0,compras_mes:0,proveedores_activos:0};
+ else if(p.pathname==='/api/productos/resumen')data={valorizacion:0,unidades:0};
  else if(p.pathname==='/api/asistencia/aforo')data={en_el_gym:0};
  else if(p.pathname==='/api/planes')data=[];
  else data={data:[],total:0,pages:0,stats:{total_hoy:0,en_curso:0,promedio_min:null}};

@@ -6,13 +6,11 @@ const Producto = require('../../models/Producto');
 const Lote = require('../../models/Lote');
 const Conteo = require('../../models/ConteoInventario');
 const Movimiento = require('../../models/MovimientoInventario');
-const Compra = require('../../models/Compra');
 
 const app = express();
 app.use(express.json());
 app.use('/api/productos', require('../../routes/productos'));
 app.use('/api/inventario', require('../../routes/inventario'));
-app.use('/api/compras', require('../../routes/compras'));
 app.use('/api/dashboard', require('../../routes/dashboard'));
 
 const admin = `Bearer ${createAuthToken({ id: 'dev', role: 'admin', name: 'Ana Admin' })}`;
@@ -103,30 +101,6 @@ test('lotes: CRUD con validaciones y permisos', async () => {
   await request(app).delete(`/api/productos/${p._id}`).set('Authorization', admin).expect(200);
   await request(app).post(`/api/productos/${p._id}/lotes`).set('Authorization', admin)
     .send({ cantidad: 2, fecha_vencimiento: '2027-06-01' }).expect(400);
-});
-
-test('compra con vencimiento crea el lote automáticamente', async () => {
-  const p = await crearProducto({ nombre: 'Proteína', stock: 5 });
-
-  // Sin vencimiento → sin lote
-  await request(app).post('/api/compras').set('Authorization', admin)
-    .send({ items: [{ producto_id: p._id, cantidad: 2, costo_unit: 30 }] }).expect(201);
-  expect(await Lote.countDocuments()).toBe(0);
-
-  // Con vencimiento → lote ligado a la compra
-  const res = await request(app).post('/api/compras').set('Authorization', admin)
-    .send({ items: [{ producto_id: p._id, cantidad: 4, costo_unit: 30, fecha_vencimiento: '2027-03-10', numero_lote: 'LOT-9' }] })
-    .expect(201);
-  expect(await Lote.countDocuments()).toBe(1);
-  const lote = await Lote.findOne({ producto_id: p._id }).lean();
-  expect(lote.cantidad).toBe(4);
-  expect(lote.numero_lote).toBe('LOT-9');
-  expect(lote.compra_id.toString()).toBe(res.body._id);
-
-  // La compra conserva el snapshot del vencimiento
-  const compra = await Compra.findById(res.body._id).lean();
-  expect(compra.items[0].fecha_vencimiento).not.toBeNull();
-  expect((await Producto.findById(p._id)).stock).toBe(11);
 });
 
 // ── Conteo físico ────────────────────────────────────────────────────────────
