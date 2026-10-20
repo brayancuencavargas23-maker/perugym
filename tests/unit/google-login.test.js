@@ -13,10 +13,12 @@ app.use('/api/auth', require('../../routes/auth'));
 
 const user = { _id: '507f1f77bcf86cd799439011', usuario: 'Recepción', email: 'permitido@gmail.com', rol: 'recepcionista', permisos: ['caja'], password: 'hash' };
 let oauth;
+let errorLog;
 const originalEnv = { ...process.env };
 
 beforeEach(() => {
   jest.clearAllMocks();
+  errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
   require('bcryptjs').compare.mockResolvedValue(true);
   process.env.JWT_SECRET = 'test-google-secret';
   process.env.JWT_EXPIRES_IN = '12h';
@@ -28,6 +30,7 @@ beforeEach(() => {
   OAuth2Client.mockImplementation(() => oauth);
   Usuario.findOne.mockResolvedValue(user);
 });
+afterEach(() => { errorLog.mockRestore(); });
 afterAll(() => { process.env = originalEnv; });
 
 async function begin() {
@@ -112,4 +115,28 @@ test('configuración incompleta muestra error recuperable en login', async () =>
   delete process.env.GOOGLE_CLIENT_SECRET;
   const res = await request(app).get('/api/auth/google');
   expect(res.headers.location).toBe('/login.html?google_error=config');
+  const diagnostic = JSON.parse(errorLog.mock.calls[0][0]);
+  expect(diagnostic.stage).toBe('configuration');
+  expect(diagnostic.reason).toBe('GOOGLE_CONFIG_MISSING');
+  expect(diagnostic.variables.GOOGLE_CLIENT_SECRET).toBe('missing');
+});
+
+test('callback inválido identifica la causa sin imprimir configuración privada', async () => {
+  process.env.GOOGLE_CALLBACK_URL = 'http://production.example/api/auth/google/callback';
+  const res = await request(app).get('/api/auth/google');
+  expect(res.headers.location).toBe('/login.html?google_error=config');
+  const log = errorLog.mock.calls[0][0];
+  expect(JSON.parse(log).reason).toBe('GOOGLE_CALLBACK_INVALID');
+  expect(log).not.toContain(process.env.GOOGLE_CLIENT_SECRET);
+  expect(log).not.toContain(process.env.JWT_SECRET);
+  expect(log).not.toContain(process.env.GOOGLE_CALLBACK_URL);
+});
+
+test('distingue fallo de librería de variables ausentes sin registrar mensajes con secretos', async () => {
+  oauth.generateAuthUrl.mockImplementation(() => { throw new Error(process.env.GOOGLE_CLIENT_SECRET); });
+  const res = await request(app).get('/api/auth/google');
+  expect(res.headers.location).toBe('/login.html?google_error=config');
+  const log = errorLog.mock.calls[0][0];
+  expect(JSON.parse(log)).toEqual(expect.objectContaining({ stage: 'authorization_url', reason: 'OAUTH_START_ERROR' }));
+  expect(log).not.toContain(process.env.GOOGLE_CLIENT_SECRET);
 });

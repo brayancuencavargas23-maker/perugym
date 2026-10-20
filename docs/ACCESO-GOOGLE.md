@@ -41,3 +41,13 @@ El valor predeterminado para nuevos tokens es 12 horas. Un `JWT_EXPIRES_IN` expl
 Las protecciones de intentos del router de autenticación también se ejecutan en Netlify. El limitador en memoria es por instancia: no es un límite distribuido entre Functions. Para un límite global se necesita almacenamiento compartido o protección del proveedor.
 
 El flujo usa redirecciones del servidor, por lo que no necesita un script de Google en el navegador ni ampliar la CSP para Google. El usuario desarrollador del `.env` entra por su `DEV_EMAIL` y contraseña; Google se reserva a usuarios registrados en la base de datos.
+
+## Diagnóstico en Netlify
+
+Si `/api/auth/google` devuelve `google_error=config`, consultar los logs de la Function `api` y buscar `google_oauth_start_failed`. El registro muestra la presencia de las cuatro variables, la versión de Node y la etapa del fallo, sin mostrar valores privados:
+
+- `GOOGLE_CONFIG_MISSING`: falta una variable o está vacía en la Function que ejecutó la petición.
+- `GOOGLE_CALLBACK_INVALID`: la URL de retorno no es válida o usa HTTP fuera de localhost.
+- `OAUTH_START_ERROR`: consultar `stage` para distinguir generación de estado, cookie, URL de autorización o redirección. No implica necesariamente que falten variables.
+
+Después de publicar esta versión de diagnóstico, provocar una petición al botón Google y consultar el evento más reciente. Guardar variables en el panel no actualiza Functions ya desplegadas: realizar un nuevo deploy publicado.

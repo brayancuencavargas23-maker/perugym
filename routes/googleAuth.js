@@ -20,10 +20,28 @@ function cookie(req, name) {
 
 function client() {
   const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_CALLBACK_URL, JWT_SECRET } = process.env;
-  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_CALLBACK_URL || !JWT_SECRET) throw new Error('Google no configurado');
-  const url = new URL(GOOGLE_CALLBACK_URL);
-  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))) throw new Error('Callback inválido');
+  if (![GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_CALLBACK_URL, JWT_SECRET].every(value => value?.trim())) {
+    throw Object.assign(new Error('Google no configurado'), { code: 'GOOGLE_CONFIG_MISSING' });
+  }
+  let url;
+  try { url = new URL(GOOGLE_CALLBACK_URL); } catch {
+    throw Object.assign(new Error('Callback inválido'), { code: 'GOOGLE_CALLBACK_INVALID' });
+  }
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))) {
+    throw Object.assign(new Error('Callback inválido'), { code: 'GOOGLE_CALLBACK_INVALID' });
+  }
   return new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_CALLBACK_URL);
+}
+
+// Solo registra presencia y etapa: nunca valores, cookies, tokens o errores
+// completos de librerías, que podrían incluir credenciales de la petición.
+function logStartFailure(stage, error) {
+  const variables = Object.fromEntries(['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_CALLBACK_URL', 'JWT_SECRET']
+    .map(key => [key, process.env[key]?.trim() ? 'present' : 'missing']));
+  const knownCodes = ['GOOGLE_CONFIG_MISSING', 'GOOGLE_CALLBACK_INVALID'];
+  console.error(JSON.stringify({ event: 'google_oauth_start_failed', stage, variables,
+    reason: knownCodes.includes(error?.code) ? error.code : 'OAUTH_START_ERROR',
+    node: process.version }));
 }
 
 router.use((_req, res, next) => {
@@ -32,17 +50,24 @@ router.use((_req, res, next) => {
 });
 
 router.get('/', (req, res) => {
+  let stage = 'configuration';
   try {
     const oauth = client();
+    stage = 'state_generation';
     const state = crypto.randomBytes(32).toString('base64url');
     const nonce = crypto.randomBytes(32).toString('base64url');
     const verifier = crypto.randomBytes(32).toString('base64url');
+    stage = 'state_cookie';
     res.clearCookie(RESULT_COOKIE, options());
     res.cookie(STATE_COOKIE, jwt.sign({ purpose: 'google-state', state, nonce, verifier }, process.env.JWT_SECRET,
       { expiresIn: '10m', audience: 'google-state' }), { ...options(), maxAge: 600000 });
-    res.redirect(oauth.generateAuthUrl({ scope: ['openid', 'email', 'profile'], state, nonce,
-      prompt: 'select_account', code_challenge: crypto.createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256' }));
-  } catch {
+    stage = 'authorization_url';
+    const authorizationUrl = oauth.generateAuthUrl({ scope: ['openid', 'email', 'profile'], state, nonce,
+      prompt: 'select_account', code_challenge: crypto.createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256' });
+    stage = 'redirect';
+    res.redirect(authorizationUrl);
+  } catch (error) {
+    logStartFailure(stage, error);
     res.redirect('/login.html?google_error=config');
   }
 });
